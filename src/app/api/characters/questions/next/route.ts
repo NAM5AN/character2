@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       instructions: QUESTION_INSTRUCTIONS,
       schema: interviewQuestionSchema,
       maxOutputTokens: 1200,
-      input: `현재 문항 번호: ${order}/20\n\n캐릭터 데이터:\n${JSON.stringify(compactDraft)}\n\n최근 답변:\n${JSON.stringify(recentAnswers)}\n\n이미 물어본 질문 전체:\n${JSON.stringify(body.answers.map(a => a.question))}\n\n현재 문항 번호에 맞는 category를 사용하고, order=${order}로 출력하세요.`,
+      input: `현재 문항 번호: ${order}/20\n\n캐릭터 데이터:\n${JSON.stringify(compactDraft)}\n\n최근 답변:\n${JSON.stringify(recentAnswers)}\n\n이미 물어본 질문 전체:\n${JSON.stringify(body.answers.map(a => a.question))}\n\n현재 문항 번호에 맞는 category를 사용하고, order=${order}로 출력하세요. 출력 키는 order, category, question, options, allowCustom, rationale만 사용하세요. options는 3~5개의 문자열 배열, allowCustom은 boolean입니다.`,
     });
     return NextResponse.json({ done: false, question });
   } catch (error) {
