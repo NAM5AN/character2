@@ -13,6 +13,7 @@ export const interviewAnswerSchema = z.object({
   order: z.number().int().min(1).max(20),
   question: z.string().min(1),
   answer: z.string().min(1),
+  reason: z.string().max(1200).optional(),
   branchContext: z.record(z.string(), z.unknown()).optional(),
 });
 
