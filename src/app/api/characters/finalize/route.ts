@@ -37,25 +37,26 @@ export async function POST(request: Request) {
       system: FINAL_ANALYSIS_SYSTEM,
       schema: finalAnalysisSchema,
       maxTokens: 3500,
-      input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
+      input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n공개 프로필과 비밀 프로필을 모두 근거로 최종 캐해를 작성하되, 비밀 프로필 원문을 길게 인용하거나 그대로 복사하지 마세요.\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
     });
 
     const supabase = getSupabaseServer();
     const shareCode = await uniqueShareCode();
     const editToken = createEditToken();
     const characterId = crypto.randomUUID();
+    const { name, age, gender, profileText } = body.draft.basicProfile;
     const passport = characterPassportSchema.parse({
       schemaVersion: 'character-passport/1.0',
       characterId,
       shareCode,
-      basicProfile: body.draft.basicProfile,
+      basicProfile: { name, age, gender, profileText },
       traits: body.draft.traits,
       relationshipTraits: body.draft.relationshipTraits,
       confirmedFacts: body.draft.confirmedFacts,
       aiInferences: body.draft.aiInferences,
       interview: { version: 'interview/1.0', completedCount: 20, answers: body.answers },
       analysis,
-      engineVersions: { parser: 'parser/1.0', interview: 'interview/1.0', analysis: 'analysis/1.0' },
+      engineVersions: { parser: 'parser/1.1', interview: 'interview/1.1', analysis: 'analysis/1.1' },
     });
 
     const { data: saved, error: saveError } = await supabase.rpc('character2_create_character', {
