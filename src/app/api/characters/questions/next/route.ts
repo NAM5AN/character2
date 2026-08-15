@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const question = await askOpenAIJson({
       instructions: QUESTION_INSTRUCTIONS,
       schema: interviewQuestionSchema,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 1400,
       input: `현재 문항 번호: ${order}/20
 
 이번 문항의 강제 탐색 계획:
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 캐릭터 데이터:
 ${JSON.stringify(compactDraft)}
 
-이전 문답 전체 — 캐릭터 맞춤화와 중복 방지를 위한 참고 증거일 뿐, 대화를 이어가기 위한 소재가 아님:
+이전 문답 전체 — 캐릭터 맞춤화, 현재 행동 가설 추정, 중복 방지를 위한 참고 증거입니다. 직전 대화를 이어가기 위한 소재가 아닙니다:
 ${JSON.stringify(priorEvidence)}
 
 직전 2개 문답 — 아래 문답에서 사용한 구체적 상황, 등장인물 관계, 감정 흐름, 갈등 소재를 이번 질문에서 이어서 사용하지 마세요:
@@ -82,14 +82,29 @@ ${JSON.stringify(hardBan)}
 이미 사용한 질문:
 ${JSON.stringify(body.answers.map(a => a.question))}
 
+이번 질문을 만들 때 내부적으로 먼저 다음 두 종류의 캐릭터 가설을 세우세요:
+A. 현재 공개·비밀 프로필, 확인된 설정, 거절되지 않은 추론, 이전 답변을 종합했을 때 가장 자연스럽게 예상되는 행동 패턴.
+B. A와 다르지만 공식 설정을 깨뜨리지 않으며, 선택될 경우 이 캐릭터를 새롭게 해석하게 만들 경쟁 행동 패턴.
+
+그 다음 선택지를 설계하세요:
+- 기본 4개를 권장합니다.
+- 1~2개는 A에서 파생된 구체적인 예상 행동이어야 합니다.
+- 1~2개는 B에서 파생된 충분히 그럴듯한 경쟁 행동이어야 합니다.
+- 필요하면 1개는 상대/상황에 따라 달라지는 조건부 행동이어도 됩니다.
+- 어느 선택지가 A/B인지 사용자가 짐작하지 못하게 순서를 섞으세요.
+- A와 B 모두 캐릭터에게 실제로 가능한 모습이어야 합니다. 억지 반대 성격이나 개그성 오답을 만들지 마세요.
+- 선택지는 성격 단어가 아니라 이 장면에서 실제로 하는 말·행동·선택으로 작성하세요.
+- 선택지만 읽어도 '이걸 고르면 결과가 이렇게 나오겠구나'가 노골적으로 보이면 실패입니다.
+
 추가 규칙:
 - 이번 질문은 이전 질문의 후속질문처럼 느껴지면 실패입니다.
 - 이번 렌즈 하나만 선명하게 보되, 특정 성격 결론을 유도하지 마세요.
-- 프로필과 이전 답변을 활용해 이 캐릭터에게 어울리는 디테일을 넣되, 이전 상황 자체는 재사용하지 마세요.
+- 프로필과 이전 답변을 활용해 이 캐릭터에게 어울리는 고유한 디테일을 넣되, 이전 상황 자체는 재사용하지 마세요.
 - ${canSynthesize ? 'validation 단계이므로 이전 패턴을 종합해도 되지만 반드시 새로운 상황에서 반례/경쟁 가설을 검증하세요.' : '이전 답변의 이유를 더 캐묻지 말고, 아직 보지 않은 면을 새 상황에서 관찰하세요.'}
 - order=${order}, category="${plan.category}"로 출력하세요.
 - 출력 키는 order, category, question, options, allowCustom, rationale만 사용하세요.
-- options는 3~5개의 중립적인 문자열 배열, allowCustom은 boolean입니다.`,
+- options는 3~5개의 문자열 배열, allowCustom은 boolean입니다.
+- rationale에는 사용자에게 보여줄 설명이 아니라, 이 질문이 어떤 현재 가설과 어떤 경쟁 가설을 구분하려는지 내부용으로 1~2문장만 적으세요.`,
     });
 
     return NextResponse.json({ done: false, question });
