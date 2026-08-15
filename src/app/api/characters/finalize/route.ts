@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       system: FINAL_ANALYSIS_SYSTEM,
       schema: finalAnalysisSchema,
       maxTokens: 3500,
-      input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n최종 캐해 JSON을 작성하세요.`,
+      input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
     });
 
     const supabase = getSupabaseServer();
