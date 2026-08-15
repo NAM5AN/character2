@@ -20,8 +20,8 @@ export const interviewQuestionSchema = z.object({
   format: questionFormatSchema,
   targetHook: z.string().min(2).max(90),
   hypothesis: z.string().min(2).max(180),
-  question: z.string().min(8).max(110),
-  options: z.array(z.string().min(1).max(75)).max(5).default([]),
+  question: z.string().min(8).max(90),
+  options: z.array(z.string().min(1).max(65)).max(5).default([]),
   allowCustom: z.boolean().default(true),
   rationale: z.string().min(1).max(260),
 }).superRefine((value, ctx) => {
