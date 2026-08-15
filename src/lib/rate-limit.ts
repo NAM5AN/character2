@@ -1,30 +1,24 @@
 import { headers } from 'next/headers';
-import { getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import { sha256 } from '@/lib/crypto';
 
 export async function assertRateLimit(action: string, limit = 30, windowMinutes = 10) {
   const h = await headers();
   const rawIp = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown';
-  const ipHash = sha256(`${process.env.RATE_LIMIT_SALT || 'dev'}:${rawIp}`);
+  const ipHash = sha256(`${process.env.RATE_LIMIT_SALT || 'character2-v1'}:${rawIp}`);
 
-  let supabase;
   try {
-    supabase = getSupabaseAdmin();
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase.rpc('character2_rate_limit_check', {
+      p_ip_hash: ipHash,
+      p_action: action,
+      p_limit: limit,
+      p_window_minutes: windowMinutes,
+    });
+    if (error) throw error;
+    if (data !== true) throw new Error('RATE_LIMITED');
   } catch (error) {
-    if (error instanceof Error && error.message === 'SUPABASE_NOT_CONFIGURED') {
-      return;
-    }
-    throw error;
+    if (error instanceof Error && error.message === 'RATE_LIMITED') throw error;
+    // Rate limiting is best-effort. A temporary Supabase error must not take the site offline.
   }
-
-  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
-  const { count, error } = await supabase
-    .from('rate_limit_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('ip_hash', ipHash)
-    .eq('action', action)
-    .gte('created_at', since);
-  if (error) throw error;
-  if ((count ?? 0) >= limit) throw new Error('RATE_LIMITED');
-  await supabase.from('rate_limit_events').insert({ ip_hash: ipHash, action });
 }

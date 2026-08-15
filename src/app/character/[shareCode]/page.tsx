@@ -1,17 +1,16 @@
 import { notFound } from 'next/navigation';
-import { getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import { normalizeShareCode, isShareCode } from '@/lib/share-code';
-import type { CharacterPassport } from '@/lib/schemas/character';
+import { characterPassportSchema, type CharacterPassport } from '@/lib/schemas/character';
 
 async function loadPassport(rawCode:string):Promise<CharacterPassport|null>{
   const code = normalizeShareCode(rawCode);
   if (!isShareCode(code)) return null;
-  const supabase = getSupabaseAdmin();
-  const { data: character, error } = await supabase.from('characters').select('id').eq('share_code', code).maybeSingle();
-  if (error || !character) return null;
-  const { data: row, error: pError } = await supabase.from('character_passports').select('passport_json').eq('character_id', character.id).maybeSingle();
-  if (pError || !row) return null;
-  return row.passport_json as CharacterPassport;
+  const supabase = getSupabaseServer();
+  const { data, error } = await supabase.rpc('character2_get_character', { p_share_code: code });
+  if (error || !data) return null;
+  const parsed = characterPassportSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
 }
 
 export default async function CharacterPage({params}:{params:Promise<{shareCode:string}>}){

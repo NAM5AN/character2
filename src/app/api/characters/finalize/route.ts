@@ -7,7 +7,7 @@ import { validateAccessCode } from '@/lib/settings';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
 import { createEditToken, sha256 } from '@/lib/crypto';
-import { getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseServer } from '@/lib/supabase/server';
 import { apiError } from '@/lib/http';
 
 const requestSchema = z.object({
@@ -17,12 +17,12 @@ const requestSchema = z.object({
 });
 
 async function uniqueShareCode() {
-  const supabase = getSupabaseAdmin();
+  const supabase = getSupabaseServer();
   for (let i = 0; i < 8; i += 1) {
     const code = generateShareCode();
-    const { data, error } = await supabase.from('characters').select('id').eq('share_code', code).maybeSingle();
+    const { data, error } = await supabase.rpc('character2_share_code_exists', { p_share_code: code });
     if (error) throw error;
-    if (!data) return code;
+    if (data !== true) return code;
   }
   throw new Error('SHARE_CODE_EXHAUSTED');
 }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n최종 캐해 JSON을 작성하세요.`,
     });
 
-    const supabase = getSupabaseAdmin();
+    const supabase = getSupabaseServer();
     const shareCode = await uniqueShareCode();
     const editToken = createEditToken();
     const characterId = crypto.randomUUID();
@@ -58,40 +58,20 @@ export async function POST(request: Request) {
       engineVersions: { parser: 'parser/1.0', interview: 'interview/1.0', analysis: 'analysis/1.0' },
     });
 
-    const { error: characterError } = await supabase.from('characters').insert({
-      id: characterId,
-      share_code: shareCode,
-      name: body.draft.basicProfile.name,
-      status: 'ready',
-      schema_version: passport.schemaVersion,
+    const { data: saved, error: saveError } = await supabase.rpc('character2_create_character', {
+      p_character_id: characterId,
+      p_share_code: shareCode,
+      p_name: body.draft.basicProfile.name,
+      p_schema_version: passport.schemaVersion,
+      p_passport_json: passport,
+      p_analysis_confidence: body.draft.analysisConfidence,
+      p_engine_versions: passport.engineVersions,
+      p_answers: body.answers,
+      p_edit_token_hash: sha256(editToken),
+      p_access_code: body.accessCode,
     });
-    if (characterError) throw characterError;
-
-    const { error: passportError } = await supabase.from('character_passports').insert({
-      character_id: characterId,
-      passport_json: passport,
-      analysis_confidence: body.draft.analysisConfidence,
-      engine_versions: passport.engineVersions,
-    });
-    if (passportError) throw passportError;
-
-    const { error: answerError } = await supabase.from('character_answers').insert(
-      body.answers.map(a => ({
-        character_id: characterId,
-        question_order: a.order,
-        question_text: a.question,
-        answer_json: { answer: a.answer },
-        branch_context: a.branchContext ?? {},
-        question_engine_version: 'interview/1.0',
-      })),
-    );
-    if (answerError) throw answerError;
-
-    const { error: accessError } = await supabase.from('character_access').insert({
-      character_id: characterId,
-      edit_token_hash: sha256(editToken),
-    });
-    if (accessError) throw accessError;
+    if (saveError) throw saveError;
+    if (saved !== true) throw new Error('CHARACTER_SAVE_FAILED');
 
     return NextResponse.json({ passport, shareCode, editToken });
   } catch (error) {
