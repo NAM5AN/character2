@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { characterDraftSchema } from '@/lib/schemas/character';
+import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas/character';
 import { askOpenAIJson } from '@/lib/ai/openai';
 import { PARSER_INSTRUCTIONS } from '@/lib/ai/prompts';
 import { validateAccessCode } from '@/lib/settings';
@@ -19,12 +19,26 @@ export async function POST(request: Request) {
     const body = requestSchema.parse(await request.json());
     if (!(await validateAccessCode(body.accessCode))) throw new Error('CODE_INVALID');
 
-    const draft = await askOpenAIJson({
+    const aiDraft = await askOpenAIJson({
       instructions: PARSER_INSTRUCTIONS,
-      schema: characterDraftSchema,
-      maxOutputTokens: 4000,
-      input: `캐릭터 이름: ${body.name}\n\n원본 프로필:\n${body.profileText}\n\n출력 JSON 키는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 정확히 사용하세요. basicProfile.profileText에는 원본 프로필 전체를 그대로 보존하세요. aiInferences 각 항목에는 id, text, confidence, ownerVerdict="unreviewed"를 넣으세요. confirmedFacts 각 항목은 {key, value, source}이며 source는 "profile" 또는 "owner_answer"만 사용하세요. traits와 relationshipTraits는 JSON 객체여야 합니다.`,
+      schema: initialCharacterDraftSchema,
+      maxOutputTokens: 3200,
+      input: `캐릭터 이름: ${body.name}\n\n원본 프로필:\n${body.profileText}\n\n출력 JSON 키는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 정확히 사용하세요.\n중요: basicProfile에는 name, age, gender만 넣고 profileText는 절대 출력하지 마세요. 원문은 서버가 별도로 보존합니다.\nconfirmedFacts 각 항목은 {key, value}만 사용하세요.\naiInferences 각 항목에는 id, text, confidence, ownerVerdict="unreviewed"를 넣으세요.\ntraits와 relationshipTraits는 JSON 객체여야 하며 각 값은 0~100 숫자, 문자열, boolean, null 중 하나만 사용하세요.`,
     });
+
+    const draft = characterDraftSchema.parse({
+      ...aiDraft,
+      basicProfile: {
+        ...aiDraft.basicProfile,
+        name: body.name,
+        profileText: body.profileText,
+      },
+      confirmedFacts: aiDraft.confirmedFacts.map(fact => ({
+        ...fact,
+        source: 'profile' as const,
+      })),
+    });
+
     return NextResponse.json({ draft });
   } catch (error) {
     return apiError(error);
