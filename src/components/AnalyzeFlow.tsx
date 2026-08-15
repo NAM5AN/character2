@@ -12,6 +12,7 @@ export function AnalyzeFlow(){
   const [stage,setStage]=useState<Stage>('input');
   const [name,setName]=useState('');
   const [profileText,setProfileText]=useState('');
+  const [secretProfileText,setSecretProfileText]=useState('');
   const [draft,setDraft]=useState<CharacterDraft|null>(null);
   const [answers,setAnswers]=useState<InterviewAnswer[]>([]);
   const [question,setQuestion]=useState<InterviewQuestion|null>(null);
@@ -39,7 +40,7 @@ export function AnalyzeFlow(){
   async function parse(code:string){
     setBusy(true); setError('');
     try{
-      const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,accessCode:code})});
+      const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText,accessCode:code})});
       const body=await r.json();
       if(!r.ok){handleApiError(r.status,body,()=>gate(parse));return;}
       setDraft(body.draft); setStage('review');
@@ -86,8 +87,9 @@ export function AnalyzeFlow(){
     <AccessCodeModal open={accessModal} onClose={()=>setAccessModal(false)} onValidated={async()=>{const fn=pendingAction;setPendingAction(null);if(fn)await fn();}} />
     {stage==='input' && <div className="card">
       <div className="field"><label className="label">캐릭터 이름</label><input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
-      <div className="field"><label className="label">캐릭터 프로필</label><textarea className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="공개 프로필, 비밀 설정, 성격 설명 등을 통째로 붙여넣으세요. 처음 버전은 텍스트 입력부터 지원합니다." /></div>
-      <div className="notice">프로필에 적힌 공식 설정과 AI가 해석한 추론은 결과에서 따로 표시돼요. 틀린 추론은 인터뷰 전에 직접 제외할 수 있습니다.</div>
+      <div className="field"><label className="label">공개 프로필</label><textarea className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
+      <div className="field"><label className="label">비밀 프로필 <span className="muted">(선택)</span></label><textarea className="textarea" value={secretProfileText} onChange={e=>setSecretProfileText(e.target.value)} placeholder="오너만 알고 있던 비밀 설정, 숨겨진 동기, 과거, 공개 프로필에 적지 않았던 내용을 붙여넣으세요. 없다면 비워두면 됩니다." /></div>
+      <div className="notice">공개 프로필과 비밀 프로필은 서로 다른 정보층으로 구분해 함께 분석합니다. 비밀 프로필 원문은 공유 코드로 보는 Character Passport에 직접 노출하지 않습니다.</div>
       {error&&<p className="error">{error}</p>}
       <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={()=>gate(parse)}>{busy?<span className="loading">분석 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
     </div>}
@@ -103,8 +105,8 @@ export function AnalyzeFlow(){
       <div>{error&&<p className="error">{error}</p>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':question.order===20?'20문항 완료하고 최종 캐해':'답변하고 다음 질문'}</button></div>
     </div>}
 
-    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>최종 캐해를 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 프로필을 합쳐 Character Passport를 만들고 있습니다.</p>{error&&<p className="error">{error}</p>}</div>}
+    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>최종 캐해를 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 공개·비밀 프로필을 합쳐 Character Passport를 만들고 있습니다.</p>{error&&<p className="error">{error}</p>}</div>}
 
-    {stage==='done' && result && <div className="stack"><div className="card result-hero"><div><div className="eyebrow">Analysis complete</div><h2 style={{marginTop:10,marginBottom:8}}>Character Passport가 저장됐어요.</h2><p className="muted">다른 프로젝트나 다른 기기에서 이 코드로 캐릭터를 불러올 수 있습니다.</p></div><div><div className="label">공유 코드</div><div className="share-code">{result.shareCode}</div><button className="btn soft" onClick={()=>navigator.clipboard.writeText(result.shareCode)}>코드 복사</button></div></div><div className="actions"><button className="btn primary" onClick={()=>router.push(`/character/${result.shareCode}`)}>완성된 캐해 보기</button><button className="btn" onClick={()=>{setStage('input');setName('');setProfileText('');setDraft(null);setAnswers([]);setQuestion(null);setResult(null)}}>다른 캐릭터 분석</button></div></div>}
+    {stage==='done' && result && <div className="stack"><div className="card result-hero"><div><div className="eyebrow">Analysis complete</div><h2 style={{marginTop:10,marginBottom:8}}>Character Passport가 저장됐어요.</h2><p className="muted">다른 프로젝트나 다른 기기에서 이 코드로 캐릭터를 불러올 수 있습니다.</p></div><div><div className="label">공유 코드</div><div className="share-code">{result.shareCode}</div><button className="btn soft" onClick={()=>navigator.clipboard.writeText(result.shareCode)}>코드 복사</button></div></div><div className="actions"><button className="btn primary" onClick={()=>router.push(`/character/${result.shareCode}`)}>완성된 캐해 보기</button><button className="btn" onClick={()=>{setStage('input');setName('');setProfileText('');setSecretProfileText('');setDraft(null);setAnswers([]);setQuestion(null);setResult(null)}}>다른 캐릭터 분석</button></div></div>}
   </>;
 }
