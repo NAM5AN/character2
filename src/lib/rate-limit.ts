@@ -6,7 +6,17 @@ export async function assertRateLimit(action: string, limit = 30, windowMinutes 
   const h = await headers();
   const rawIp = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown';
   const ipHash = sha256(`${process.env.RATE_LIMIT_SALT || 'dev'}:${rawIp}`);
-  const supabase = getSupabaseAdmin();
+
+  let supabase;
+  try {
+    supabase = getSupabaseAdmin();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'SUPABASE_NOT_CONFIGURED') {
+      return;
+    }
+    throw error;
+  }
+
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
   const { count, error } = await supabase
     .from('rate_limit_events')
