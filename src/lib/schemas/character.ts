@@ -29,6 +29,13 @@ const confirmedFactSchema = z.object({
   source: z.enum(['profile', 'owner_answer']),
 });
 
+const publicBasicProfileSchema = z.object({
+  name: z.string().min(1),
+  age: z.union([z.string(), z.number()]).nullable().optional(),
+  gender: z.string().nullable().optional(),
+  profileText: z.string().min(20),
+});
+
 export const initialCharacterDraftSchema = z.object({
   basicProfile: z.object({
     name: z.string().min(1),
@@ -46,11 +53,8 @@ export const initialCharacterDraftSchema = z.object({
 });
 
 export const characterDraftSchema = z.object({
-  basicProfile: z.object({
-    name: z.string().min(1),
-    age: z.union([z.string(), z.number()]).nullable().optional(),
-    gender: z.string().nullable().optional(),
-    profileText: z.string().min(20),
+  basicProfile: publicBasicProfileSchema.extend({
+    secretProfileText: z.string().max(50_000).optional(),
   }),
   traits: z.record(z.string(), traitValueSchema),
   relationshipTraits: z.record(z.string(), traitValueSchema),
@@ -77,7 +81,7 @@ export const characterPassportSchema = z.object({
   schemaVersion: z.literal('character-passport/1.0'),
   characterId: z.string().uuid(),
   shareCode: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
-  basicProfile: characterDraftSchema.shape.basicProfile,
+  basicProfile: publicBasicProfileSchema,
   traits: characterDraftSchema.shape.traits,
   relationshipTraits: characterDraftSchema.shape.relationshipTraits,
   confirmedFacts: characterDraftSchema.shape.confirmedFacts,
