@@ -18,12 +18,12 @@ export const interviewQuestionSchema = z.object({
   category: questionCategorySchema,
   mode: questionModeSchema,
   format: questionFormatSchema,
-  targetHook: z.string().min(2),
-  hypothesis: z.string().min(2),
-  question: z.string().min(8),
-  options: z.array(z.string().min(1)).max(5).default([]),
+  targetHook: z.string().min(2).max(90),
+  hypothesis: z.string().min(2).max(180),
+  question: z.string().min(8).max(110),
+  options: z.array(z.string().min(1).max(75)).max(5).default([]),
   allowCustom: z.boolean().default(true),
-  rationale: z.string().min(1),
+  rationale: z.string().min(1).max(260),
 }).superRefine((value, ctx) => {
   if (value.format !== 'free_response' && value.options.length < 3) {
     ctx.addIssue({
