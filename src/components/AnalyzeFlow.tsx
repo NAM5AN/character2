@@ -64,7 +64,18 @@ export function AnalyzeFlow(){
 
   async function answerCurrent(){
     if(!question)return; const answer=(custom.trim()||selected).trim(); if(!answer)return;
-    const next=[...answers,{order:question.order,question:question.question,answer,branchContext:{category:question.category}}];
+    const next=[...answers,{
+      order:question.order,
+      question:question.question,
+      answer,
+      branchContext:{
+        category:question.category,
+        mode:question.mode,
+        format:question.format,
+        targetHook:question.targetHook,
+        hypothesis:question.hypothesis,
+      },
+    }];
     setAnswers(next);
     if(next.length===20){ await gate(code=>finalize(code,next)); }
     else { await gate(code=>nextQuestion(code,next)); }
@@ -82,6 +93,7 @@ export function AnalyzeFlow(){
   }
 
   const confidence=draft?.analysisConfidence??0;
+  const freeResponse=question?.format==='free_response';
 
   return <>
     <AccessCodeModal open={accessModal} onClose={()=>setAccessModal(false)} onValidated={async()=>{const fn=pendingAction;setPendingAction(null);if(fn)await fn();}} />
@@ -101,7 +113,7 @@ export function AnalyzeFlow(){
     </div>}
 
     {stage==='interview' && question && <div className="card question-card">
-      <div><div className="q-meta"><span>{question.order} / 20</span><span>{question.category}</span></div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2><div className="options">{question.options.map(o=><button key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div><div className="field"><label className="label">직접 입력</label><textarea className="input" style={{minHeight:90,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} placeholder="선택지에 딱 맞는 답이 없다면 직접 적어주세요." /></div></div>
+      <div><div className="q-meta"><span>{question.order} / 20</span></div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{!freeResponse&&<div className="options">{question.options.map(o=><button key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>}<div className="field"><label className="label">{freeResponse?'직접 답변':'직접 입력'}</label><textarea className="input" style={{minHeight:freeResponse?150:90,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} placeholder={freeResponse?'이 캐릭터라면 어떤지 오너의 해석을 자유롭게 적어주세요.':'선택지에 딱 맞는 답이 없다면 직접 적어주세요.'} /></div></div>
       <div>{error&&<p className="error">{error}</p>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':question.order===20?'20문항 완료하고 최종 캐해':'답변하고 다음 질문'}</button></div>
     </div>}
 
