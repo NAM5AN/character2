@@ -62,15 +62,29 @@ function normalizeFacts(items: unknown[]) {
   }).slice(0, 80);
 }
 
+function isDocumentMetaInference(text: string) {
+  const normalized = text.replace(/\s+/g, ' ');
+  const patterns = [
+    /공개\s*프로필|비밀\s*프로필|비공개\s*프로필/,
+    /프로필.{0,24}(표기|문서|작성|정보|누락|불일치|차이|명시|확정)/,
+    /(이름|인식표|표기).{0,24}(차이|불일치|다르|상이)/,
+    /정보층|문서상|설정상.{0,16}(명시되지|확정하기 어렵|정보가 부족)/,
+    /명시되지 않았|확정하기 어렵|정보가 부족|판단하기 어렵/,
+  ];
+  return patterns.some(pattern => pattern.test(normalized));
+}
+
 function normalizeInferences(items: unknown[]) {
   return items.flatMap((item, index) => {
     if (typeof item === 'string' && item.trim()) {
-      return [{ id: `inf_${index + 1}`, text: item.trim(), confidence: 60, ownerVerdict: 'unreviewed' as const }];
+      const text = item.trim();
+      if (isDocumentMetaInference(text)) return [];
+      return [{ id: `inf_${index + 1}`, text, confidence: 60, ownerVerdict: 'unreviewed' as const }];
     }
     const record = asRecord(item);
     if (!Object.keys(record).length) return [];
     const text = pickString(record, ['text', 'inference', 'hypothesis', 'summary', 'content', 'description', 'claim', 'interpretation']);
-    if (!text) return [];
+    if (!text || isDocumentMetaInference(text)) return [];
     const confidence = normalizeScore(record.confidence ?? record.score ?? record.probability ?? record.certainty, 60);
     return [{ id: `inf_${index + 1}`, text, confidence, ownerVerdict: 'unreviewed' as const }];
   }).slice(0, 40);
@@ -89,8 +103,8 @@ export async function POST(request: Request) {
     const raw = await askOpenAIJson({
       instructions: PARSER_INSTRUCTIONS,
       schema: initialCharacterDraftSchema,
-      maxOutputTokens: 3200,
-      input: `캐릭터 이름: ${body.name}\n\n공개 프로필:\n${body.profileText}${secretSection}\n\n공개 프로필과 비밀 프로필을 서로 다른 정보층으로 인식해 함께 분석하세요. 둘 사이의 차이·숨겨진 동기·겉과 속의 간극을 한쪽으로 지워 합치지 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText는 서버가 직접 보존하므로 출력하지 않아도 됩니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로, aiInferences는 가능한 한 {text, confidence} 배열로 출력하세요. id와 ownerVerdict는 서버가 생성합니다.`,
+      maxOutputTokens: 2800,
+      input: `캐릭터 이름: ${body.name}\n\n공개 프로필:\n${body.profileText}${secretSection}\n\n공개 프로필과 비밀 프로필은 서로 다른 정보층으로 읽되, aiInferences에는 문서의 차이·누락·표기 문제를 적지 말고 캐릭터 자체의 행동·관계·가치·동기에 대한 해석만 적으세요.\n외상, 멍, 흉터, 보호대, 의상, 소지품은 그 의미가 프로필에 직접 연결되어 있지 않다면 사실로만 보존하고 상징적 중요성을 추론하지 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText는 서버가 직접 보존하므로 출력하지 않아도 됩니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로, aiInferences는 가능한 한 {text, confidence} 배열로 출력하세요. id와 ownerVerdict는 서버가 생성합니다.`,
     });
 
     const basic = asRecord(raw.basicProfile);
