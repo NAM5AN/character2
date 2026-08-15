@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function NotFound(){return <main className="container page"><div className="card" style={{textAlign:'center',padding:'70px 24px'}}><div className="eyebrow">Not found</div><h2 style={{marginTop:12}}>캐릭터를 찾지 못했어요.</h2><p className="muted">공유 코드가 정확한지 확인해주세요.</p><div className="actions" style={{justifyContent:'center'}}><Link className="btn primary" href="/">홈으로</Link></div></div></main>}
