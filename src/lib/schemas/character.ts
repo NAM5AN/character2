@@ -36,21 +36,16 @@ const publicBasicProfileSchema = z.object({
   profileText: z.string().min(20),
 });
 
+// AI parser output is intentionally loose. The server normalizes this into
+// CharacterDraft instead of trusting model-chosen field names/types.
 export const initialCharacterDraftSchema = z.object({
-  basicProfile: z.object({
-    name: z.string().min(1),
-    age: z.union([z.string(), z.number()]).nullable().optional(),
-    gender: z.string().nullable().optional(),
-  }),
-  traits: z.record(z.string(), traitValueSchema),
-  relationshipTraits: z.record(z.string(), traitValueSchema),
-  confirmedFacts: z.array(z.object({
-    key: z.string(),
-    value: z.unknown(),
-  })),
-  aiInferences: z.array(inferenceSchema),
-  analysisConfidence: z.number().min(0).max(100),
-});
+  basicProfile: z.record(z.string(), z.unknown()).optional().default({}),
+  traits: z.record(z.string(), z.unknown()).optional().default({}),
+  relationshipTraits: z.record(z.string(), z.unknown()).optional().default({}),
+  confirmedFacts: z.array(z.unknown()).optional().default([]),
+  aiInferences: z.array(z.unknown()).optional().default([]),
+  analysisConfidence: z.unknown().optional(),
+}).passthrough();
 
 export const characterDraftSchema = z.object({
   basicProfile: publicBasicProfileSchema.extend({
