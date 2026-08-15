@@ -14,34 +14,46 @@ const requestSchema = z.object({
   accessCode: z.string().min(1),
 });
 
-const QUESTION_PLAN = [
-  { category: 'core', lens: '가치 우선순위', scene: '서로 매력적인 두 선택지 사이의 일상적 선택' },
-  { category: 'core', lens: '결정 방식과 주도권', scene: '정보가 불완전한 개인적 결정' },
-  { category: 'core', lens: '자기인식과 타인의 평가', scene: '오해·평가·첫인상이 개입되는 장면' },
-  { category: 'core', lens: '동기와 성취 방식', scene: '기회·목표·노력의 우선순위를 정하는 장면' },
-  { category: 'core', lens: '경계선과 융통성', scene: '예상 밖 부탁·규칙 변화·개인적 한계' },
-  { category: 'relationship', lens: '새 관계를 시작하는 방식', scene: '처음 만나는 사람과의 거리 조절' },
-  { category: 'relationship', lens: '신뢰와 자기공개', scene: '약점·비밀·개인적인 정보를 나누는 순간' },
-  { category: 'relationship', lens: '돌봄과 애정 표현', scene: '도움을 주거나 받는 장면' },
-  { category: 'relationship', lens: '친밀감과 자율성의 균형', scene: '연락·공간·부재·혼자 있는 시간' },
-  { category: 'relationship', lens: '집단 안 역할과 권력관계', scene: '여럿이 함께 있는 자리·리더·선후배 관계' },
-  { category: 'conflict', lens: '의견 충돌 처리', scene: '같은 목표를 두고 방법이 갈리는 장면' },
-  { category: 'conflict', lens: '신뢰가 깨졌을 때의 반응', scene: '약속 위반·실망·배신 가능성이 생긴 장면' },
-  { category: 'conflict', lens: '실수·책임·비난을 다루는 방식', scene: '본인 또는 타인의 실수로 결과가 틀어진 장면' },
-  { category: 'conflict', lens: '압박과 불확실성 대응', scene: '시간 부족·예상 밖 변수·즉석 판단이 필요한 장면' },
-  { category: 'conflict', lens: '가치 충돌과 손해 감수', scene: '어느 쪽을 택해도 무언가를 포기해야 하는 선택' },
-  { category: 'inner', lens: '원하는 것과 실제 행동의 차이', scene: '아무도 보지 않는 사적인 선택' },
-  { category: 'inner', lens: '이상적 자아와 반복되는 습관의 차이', scene: '평소 반복되는 작은 행동이나 버릇' },
-  { category: 'inner', lens: '후회·수치·자기보호 이후의 내적 정리', scene: '일이 끝난 뒤 혼자 되돌아보는 순간' },
-  { category: 'validation', lens: '가장 강한 기존 해석의 반례 찾기', scene: '그 특성이 평소와 다르게 나타날 수 있는 완전히 새로운 맥락' },
-  { category: 'validation', lens: '서로 경쟁하는 두 캐릭터 해석의 최종 검증', scene: '한쪽으로 쉽게 결론 내릴 수 없는 새로운 선택 상황' },
-] as const;
+const CATEGORY_TARGETS = {
+  core: 3,
+  relationship: 3,
+  conflict: 3,
+  inner: 3,
+  validation: 2,
+} as const;
+
+const FORMAT_LABELS = {
+  scenario: '상황형',
+  comparison: '비교형',
+  priority: '우선순위형',
+  exception: '예외 탐색형',
+  hypothesis: '해석 경쟁형',
+  relationship_contrast: '관계 대조형',
+  sentence_completion: '문장 완성형',
+  free_response: '자유서술형',
+} as const;
+
+function contextString(value: unknown, key: string) {
+  if (!value || typeof value !== 'object') return '';
+  const candidate = (value as Record<string, unknown>)[key];
+  return typeof candidate === 'string' ? candidate : '';
+}
+
+function trailingCount(values: string[], target: string) {
+  let count = 0;
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (values[i] !== target) break;
+    count += 1;
+  }
+  return count;
+}
 
 export async function POST(request: Request) {
   try {
     await assertRateLimit('question_next', 60, 60);
     const body = requestSchema.parse(await request.json());
     if (!(await validateAccessCode(body.accessCode))) throw new Error('CODE_INVALID');
+
     const order = body.answers.length + 1;
     if (order > 20) return NextResponse.json({ done: true });
 
@@ -54,57 +66,117 @@ export async function POST(request: Request) {
       analysisConfidence: body.draft.analysisConfidence,
     };
 
-    const plan = QUESTION_PLAN[order - 1];
-    const priorEvidence = body.answers.map(a => ({ order: a.order, question: a.question, answer: a.answer }));
-    const hardBan = body.answers.slice(-2).map(a => ({ question: a.question, answer: a.answer }));
-    const canSynthesize = order >= 19;
+    const history = body.answers.map(answer => ({
+      order: answer.order,
+      question: answer.question,
+      answer: answer.answer,
+      category: contextString(answer.branchContext, 'category'),
+      mode: contextString(answer.branchContext, 'mode'),
+      format: contextString(answer.branchContext, 'format'),
+      targetHook: contextString(answer.branchContext, 'targetHook'),
+      hypothesis: contextString(answer.branchContext, 'hypothesis'),
+    }));
+
+    const categoryCounts = Object.fromEntries(
+      Object.keys(CATEGORY_TARGETS).map(category => [
+        category,
+        history.filter(item => item.category === category).length,
+      ]),
+    );
+
+    const formatCounts = Object.fromEntries(
+      Object.keys(FORMAT_LABELS).map(format => [
+        format,
+        history.filter(item => item.format === format).length,
+      ]),
+    );
+
+    const unmetCategories = Object.entries(CATEGORY_TARGETS)
+      .filter(([category, target]) => (categoryCounts[category] || 0) < target)
+      .map(([category, target]) => `${category} ${(categoryCounts[category] || 0)}/${target}`);
+
+    const remainingIncludingCurrent = 21 - order;
+    const requiredCoverageSlots = Object.entries(CATEGORY_TARGETS)
+      .reduce((sum, [category, target]) => sum + Math.max(0, target - (categoryCounts[category] || 0)), 0);
+
+    const recentModes = history.slice(-4).map(item => item.mode).filter(Boolean);
+    const recentFormats = history.slice(-4).map(item => item.format).filter(Boolean);
+    const branchStreak = trailingCount(history.map(item => item.mode), 'branch');
+    const scenarioCount = formatCounts.scenario || 0;
+    const freeResponseCount = formatCounts.free_response || 0;
+    const lastFormat = history.at(-1)?.format || '';
+    const usedHooks = history.map(item => item.targetHook).filter(Boolean);
+
+    const modeRules = order === 1
+      ? '첫 문항이므로 mode는 pivot으로 시작하세요.'
+      : branchStreak >= 2
+        ? '직전 두 문항이 branch였으므로 이번 문항은 branch 금지입니다. pivot 또는 counter를 선택하세요.'
+        : '직전 답변이 새로운 모순·예외·조건·예상 밖 정보를 만들었다면 branch를 우선 검토하세요. 그렇지 않으면 pivot/counter 중 정보가치가 높은 쪽을 선택하세요.';
+
+    const formatRules = [
+      lastFormat ? `직전 형식은 ${lastFormat}(${FORMAT_LABELS[lastFormat as keyof typeof FORMAT_LABELS] || lastFormat})이므로 이번에는 다른 형식을 우선하세요.` : '',
+      scenarioCount >= 6 ? 'scenario는 이미 6회 이상 사용했으므로 더 이상 사용하지 마세요.' : 'scenario는 전체 20문항 중 최대 6회까지만 사용하세요.',
+      freeResponseCount >= 2 ? 'free_response는 이미 2회 사용했으므로 더 이상 사용하지 마세요.' : 'free_response는 전체 1~2회만 사용하세요.',
+    ].filter(Boolean).join('\n');
+
+    const coverageRule = requiredCoverageSlots >= remainingIncludingCurrent
+      ? `남은 문항 수와 필수 커버리지 슬롯이 같거나 부족합니다. 이번 category는 반드시 아직 목표치가 부족한 영역 중 하나여야 합니다: ${unmetCategories.join(', ')}`
+      : `category 순서는 자유입니다. 캐릭터상 정보가치가 가장 높은 영역을 고르되, 부족 영역도 고려하세요: ${unmetCategories.join(', ') || '없음'}`;
 
     const question = await askOpenAIJson({
       instructions: QUESTION_INSTRUCTIONS,
       schema: interviewQuestionSchema,
-      maxOutputTokens: 1400,
+      maxOutputTokens: 1700,
       input: `현재 문항 번호: ${order}/20
-
-이번 문항의 강제 탐색 계획:
-- category: ${plan.category}
-- 반드시 탐색할 새 렌즈: ${plan.lens}
-- 사용할 상황군: ${plan.scene}
 
 캐릭터 데이터:
 ${JSON.stringify(compactDraft)}
 
-이전 문답 전체 — 캐릭터 맞춤화, 현재 행동 가설 추정, 중복 방지를 위한 참고 증거입니다. 직전 대화를 이어가기 위한 소재가 아닙니다:
-${JSON.stringify(priorEvidence)}
+지금까지의 실제 문답과 내부 질문 메타데이터:
+${JSON.stringify(history)}
 
-직전 2개 문답 — 아래 문답에서 사용한 구체적 상황, 등장인물 관계, 감정 흐름, 갈등 소재를 이번 질문에서 이어서 사용하지 마세요:
-${JSON.stringify(hardBan)}
+현재 커버리지:
+- category counts: ${JSON.stringify(categoryCounts)}
+- format counts: ${JSON.stringify(formatCounts)}
+- 최근 mode: ${JSON.stringify(recentModes)}
+- 최근 format: ${JSON.stringify(recentFormats)}
+- 이미 겨냥한 targetHook: ${JSON.stringify(usedHooks)}
 
-이미 사용한 질문:
-${JSON.stringify(body.answers.map(a => a.question))}
+이번 문항의 진행 제약:
+${modeRules}
+${formatRules}
+${coverageRule}
 
-이번 질문을 만들 때 내부적으로 먼저 다음 두 종류의 캐릭터 가설을 세우세요:
-A. 현재 공개·비밀 프로필, 확인된 설정, 거절되지 않은 추론, 이전 답변을 종합했을 때 가장 자연스럽게 예상되는 행동 패턴.
-B. A와 다르지만 공식 설정을 깨뜨리지 않으며, 선택될 경우 이 캐릭터를 새롭게 해석하게 만들 경쟁 행동 패턴.
+질문 선택 절차:
+1. 먼저 현재 캐릭터에서 아직 덜 확인됐거나 방금 답변 때문에 새로 생긴 의문을 2~4개 내부적으로 비교하세요.
+2. 그중 지금 한 문항을 썼을 때 캐릭터 해석이 가장 많이 달라질 수 있는 지점을 targetHook으로 고르세요.
+3. 최근 답변을 한 단계 더 보는 것이 가치 있으면 branch, 다른 고유 Hook이 더 중요하면 pivot, 강해진 해석의 예외를 볼 필요가 있으면 counter를 선택하세요.
+4. 질문 내용에 맞는 format을 고르되 최근 형식을 반복하지 마세요.
+5. 질문과 선택지를 이 캐릭터에게 맞게 생성하세요.
 
-그 다음 선택지를 설계하세요:
-- 기본 4개를 권장합니다.
-- 1~2개는 A에서 파생된 구체적인 예상 행동이어야 합니다.
-- 1~2개는 B에서 파생된 충분히 그럴듯한 경쟁 행동이어야 합니다.
-- 필요하면 1개는 상대/상황에 따라 달라지는 조건부 행동이어도 됩니다.
-- 어느 선택지가 A/B인지 사용자가 짐작하지 못하게 순서를 섞으세요.
-- A와 B 모두 캐릭터에게 실제로 가능한 모습이어야 합니다. 억지 반대 성격이나 개그성 오답을 만들지 마세요.
-- 선택지는 성격 단어가 아니라 이 장면에서 실제로 하는 말·행동·선택으로 작성하세요.
-- 선택지만 읽어도 '이걸 고르면 결과가 이렇게 나오겠구나'가 노골적으로 보이면 실패입니다.
+분기 관련 세부 규칙:
+- branch는 허용됩니다. 단, 이전 질문 문장을 다시 말하거나 같은 사건을 그대로 연장하는 것이 아니라 최근 답변에서 드러난 핵심을 다른 각도·관계·비교·예외로 한 단계 더 확인해야 합니다.
+- pivot도 이전 답변과 완전히 무관한 랜덤 질문이면 실패입니다. 프로필의 다른 고유 Hook 또는 현재 해석과 연결되는 미확인 지점으로 이동하세요.
+- counter는 현재까지 가장 그럴듯해진 해석이 언제 깨지는지 확인하세요.
 
-추가 규칙:
-- 이번 질문은 이전 질문의 후속질문처럼 느껴지면 실패입니다.
-- 이번 렌즈 하나만 선명하게 보되, 특정 성격 결론을 유도하지 마세요.
-- 프로필과 이전 답변을 활용해 이 캐릭터에게 어울리는 고유한 디테일을 넣되, 이전 상황 자체는 재사용하지 마세요.
-- ${canSynthesize ? 'validation 단계이므로 이전 패턴을 종합해도 되지만 반드시 새로운 상황에서 반례/경쟁 가설을 검증하세요.' : '이전 답변의 이유를 더 캐묻지 말고, 아직 보지 않은 면을 새 상황에서 관찰하세요.'}
-- order=${order}, category="${plan.category}"로 출력하세요.
-- 출력 키는 order, category, question, options, allowCustom, rationale만 사용하세요.
-- options는 3~5개의 문자열 배열, allowCustom은 boolean입니다.
-- rationale에는 사용자에게 보여줄 설명이 아니라, 이 질문이 어떤 현재 가설과 어떤 경쟁 가설을 구분하려는지 내부용으로 1~2문장만 적으세요.`,
+질문 형식 관련 세부 규칙:
+- scenario만 반복하지 마세요. "어떤 상황에서 어떻게 반응?" 문법이 연속되면 실패입니다.
+- comparison은 두 방식의 차이, priority는 무엇을 더 놓기 어려운지, exception은 평소와 달라지는 조건, hypothesis는 경쟁 해석, relationship_contrast는 관계별 차이, sentence_completion은 사고 규칙의 빈칸, free_response는 오너의 직접 캐해를 얻는 데 사용하세요.
+- free_response일 때 options=[]로 출력하세요.
+- 그 외 형식은 options 3~5개를 출력하세요.
+
+선택지 설계:
+- 현재 증거로 가장 예상되는 후보 1~2개와, 다른 캐해를 열 수 있지만 충분히 그럴듯한 경쟁 후보 1~2개를 반드시 함께 넣으세요.
+- 필요하면 조건부/혼합 후보를 1개 추가하세요.
+- 역할은 표시하지 말고 순서를 섞으세요.
+- 보기만 읽고 결과 성격 라벨이 바로 예상되지 않도록 행동·말·판단 기준 수준으로 작성하세요.
+
+출력 규칙:
+- order=${order}
+- 출력 키는 order, category, mode, format, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.
+- targetHook은 이번 문항이 겨냥하는 캐릭터 고유 지점입니다.
+- hypothesis는 이번 문항으로 확인하려는 현재 해석입니다.
+- rationale은 내부 기록용 1~2문장입니다.`,
     });
 
     return NextResponse.json({ done: false, question });
