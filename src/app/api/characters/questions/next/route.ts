@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     const question = await askOpenAIJson({
       instructions: QUESTION_INSTRUCTIONS,
       schema: interviewQuestionSchema,
-      maxOutputTokens: 1150,
+      maxOutputTokens: 1050,
       input: `현재 문항 번호: ${order}/20
 
 캐릭터 데이터:
@@ -168,8 +168,8 @@ ${coverageRule}
 5. 질문은 한 가지 판단만 묻고 짧게 작성하세요.
 
 길이 강제:
-- question은 최대 110자이며 90자 안팎을 목표로 합니다.
-- 각 option은 최대 75자이며 60자 안팎을 목표로 합니다.
+- question은 최대 90자이며 70자 안팎을 목표로 합니다.
+- 각 option은 최대 65자이며 50자 안팎을 목표로 합니다.
 - 질문과 보기에 긴 배경설명이나 여러 조건을 겹치지 마세요.
 
 분기 규칙:
