@@ -1,5 +1,5 @@
-import { generateText, Output } from 'ai';
 import { z } from 'zod';
+import { generateValidatedJson } from '@/lib/ai/json';
 
 export async function askOpenAIJson<T>(args: {
   instructions: string;
@@ -8,11 +8,11 @@ export async function askOpenAIJson<T>(args: {
   maxOutputTokens?: number;
 }): Promise<T> {
   const model = process.env.OPENAI_MODEL || 'openai/gpt-5.6-luna';
-  const { output } = await generateText({
+  return generateValidatedJson({
     model,
     system: args.instructions,
     prompt: args.input,
-    output: Output.object({ schema: args.schema }),
+    schema: args.schema,
+    maxOutputTokens: args.maxOutputTokens,
   });
-  return args.schema.parse(output);
 }
