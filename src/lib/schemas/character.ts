@@ -65,8 +65,37 @@ export const characterDraftSchema = z.object({
   analysisConfidence: z.number().min(0).max(100),
 });
 
+export const analysisTypeSummarySchema = z.object({
+  outerSelf: z.string().min(70).max(160),
+  innerSelf: z.string().min(70).max(160),
+  conflictStyle: z.string().min(70).max(160),
+  affectionStyle: z.string().min(70).max(160),
+});
+
+const reportListSchema = z.array(z.string().min(8).max(80)).min(2).max(5);
+
+// Strict schema used only for new AI generation.
+export const finalAnalysisGenerationSchema = z.object({
+  oneLineSummary: z.string().min(25).max(80),
+  summary: analysisTypeSummarySchema,
+  outerSelf: z.string().min(180).max(360),
+  innerSelf: z.string().min(180).max(360),
+  coreValues: reportListSchema,
+  desires: reportListSchema,
+  fears: reportListSchema,
+  conflictStyle: z.string().min(180).max(360),
+  affectionStyle: z.string().min(180).max(360),
+  misunderstoodPoints: reportListSchema,
+  contradictions: reportListSchema,
+  interestingPoints: reportListSchema,
+  detailedReport: z.string().min(700).max(1400),
+});
+
+// Compatibility schema for stored passports. New layered fields are optional so
+// previously issued 8-character share codes remain readable.
 export const finalAnalysisSchema = z.object({
   oneLineSummary: z.string(),
+  summary: analysisTypeSummarySchema.optional(),
   outerSelf: z.string(),
   innerSelf: z.string(),
   coreValues: z.array(z.string()),
@@ -77,6 +106,7 @@ export const finalAnalysisSchema = z.object({
   misunderstoodPoints: z.array(z.string()),
   contradictions: z.array(z.string()),
   interestingPoints: z.array(z.string()),
+  detailedReport: z.string().optional(),
 });
 
 export const characterPassportSchema = z.object({
@@ -106,3 +136,5 @@ export type CharacterDraft = z.infer<typeof characterDraftSchema>;
 export type InterviewAnswer = z.infer<typeof interviewAnswerSchema>;
 export type CharacterPassport = z.infer<typeof characterPassportSchema>;
 export type FinalAnalysis = z.infer<typeof finalAnalysisSchema>;
+export type FinalAnalysisGeneration = z.infer<typeof finalAnalysisGenerationSchema>;
+export type AnalysisTypeSummary = z.infer<typeof analysisTypeSummarySchema>;
