@@ -13,7 +13,7 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
-export const DETAIL_REPORT_VERSION = 'detail-analysis/5.0' as const;
+export const DETAIL_REPORT_VERSION = 'detail-analysis/6.0' as const;
 
 const legacyDetailSeedSchema = z.object({
   version: z.literal('detail-seed/1.0'),
@@ -43,14 +43,43 @@ export const privateDetailSourceSchema = z.object({
   relationshipTraits: z.record(z.string(),z.unknown()).default({}),
 });
 
-const latentHypothesisSchema = z.object({
-  conclusion: z.string().min(28).max(460),
-  support: z.array(z.string().min(12).max(280)).min(2).max(5),
-  counterSignals: z.array(z.string().min(12).max(260)).max(3).default([]),
+const semanticCodeSchema = z.object({
+  code: z.string().min(8).max(150),
+  anchors: z.array(z.string().min(10).max(260)).min(1).max(4),
+  conditions: z.array(z.string().min(8).max(220)).max(3).default([]),
+});
+
+const themeSchema = z.object({
+  theme: z.string().min(18).max(220),
+  mechanism: z.string().min(32).max(460),
+  supports: z.array(z.string().min(10).max(280)).min(2).max(5),
+  alternatives: z.array(z.string().min(12).max(260)).min(1).max(3),
+  counterSignals: z.array(z.string().min(10).max(260)).max(3).default([]),
+});
+
+const qualityScoreSchema = z.object({
+  evidenceStrength: z.number().int().min(0).max(3),
+  specificity: z.number().int().min(0).max(3),
+  latentDepth: z.number().int().min(0).max(3),
+  counterEvidenceRobustness: z.number().int().min(0).max(3),
+  inferenceDistance: z.number().int().min(0).max(3),
+  predictiveValue: z.number().int().min(0).max(3),
+  verdict: z.string().min(2).max(40),
+});
+
+const validatedInsightSchema = z.object({
+  conclusion: z.string().min(30).max(460),
+  mechanism: z.string().min(32).max(460),
+  evidenceAnchors: z.array(z.string().min(12).max(280)).min(2).max(5),
+  counterEvidence: z.array(z.string().min(10).max(260)).max(3).default([]),
   confidence: z.string().min(2).max(40),
+  prediction: z.string().min(20).max(320),
+  quality: qualityScoreSchema,
 });
 
 const psychologicalModelSchema = z.object({
+  semanticCodes: z.array(semanticCodeSchema).min(4).max(18),
+  themes: z.array(themeSchema).min(4).max(8),
   coreEngine: z.string().min(45).max(520),
   hiddenNeed: z.string().min(36).max(460),
   hiddenFear: z.string().min(36).max(460),
@@ -59,8 +88,8 @@ const psychologicalModelSchema = z.object({
   intimacyLogic: z.string().min(36).max(460),
   conflictLogic: z.string().min(36).max(460),
   selfNarrative: z.string().min(36).max(460),
-  hypotheses: z.array(latentHypothesisSchema).min(6).max(10),
-  tensions: z.array(latentHypothesisSchema).min(2).max(6),
+  validatedInsights: z.array(validatedInsightSchema).min(5).max(8),
+  tensions: z.array(validatedInsightSchema).min(2).max(5),
   uncertainties: z.array(z.string().min(18).max(240)).max(4).default([]),
 });
 
@@ -80,62 +109,46 @@ type SourcePacket = {
   ownerReview:unknown;
   confirmedFacts:unknown[];
   interview:SemanticAnswer[];
-  coverageIndex:unknown;
+  coverageHints:unknown;
 };
 
-const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위해 캐릭터의 숨은 심리 구조를 추론하는 분석가입니다.
-당신의 목적은 자료를 다시 정리하거나 성격표를 만드는 것이 아닙니다. 공개 설정, 비밀 설정, 오너의 정정, 반복되는 선택, 직접 적은 이유, 예외 상황을 서로 연결해서 캐릭터 자신이나 오너가 명시적으로 적지 않았을 수도 있는 내적 동력과 맹점을 밝혀내야 합니다.
+const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위한 분석 워크벤치를 만드는 분석가입니다.
+최종 글을 쓰지 마세요. 입력을 항목별로 다시 정리하는 것도 목적이 아닙니다.
 
-이 단계에서는 '자료에 적혀 있지 않은 해석'을 도출하는 것이 허용되고 오히려 필요합니다. 단, 새로운 과거 사건·비밀 설정·질병·진단을 창작해서는 안 됩니다. 해석은 반드시 둘 이상의 독립적인 단서가 함께 가리키는 방향에서 도출하세요.
+한 번의 호출 안에서도 반드시 다음 순서를 실제 출력 구조로 수행하세요.
+1) 관찰 가능한 단서를 semanticCodes로 압축
+2) 서로 떨어진 코드를 묶어 themes에서 잠재 기능을 도출
+3) 각 theme마다 최소 하나의 대안 설명을 경쟁시킴
+4) 반례와 조건 차이를 검토
+5) 추론 품질 점수를 매김
+6) 통과한 해석만 validatedInsights에 남김
+7) 통과한 해석들로 coreEngine과 숨은 욕구·두려움·맹점·관계 논리를 구성
 
-반드시 지킬 원칙:
-- 질문 번호, 문항 번호, 선택지 번호, 점수, 퍼센트, 슬라이더 값 같은 UI 흔적은 남기지 마세요.
-- 단순 요약 금지: 원문에서 바로 찾을 수 있는 사실만 다시 쓰면 실패입니다.
-- '착하다/독립적이다/호기심이 많다' 같은 라벨에서 멈추지 말고, 왜 그런 행동이 나오는지 내부 기준과 보상 구조를 추론하세요.
-- 숨은 욕구: 무엇을 얻고 싶어서 행동하는지뿐 아니라 어떤 감각·관계 상태·자기상을 유지하려는지 보세요.
-- 숨은 두려움: 겉으로 두려워한다고 말하지 않아도 반복 회피, 과잉 개입, 통제, 무관심처럼 보이는 태도 뒤에 무엇을 잃지 않으려는지가 있는지 검토하세요.
-- 자기보호 방식: 불편한 감정이나 위협을 직접 다루기보다 다른 행동으로 우회하는 패턴이 있는지 찾으세요. 다만 임상 용어로 진단하지 마세요.
-- 맹점: 캐릭터가 자기 행동을 어떤 이유로 설명하지만 실제 반복 패턴은 다른 동기를 암시하는 경우를 찾으세요.
-- 친밀감: 가까워질수록 무엇을 더 허용하고 무엇을 더 통제하는지, 사랑받는 것과 침범당하는 것의 경계가 어디인지 보세요.
-- 갈등: 무엇이 단순한 불편함이고 무엇이 정체성이나 통제감의 위협으로 바뀌는지 찾으세요.
-- 모순은 결함이 아니라 더 큰 공통 원리를 찾는 단서로 사용하세요.
-- 오너가 직접 적은 이유와 정정은 매우 중요하지만, 그것만 정답으로 복사하지 마세요. 실제 행동 패턴과 맞는지 대조하세요.
-- 반대 단서가 있으면 counterSignals에 남기고, 해석이 약하면 confidence에 낮음/잠정적 같은 표현을 사용하세요.
-
-좋은 결과의 기준:
-자료: 가까운 사람의 망가진 물건을 대신 새것으로 사주기보다 직접 고치려 하고, 남이 자기가 고친 것을 다시 손대려 하면 싫어한다.
-나쁜 해석: 고치는 것을 좋아하고 자기 방식이 강하다.
-좋은 해석: 애착을 '원래대로 보존하는 것'보다 자기 손을 거쳐 다시 성립시키는 과정으로 느끼며, 그래서 도움을 주는 행위와 자기 개입의 흔적을 지키려는 욕구가 같은 뿌리에서 나온다.
-
-이처럼 최종적으로는 '무엇을 했다'가 아니라 '왜 그 행동을 반복하며, 무엇이 충족되거나 위협받는가'를 밝혀야 합니다.`;
+중요:
+- 원문에 바로 적힌 사실을 conclusion으로 다시 쓰면 실패입니다.
+- "책임감이 강하다", "독립적이다" 같은 라벨은 validatedInsights에 들어갈 수 없습니다.
+- validatedInsights는 최소 두 개의 독립 근거를 연결해야 하며, 무엇을 얻거나 지키는지와 어떤 조건에서 달라지는지를 설명해야 합니다.
+- 대안 가설이 더 단순하게 자료를 설명하면 과한 심리 가설을 버리세요.
+- 새로운 과거 사건, 트라우마, 진단, 숨겨진 사실은 만들지 마세요.
+- 질문 번호, 점수, 퍼센트, 슬라이더 등 UI 흔적은 출력하지 마세요.`;
 
 const REPORT_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 쓰는 분석가입니다.
-당신에게는 캐릭터의 숨은 심리 구조를 추론한 모델과, 그 추론이 실제 캐릭터에서 벗어나지 않는지 확인할 구체적 참고 자료가 함께 주어집니다.
+당신에게는 이미 원자료를 직접 읽고 검증까지 마친 "검증된 해석 묶음"만 주어집니다.
+원 질문과 원 답변은 제공되지 않습니다. 따라서 답변을 항목별로 재분류하려 하지 말고, 검증된 심리 메커니즘을 하나의 인물 해석으로 통합하세요.
 
-이 리포트의 가치는 오너가 이미 아는 설정을 예쁘게 정리해 주는 데 있지 않습니다. 반복 행동의 이면에 있는 욕구, 자기보호, 맹점, 관계에서의 숨은 기대, 스스로도 자각하지 못할 수 있는 모순을 설득력 있게 밝혀내는 데 있습니다.
+리포트의 가치는 오너가 이미 아는 설정을 다시 말하는 데 있지 않습니다.
+오너도 명시적으로 적지 않았을 수 있는 숨은 욕구, 자기보호, 맹점, 관계의 기대, 행동이 뒤집히는 임계점을 설득력 있게 보여주는 데 있습니다.
 
-최종 결과에서 금지되는 것:
-- 질문 번호, 문항 번호, 점수, 백분율, 슬라이더 값, 선택지 번호를 언급하지 마세요.
-- '프로필에서', '질문에서', '답변에서', '오너가', 'AI 추론이', '원자료상', '근거상'처럼 분석 과정이나 출처를 설명하지 마세요.
-- 원문 문장이나 인터뷰 답변을 길게 그대로 인용하지 마세요.
-- 자료를 항목별로 다시 분류해 나열하는 요약문을 만들지 마세요.
-- 해석을 안전하게 만들겠다는 이유로 누구에게나 붙일 수 있는 추상 문장만 쓰지 마세요.
+작성 원칙:
+- 각 주요 해석은 evidenceAnchors를 근거로 삼되, 근거를 목록처럼 읽어주지 마세요.
+- 먼저 결론과 메커니즘을 설명하고, 필요한 구체적 행동은 그 해석을 붙잡는 짧은 예시로만 사용하세요.
+- 같은 evidenceAnchor를 여러 섹션에서 반복하지 마세요.
+- coreValues / desires / fears도 표면 목표가 아니라 심리적 기능을 적으세요.
+- contradictions는 상반된 행동을 나열하는 대신 같은 욕구가 왜 다른 행동으로 갈라지는지 설명하세요.
+- interestingPoints에는 validatedInsights 중 특히 오너가 직접 적지 않았을 가능성이 높은 연결을 우선하세요.
+- detailedReport는 항목 요약본이 아니라 coreEngine에서 친밀감·갈등·자기보호·맹점이 파생되는 흐름을 보여주세요.
 - 자료에 없는 과거 사건, 트라우마, 진단명, 숨겨진 사실을 창작하지 마세요.
-
-최종 결과가 해야 하는 일:
-- 각 주요 섹션에서 반드시 '관찰 가능한 행동 → 그 행동을 만드는 내부 기준/욕구 → 그 기준이 깨지거나 뒤집히는 조건'까지 한 단계 이상 깊게 내려가세요.
-- 겉으로 보이는 모습은 단순 인상이 아니라, 타인이 보는 태도와 실제 내부 계산 사이의 차이를 설명하세요.
-- 실제 내면은 이 캐릭터가 유지하고 싶은 자기상, 관계 상태, 통제감, 보상 감각과 그에 대한 위협을 해석하세요.
-- 갈등 방식은 어떤 자극이 단순 불편함에서 자기 기준의 침범으로 바뀌는지, 왜 특정 지점부터 고집이나 개입이 강해지는지 설명하세요.
-- 애정 표현은 '무엇을 해준다'가 아니라 친밀함 속에서 무엇을 확인받고 싶어 하는지, 무엇을 침범으로 느끼는지, 보호와 통제가 어디서 맞닿는지 해석하세요.
-- 핵심 가치·욕망·두려움은 표면 목표보다 한 층 아래의 심리적 기능을 적으세요.
-- 캐릭터의 모순에서는 서로 반대처럼 보이는 행동이 사실 어떤 공통 욕구에서 갈라져 나오는지 설명하세요.
-- AI가 발견한 흥미로운 지점에는 자료에 직접 문장으로 적혀 있지 않지만 여러 단서가 함께 가리키는 새로운 해석을 우선하세요.
-- 상세 통합 해석에는 최소 세 가지 이상의 '명시되어 있지 않았지만 근거를 통해 도출되는 해석'이 자연스럽게 포함되어야 합니다.
-- 강하게 지지되는 해석은 자연스럽게 서술하고, 반대 단서가 있는 가설은 '가능성이 있다/이렇게 읽힐 수 있다'처럼 강도를 조절하세요.
-- 각 중요한 해석에는 이 캐릭터만의 구체적 행동·상황·관계 조건을 자연스럽게 한두 개 녹여서, 뜬구름 잡는 심리 분석이 되지 않게 하세요.
-
-문체는 자연스럽고 읽히는 한국어 산문이어야 합니다. 문단은 논점이 실제로 전환될 때만 나누세요.`;
+- 질문 번호, 점수, 퍼센트, 슬라이더, 분석 출처 표현은 절대 쓰지 마세요.`;
 
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : {};
@@ -274,16 +287,8 @@ function confirmedFactsReference(value:unknown[]){
   });
 }
 
-function evidencePackReference(pack:z.infer<typeof characterEvidencePackSchema>){
+function evidencePackHints(pack:z.infer<typeof characterEvidencePackSchema>){
   return {
-    publicProfileEvidence:pack.publicProfileEvidence,
-    secretProfileEvidence:pack.secretProfileEvidence,
-    ownerReviewEvidence:pack.ownerReviewEvidence,
-    interviewEvidence:pack.interviewEvidence.map(item=>item.finding),
-    behaviorRules:pack.behaviorRules,
-    relationshipPatterns:pack.relationshipPatterns,
-    emotionalPatterns:pack.emotionalPatterns,
-    valuesAndMotives:pack.valuesAndMotives,
     exceptionsAndConditions:pack.exceptionsAndConditions,
     tensionsAndContradictions:pack.tensionsAndContradictions,
     distinctiveDetails:pack.distinctiveDetails,
@@ -309,7 +314,7 @@ function buildSourcePacket(seed:DetailSeed,publicProfileText:string,privateSourc
       ownerReview:ownerReviewReference(source.ownerReview),
       confirmedFacts:confirmedFactsReference(source.confirmedFacts),
       interview:source.answers.map(semanticAnswer),
-      coverageIndex:evidencePackReference(seed.evidencePack),
+      coverageHints:evidencePackHints(seed.evidencePack),
     };
     return {packet,sources:rawSourceStrings(publicProfileText,source)};
   }
@@ -326,10 +331,12 @@ function buildSourcePacket(seed:DetailSeed,publicProfileText:string,privateSourc
 
 function allPsychText(model:PsychologicalModel){
   return [
+    ...model.semanticCodes.flatMap(x=>[x.code,...x.anchors,...x.conditions]),
+    ...model.themes.flatMap(x=>[x.theme,x.mechanism,...x.supports,...x.alternatives,...x.counterSignals]),
     model.coreEngine,model.hiddenNeed,model.hiddenFear,model.selfProtection,model.blindSpot,
     model.intimacyLogic,model.conflictLogic,model.selfNarrative,
-    ...model.hypotheses.flatMap(x=>[x.conclusion,...x.support,...x.counterSignals]),
-    ...model.tensions.flatMap(x=>[x.conclusion,...x.support,...x.counterSignals]),
+    ...model.validatedInsights.flatMap(x=>[x.conclusion,x.mechanism,...x.evidenceAnchors,...x.counterEvidence,x.prediction]),
+    ...model.tensions.flatMap(x=>[x.conclusion,x.mechanism,...x.evidenceAnchors,...x.counterEvidence,x.prediction]),
     ...model.uncertainties,
   ].join(' ');
 }
@@ -381,22 +388,69 @@ function hasLongVerbatimOverlap(output:string,sources:string[]){
   return false;
 }
 
+function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
+  const q=insight.quality;
+  const total=q.evidenceStrength+q.specificity+q.latentDepth+q.counterEvidenceRobustness+q.inferenceDistance+q.predictiveValue;
+  return q.evidenceStrength>=2 && q.specificity>=2 && q.latentDepth>=2 && q.inferenceDistance>=2 && total>=12;
+}
+
+function validatedInsightReason(model:PsychologicalModel){
+  const accepted=[...model.validatedInsights,...model.tensions];
+  const failed=accepted.filter(x=>!qualityPass(x));
+  if(failed.length)return `품질 기준 미달 insight ${failed.length}개`;
+  if(model.validatedInsights.length<5)return '검증된 insight 부족';
+  return '';
+}
+
 async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|UnknownRecord):Promise<PsychologicalModel>{
   let lastReason='';
   for(let attempt=0;attempt<2;attempt+=1){
-    const retry=attempt===0?'':`\n\n이전 결과는 자료 요약에 머물렀거나 숨은 심리 추론이 충분하지 않았습니다. 원문에 직접 적힌 사실을 다시 분류하지 말고, 서로 다른 단서 두 개 이상을 연결해 내적 욕구·자기보호·맹점·관계의 숨은 기대를 새로 도출하세요. 실패 이유: ${lastReason}`;
+    const retry=attempt===0?'':`\n\n이전 결과는 스킬의 단계가 충분히 분리되지 않았거나 품질 기준을 통과하지 못했습니다. semanticCodes → themes → 대안가설/반례 → quality → validatedInsights 순서를 다시 지키세요. 실패 이유: ${lastReason}`;
     const model=await askClaudeJson({
       system:PSYCHE_SYSTEM,
       schema:psychologicalModelSchema,
-      maxTokens:7000,
-      input:`캐릭터 이름: ${seed.name}\n\n[분석 자료]\n${JSON.stringify(packet)}\n\n작성 규칙:\n- coreEngine: 여러 영역을 관통하는 가장 핵심적인 심리적 작동 원리를 설명하세요.\n- hiddenNeed / hiddenFear: 표면적으로 말한 목표나 공포보다 한 층 아래의 관계 상태·자기상·통제감·보상 감각을 추론하세요.\n- selfProtection: 불편함이나 위협에 대응해 반복적으로 사용하는 우회·거리두기·과잉개입·재구성 등의 방식을 해석하세요. 임상 진단은 금지합니다.\n- blindSpot: 캐릭터가 스스로 설명하는 이유와 반복 행동이 어긋나는 지점, 혹은 자신은 선의라고 느끼지만 타인에게 다른 효과를 낼 수 있는 지점을 찾으세요.\n- intimacyLogic / conflictLogic: 친밀함과 갈등에서 실제로 지키려는 것과 침범으로 느끼는 것을 설명하세요.\n- selfNarrative: 스스로를 어떤 사람이라고 규정하며, 그 자기규정이 실제 행동과 어디서 맞고 어디서 어긋나는지 해석하세요.\n- hypotheses는 6~10개. 자료에 직접 문장으로 적혀 있지 않지만 두 개 이상의 독립적 단서가 함께 가리키는 새로운 해석을 만드세요. 각 가설의 support에는 구체적 행동·상황·관계 조건을 남기세요.\n- tensions는 서로 반대처럼 보이는 행동이 사실 같은 욕구에서 갈라져 나온 경우를 우선하세요.\n- confidence는 높음/중간/낮음/잠정적 등 자유로운 짧은 표현을 사용하세요.\n- 질문 번호나 점수는 절대 적지 마세요.${retry}`,
+      maxTokens:7800,
+      input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- semanticCodes는 원 질문을 다시 쓰는 문장이 아니라 행동/판단의 의미 단위여야 합니다.\n- themes는 semanticCodes 여러 개를 연결해 숨은 기능을 설명하세요.\n- alternatives에는 각 theme를 설명할 수 있는 더 단순하거나 다른 가설을 반드시 적으세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- validatedInsights의 evidenceAnchors는 최종 작가에게 전달할 짧고 구체적인 근거입니다. 질문 문장을 보존하지 말고 행동·상황·관계 조건만 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 반대 행동이 같은 욕구에서 갈라지는 경우만 작성하세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.${retry}`,
       allowFallback:false,
+      model:'anthropic/claude-sonnet-5',
     });
     const artifact=uiArtifactReason(allPsychText(model));
     if(artifact){lastReason=artifact;continue}
+    const quality=validatedInsightReason(model);
+    if(quality){lastReason=quality;continue}
     return model;
   }
   throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${lastReason||'PSYCHOLOGICAL_MODEL_INVALID'}`);
+}
+
+function buildReportDossier(model:PsychologicalModel){
+  return {
+    coreEngine:model.coreEngine,
+    hiddenNeed:model.hiddenNeed,
+    hiddenFear:model.hiddenFear,
+    selfProtection:model.selfProtection,
+    blindSpot:model.blindSpot,
+    intimacyLogic:model.intimacyLogic,
+    conflictLogic:model.conflictLogic,
+    selfNarrative:model.selfNarrative,
+    validatedInsights:model.validatedInsights.map(x=>({
+      conclusion:x.conclusion,
+      mechanism:x.mechanism,
+      evidenceAnchors:x.evidenceAnchors,
+      counterEvidence:x.counterEvidence,
+      confidence:x.confidence,
+      prediction:x.prediction,
+    })),
+    tensions:model.tensions.map(x=>({
+      conclusion:x.conclusion,
+      mechanism:x.mechanism,
+      evidenceAnchors:x.evidenceAnchors,
+      counterEvidence:x.counterEvidence,
+      confidence:x.confidence,
+      prediction:x.prediction,
+    })),
+    uncertainties:model.uncertainties,
+  };
 }
 
 async function generateDetailFields(
@@ -406,16 +460,17 @@ async function generateDetailFields(
 ):Promise<DetailAnalysisGeneration>{
   const {packet,sources}=buildSourcePacket(seed,publicProfileText,privateSourceInput);
   const psyche=await buildPsychologicalModel(seed,packet);
+  const dossier=buildReportDossier(psyche);
 
-  const baseInput=`캐릭터 이름: ${seed.name}\n\n[심층 심리 모델]\n${JSON.stringify(psyche)}\n\n[구체성 확인용 참고 자료]\n${JSON.stringify(packet)}\n\n사용 원칙:\n1. 심층 심리 모델을 최종 해석의 중심으로 사용하세요.\n2. 참고 자료는 각 해석이 실제 캐릭터의 행동과 맞는지 검증하고, 추상적인 문장을 구체화하는 데 사용하세요.\n3. 심층 모델과 구체적 자료가 충돌하면 구체적 자료와 오너 정정을 우선하고, 해당 해석의 강도를 낮추세요.\n4. 결과에는 분석 과정과 출처를 쓰지 마세요. 독자가 처음부터 하나의 캐릭터 해석문을 읽는 것처럼 작성하세요.\n\n출력 규칙:\n- outerSelf: 타인이 체감하는 표면 태도와 그 뒤에서 실제로 작동하는 판단을 함께 설명하세요. 단순 외형이나 행동 목록이 아니라, 왜 그런 인상으로 보이는지를 해석하세요. 180~320자.\n- innerSelf: 숨은 욕구, 유지하고 싶은 자기상, 통제감, 불안과 자기보호를 중심으로 쓰세요. 자료에 직접 적히지 않은 심리도 근거가 충분하면 도출하세요. 180~320자.\n- conflictStyle: 갈등을 일으키는 표면 사건보다 무엇을 침범당했다고 느낄 때 반응이 커지는지, 왜 그 지점에서 고집·개입·회피가 나타나는지 설명하세요. 180~320자.\n- affectionStyle: 친밀함 속에서 무엇을 확인받고 싶어 하는지, 보호와 통제·배려와 소유감·거리와 안전이 어떻게 엮이는지 해석하세요. 180~320자.\n- coreValues / desires / fears: 각각 2~5개. 표면 목표가 아니라 반복 행동을 움직이는 심리적 기능과 내적 지향을 쓰세요.\n- misunderstoodPoints: 겉으로 보이는 행동과 실제 내부 동기가 달라 오해가 생기는 구조를 쓰세요.\n- contradictions: 반대되는 행동이 어떤 공통 욕구나 두려움에서 함께 나오는지 설명하세요.\n- interestingPoints: 오너가 이미 적어둔 설정의 재진술보다, 여러 단서를 연결해 새로 도출한 속내·맹점·관계의 숨은 기대를 우선하세요.\n- detailedReport: 850~1400자. 중심 심리 원리에서 출발해 숨은 욕구와 두려움, 자기보호, 친밀감, 갈등, 맹점이 어떻게 한 인물 안에서 연결되는지 서술하세요. 최소 세 가지 이상의 새롭게 도출된 해석이 포함되어야 하며, 각 해석은 구체적 행동·상황·관계 조건과 연결되어야 합니다.\n- 문단은 논점이 실제로 바뀔 때만 \\n\\n으로 나누세요. 소제목, 번호, 불릿은 detailedReport 안에 넣지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 출처 표현은 절대 사용하지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
+  const baseInput=`캐릭터 이름: ${seed.name}\n\n[검증된 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n중요:\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- evidenceAnchors를 항목별로 나열하지 말고 conclusion과 mechanism을 먼저 설명한 뒤 필요한 곳에만 자연스럽게 녹이세요.\n- 서로 다른 섹션이 같은 insight를 반복하지 않도록 각 섹션의 초점을 분리하세요.\n\n출력 규칙:\n- outerSelf: 타인이 체감하는 표면 태도와 실제 내부 판단 사이의 간극을 해석하세요. 180~320자.\n- innerSelf: hiddenNeed, hiddenFear, selfProtection, selfNarrative를 연결해 실제 선택을 움직이는 심리를 설명하세요. 180~320자.\n- conflictStyle: 무엇이 단순 불편함에서 자기 기준의 침범으로 바뀌는지와 반응 임계점을 설명하세요. 180~320자.\n- affectionStyle: 친밀함에서 무엇을 확인받고 싶어 하는지, 보호·개입·경계가 어떤 공통 욕구에서 나오는지 설명하세요. 180~320자.\n- coreValues / desires / fears: 각각 2~5개. 표면 단어가 아니라 반복 행동을 움직이는 심리적 기능을 적으세요.\n- misunderstoodPoints: 외부 인상과 내부 기능이 엇갈리는 구조를 적으세요.\n- contradictions: 반대 행동이 같은 욕구에서 갈라지는 메커니즘을 적으세요.\n- interestingPoints: validatedInsights 중 원자료에 직접 적혀 있지 않았을 가능성이 높은 새 연결을 우선하세요.\n- detailedReport: 850~1400자. coreEngine에서 숨은 욕구·두려움·자기보호·친밀감·갈등·맹점이 어떻게 파생되는지 하나의 흐름으로 쓰세요. 최소 세 개의 검증된 새 해석을 서로 연결해야 합니다.\n- 문단은 논점이 실제로 바뀔 때만 \\n\\n으로 나누세요. 소제목, 번호, 불릿은 detailedReport 안에 넣지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 출처 표현은 절대 사용하지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
 
   let lastReason='';
   for(let attempt=0;attempt<3;attempt+=1){
-    const retry=attempt===0?'':`\n\n이전 결과는 자료를 다시 분류한 요약에 가깝거나 심리적 해석이 충분히 깊지 않았습니다. 이번에는 '왜 이런 행동을 하는가', '무엇을 유지하거나 잃지 않으려 하는가', '스스로도 자각하지 못할 수 있는 맹점은 무엇인가'에 답하도록 다시 쓰세요. 단, 없는 과거·사건·진단을 창작하지 마세요. 실패 이유: ${lastReason}`;
+    const retry=attempt===0?'':`\n\n이전 결과는 검증된 insight를 통합하기보다 evidenceAnchor를 다시 읽어주는 문장에 가까웠습니다. 이번에는 근거를 먼저 말하지 말고 심리적 결론과 메커니즘을 중심으로 다시 쓰세요. 같은 행동을 여러 섹션에서 반복하지 마세요. 실패 이유: ${lastReason}`;
     const raw=await askClaudeJson({
       system:REPORT_SYSTEM,
       schema:detailAnalysisRawSchema,
-      maxTokens:8200,
+      maxTokens:7600,
       input:`${baseInput}${retry}`,
       allowFallback:false,
     });
