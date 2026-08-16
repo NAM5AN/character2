@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
@@ -66,7 +65,7 @@ export function CharacterReportView({ preview }: { preview: CharacterReportPrevi
         <div><div className="label">공유 코드</div><div className="share-code">{preview.shareCode}</div></div>
       </div>
 
-      <div className="actions" style={{marginTop:20,marginBottom:30}}><button className="btn" onClick={()=>setView('summary')}>← 요약으로 돌아가기</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
+      <div className="actions" style={{marginTop:20,marginBottom:30}}><button className="btn" onClick={()=>setView('summary')}>← 요약으로 돌아가기</button><a className="btn" href="/analyze">다른 캐릭터 분석</a></div>
 
       <div className="eyebrow">Original analysis</div>
       <h2 style={{marginTop:10}}>유형별 해석 원문</h2>
@@ -115,7 +114,7 @@ export function CharacterReportView({ preview }: { preview: CharacterReportPrevi
       <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>이 캐릭터를 더 깊게 볼까요?</h2>
       <p className="muted" style={{lineHeight:1.7,maxWidth:650,margin:'0 auto'}}>유형별 해석 원문과 핵심 가치·욕구·두려움·모순, 그리고 프로필과 20문항을 종합한 상세 리포트를 확인할 수 있어요.</p>
       {error&&<p className="error">{error}</p>}
-      <div className="actions" style={{justifyContent:'center'}}><button className="btn primary" disabled={busy} onClick={requestDetail}>{busy?'상세 리포트 불러오는 중…':'더 자세히 보기'}</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
+      <div className="actions" style={{justifyContent:'center'}}><button className="btn primary" disabled={busy} onClick={requestDetail}>{busy?'상세 리포트 불러오는 중…':'더 자세히 보기'}</button><a className="btn" href="/analyze">다른 캐릭터 분석</a></div>
     </section>
   </>;
 }
