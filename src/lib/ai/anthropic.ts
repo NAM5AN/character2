@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
 
+const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5';
+const DEFAULT_DETAIL_MODEL = 'anthropic/claude-opus-4.8';
+
+function resolveClaudeModel(system: string, explicitModel?: string) {
+  if (explicitModel) return explicitModel;
+  const isPaidDetail = system.includes('유료 상세 캐해 리포트');
+  if (isPaidDetail) return process.env.ANTHROPIC_DETAIL_MODEL || DEFAULT_DETAIL_MODEL;
+  return process.env.ANTHROPIC_SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL;
+}
+
 export async function askClaudeJson<T>(args: {
   system: string;
   input: string;
@@ -9,7 +19,7 @@ export async function askClaudeJson<T>(args: {
   allowFallback?: boolean;
   model?: string;
 }): Promise<T> {
-  const primaryModel = args.model || process.env.ANTHROPIC_MODEL || 'anthropic/claude-sonnet-5';
+  const primaryModel = resolveClaudeModel(args.system, args.model);
   try {
     return await generateValidatedJson({
       model: primaryModel,
