@@ -26,6 +26,7 @@ const SUMMARY_SYSTEM=`당신은 자캐커뮤니티 캐릭터를 정밀하게 읽
 긴 상세 리포트와 긴 유형별 원문은 절대 미리 쓰지 마세요.
 공개 프로필, 비밀 프로필, 오너 검수, 20문항 답변과 이유만 근거로 하며 없는 설정을 만들지 마세요.
 오너 직접 정정과 인터뷰 답변/이유는 AI 추론보다 우선합니다.
+사용자에게 보이는 summary.outerSelf, summary.innerSelf, summary.conflictStyle, summary.affectionStyle은 각각 한두 문장 분량의 완결된 설명으로 작성하세요. 각 항목은 90~140자를 목표로 하고, 가능하면 70자보다 짧아지지 않게 하세요. 짧은 단어 나열이나 한 문장짜리 단정으로 끝내지 마세요.
 Evidence Pack의 원자료 보존 부분은 서버가 직접 만들므로, 당신은 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties 같은 고차원 패턴만 간결하게 제안하세요.
 프로필에서 근거가 부족한 항목은 억지로 개수를 채우지 말고 빈 배열로 둘 수 있습니다.`;
 
@@ -63,15 +64,25 @@ function buildPack(rawPack:unknown,body:z.infer<typeof requestSchema>,review:any
 }
 function normalize(raw:z.infer<typeof summaryAnalysisRawSchema>,body:z.infer<typeof requestSchema>,review:any){const s=rec(raw.summary);return {oneLineSummary:clip(text(raw.oneLineSummary),80),summary:{outerSelf:clip(text(s.outerSelf),160),innerSelf:clip(text(s.innerSelf),160),conflictStyle:clip(text(s.conflictStyle),160),affectionStyle:clip(text(s.affectionStyle),160)},evidencePack:buildPack(raw.evidencePack,body,review)}}
 function validationReason(e:z.ZodError){return e.issues.slice(0,16).map(x=>`${x.path.join('.')||'(root)'}: ${x.message}`).join('; ')}
+function shortSummaryFields(summary:SummaryAnalysisGeneration['summary']){
+  return Object.entries(summary).filter(([,value])=>value.trim().length<70).map(([key,value])=>`${key} ${value.trim().length}자`);
+}
 
 async function generateSummary(input:string,body:z.infer<typeof requestSchema>,review:any):Promise<SummaryAnalysisGeneration>{
   let last='';
   for(let attempt=0;attempt<2;attempt++){
-    const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식/길이 검증에 실패했습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 4개 필드를 최우선으로 완성하세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 원자료에서 새로 작성하세요. 실패 원인: ${last}`;
+    const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식 또는 요약 분량 점검에 걸렸습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 4개 필드를 최우선으로 완성하세요. summary.outerSelf / innerSelf / conflictStyle / affectionStyle은 각각 90~140자를 목표로 작성하고, 70자보다 짧아지지 않게 충분한 맥락을 담으세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 원자료에서 새로 작성하세요. 점검 내용: ${last}`;
     try{
       const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:4000,maxAttempts:1,input:`${input}${retry}`,allowFallback:false});
       const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
-      if(parsed.success)return parsed.data;
+      if(parsed.success){
+        const shortFields=shortSummaryFields(parsed.data.summary);
+        if(shortFields.length&&attempt===0){
+          last=`요약 필드가 권장 최소 70자보다 짧음: ${shortFields.join(', ')}`;
+          continue;
+        }
+        return parsed.data;
+      }
       last=validationReason(parsed.error);
     }catch(error){
       last=error instanceof Error?error.message:String(error);
@@ -91,7 +102,7 @@ export async function POST(request:Request){
       rejectedCorrections:body.draft.aiInferences.filter(x=>x.ownerVerdict==='rejected'&&x.ownerFeedback?.trim()).map(x=>({ownerCorrection:x.ownerFeedback!.trim()})),
     };
     const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,analysisConfidence:body.draft.analysisConfidence};
-    const summaryInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n출력 규칙:\n- oneLineSummary: 25~80자.\n- summary.outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 70~160자.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성합니다. 각 축은 정말 중요한 발견만 0~3개로 제한하세요.\n- 원자료를 반복 복사하지 말고 여러 근거를 연결한 패턴만 적으세요.\n- 근거가 부족한 축은 빈 배열로 두세요.\n- 사용자에게 보이는 oneLineSummary와 summary 4개 필드의 완결성이 evidencePack의 개수보다 항상 우선합니다.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
+    const summaryInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n출력 규칙:\n- oneLineSummary: 25~80자.\n- summary.outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 90~140자를 목표로 작성하세요. 각 항목은 최소 70자 정도의 읽을 만한 한두 문장 분량을 확보하고, 최대 160자를 넘기지 마세요.\n- 네 summary 항목은 같은 내용을 반복하지 말고 각각 겉으로 보이는 모습, 내면, 갈등 반응, 애정 표현의 차이를 구체적으로 설명하세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성합니다. 각 축은 정말 중요한 발견만 0~3개로 제한하세요.\n- 원자료를 반복 복사하지 말고 여러 근거를 연결한 패턴만 적으세요.\n- 근거가 부족한 축은 빈 배열로 두세요.\n- 사용자에게 보이는 oneLineSummary와 summary 4개 필드의 완결성과 충분한 분량이 evidencePack의 개수보다 항상 우선합니다.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
     const summaryResult=await generateSummary(summaryInput,body,inferenceReview);
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
 
