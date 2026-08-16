@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { characterDraftSchema, finalAnalysisSchema, interviewAnswerSchema, characterPassportSchema } from '@/lib/schemas/character';
+import { characterDraftSchema, finalAnalysisGenerationSchema, interviewAnswerSchema, characterPassportSchema } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
 import { FINAL_ANALYSIS_SYSTEM } from '@/lib/ai/prompts';
 import { validateAccessCode } from '@/lib/settings';
@@ -8,6 +8,7 @@ import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
 import { createEditToken, sha256 } from '@/lib/crypto';
 import { getSupabaseServer } from '@/lib/supabase/server';
+import { buildCharacterReportPreview } from '@/lib/character-report';
 import { apiError } from '@/lib/http';
 
 const requestSchema = z.object({
@@ -55,9 +56,9 @@ export async function POST(request: Request) {
 
     const analysis = await askClaudeJson({
       system: FINAL_ANALYSIS_SYSTEM,
-      schema: finalAnalysisSchema,
-      maxTokens: 3500,
-      input: `캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n오너 검수 피드백 사용 규칙:\n- rejectedCorrections.ownerCorrection은 오너가 직접 알려준 실제 설정으로 취급하세요.\n- rejectedCorrections.rejectedInference는 틀린 AI 추론이므로 사실, 가능성, 분석 근거로 절대 재사용하지 마세요.\n- ambiguous.ownerFeedback이 있으면 그 피드백을 AI 추론 문장보다 우선하세요. 추론 원문은 일부만 맞을 수 있는 불확실한 해석입니다.\n- ambiguous.ownerFeedback이 없으면 해당 추론은 확정 근거가 아니라 가능성 수준으로만 취급하세요.\n- confirmed에 있는 추론만 오너가 그대로 맞다고 확인한 해석입니다.\n- 오너가 직접 쓴 검수 피드백과 인터뷰 답변/이유는 AI 추론보다 우선순위가 높은 근거입니다.\n\n공개 프로필과 비밀 프로필을 모두 근거로 최종 캐해를 작성하되, 비밀 프로필 원문을 길게 인용하거나 그대로 복사하지 마세요.\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
+      schema: finalAnalysisGenerationSchema,
+      maxTokens: 6000,
+      input: `캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n오너 검수 피드백 사용 규칙:\n- rejectedCorrections.ownerCorrection은 오너가 직접 알려준 실제 설정으로 취급하세요.\n- rejectedCorrections.rejectedInference는 틀린 AI 추론이므로 사실, 가능성, 분석 근거로 절대 재사용하지 마세요.\n- ambiguous.ownerFeedback이 있으면 그 피드백을 AI 추론 문장보다 우선하세요. 추론 원문은 일부만 맞을 수 있는 불확실한 해석입니다.\n- ambiguous.ownerFeedback이 없으면 해당 추론은 확정 근거가 아니라 가능성 수준으로만 취급하세요.\n- confirmed에 있는 추론만 오너가 그대로 맞다고 확인한 해석입니다.\n- 오너가 직접 쓴 검수 피드백과 인터뷰 답변/이유는 AI 추론보다 우선순위가 높은 근거입니다.\n\n공개 프로필과 비밀 프로필을 모두 근거로 최종 캐해를 작성하되, 비밀 프로필 원문을 길게 인용하거나 그대로 복사하지 마세요. 같은 내용을 요약층, 원문층, 상세 리포트에서 기계적으로 반복하지 말고 각 층의 역할을 구분하세요.\n\n출력 길이와 역할:\n- oneLineSummary: 25~80자. 캐릭터 전체를 한 문장으로 압축합니다.\n- summary.outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 70~160자. 20문항 직후 공개되는 무료 요약층입니다. 핵심만 쉽고 선명하게 씁니다.\n- outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 180~360자. 현재 결과창 수준의 유형별 해석 원문입니다. 근거가 드러나도록 구체적으로 씁니다.\n- coreValues / desires / fears / misunderstoodPoints / contradictions / interestingPoints: 각 2~5개, 각 항목 8~80자입니다.\n- detailedReport: 700~1400자. 위 항목을 단순 반복하지 말고, 공개·비밀 프로필과 오너 검수, 20개 답변과 이유를 연결해 캐릭터의 행동 원리, 관계에서 반복되는 패턴, 겉과 속의 간극, 예외 조건, 중요한 모순을 하나의 상세 리포트로 통합합니다. 근거 없는 새 과거나 비밀을 만들지 마세요.\n\n최종 JSON 키는 oneLineSummary, summary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport입니다. summary 안에는 outerSelf, innerSelf, conflictStyle, affectionStyle을 넣으세요.`,
     });
 
     const supabase = getSupabaseServer();
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       aiInferences: sharedInferences,
       interview: { version: 'interview/1.0', completedCount: 20, answers: body.answers },
       analysis,
-      engineVersions: { parser: 'parser/1.3', interview: 'interview/1.3', analysis: 'analysis/1.3' },
+      engineVersions: { parser: 'parser/1.3', interview: 'interview/1.3', analysis: 'analysis/1.4' },
     });
 
     const { data: saved, error: saveError } = await supabase.rpc('character2_create_character', {
@@ -107,7 +108,8 @@ export async function POST(request: Request) {
     if (saveError) throw saveError;
     if (saved !== true) throw new Error('CHARACTER_SAVE_FAILED');
 
-    return NextResponse.json({ passport, shareCode, editToken });
+    const preview = buildCharacterReportPreview(passport);
+    return NextResponse.json({ preview, shareCode, editToken });
   } catch (error) {
     return apiError(error);
   }
