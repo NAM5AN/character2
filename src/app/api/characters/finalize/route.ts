@@ -68,7 +68,7 @@ async function generateSummary(input:string,body:z.infer<typeof requestSchema>,r
   let last='';
   for(let attempt=0;attempt<3;attempt++){
     const retry=attempt?`\n\n이전 생성은 형식/길이 검증에 실패했습니다. 원자료로 새로 작성하세요. 실패 원인: ${last}`:'';
-    const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:3000,input:`${input}${retry}`});
+    const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:3000,input:`${input}${retry}`,allowFallback:false});
     const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
     if(parsed.success)return parsed.data;last=validationReason(parsed.error);
   }
@@ -93,7 +93,7 @@ export async function POST(request:Request){
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
     const sharedInferences=body.draft.aiInferences.map(x=>({id:x.id,text:x.text,confidence:x.confidence,evidenceIds:[],evidence:[],ownerVerdict:x.ownerVerdict}));
-    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.3',interview:'interview/1.4',analysis:'claude-summary-evidence/2.3'}});
+    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.3',interview:'interview/1.4',analysis:'claude-only-summary-evidence/2.4'}});
     const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,evidencePack:summaryResult.evidencePack};
     const privateSource={version:'detail-source/1.0',secretProfileText:body.draft.basicProfile.secretProfileText||'',ownerReview:inferenceReview,answers:body.answers,confirmedFacts:body.draft.confirmedFacts,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits};
     const {data:saved,error}=await sb.rpc('character2_create_character_preview_v2',{p_character_id:characterId,p_share_code:shareCode,p_name:name,p_schema_version:passport.schemaVersion,p_passport_json:passport,p_analysis_confidence:body.draft.analysisConfidence,p_engine_versions:passport.engineVersions,p_answers:body.answers,p_edit_token_hash:sha256(editToken),p_detail_seed_json:detailSeed,p_source_json:privateSource});
