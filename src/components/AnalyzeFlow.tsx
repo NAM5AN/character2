@@ -101,62 +101,28 @@ export function AnalyzeFlow(){
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
 
   async function requestBatch(startOrder:number,currentAnswers:InterviewAnswer[],plannedBase=questionHistoryRef.current){
-    if(!draft||startOrder>20)return[];
-    const count=Math.min(5,21-startOrder);
-    const existing=plannedBase.filter(q=>q.order>=startOrder&&q.order<startOrder+count);
-    if(existing.length===count)return existing.sort((a,b)=>a.order-b.order);
-    const pending=batchRequests.current.get(startOrder);if(pending)return pending;
-    const promise=(async()=>{
-      const normalizedAnswers=uniqueAnswersByOrder(currentAnswers);
-      const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers,plannedQuestions:plannedBase,startOrder,batchSize:count})});
-      const body=await r.json();
-      if(!r.ok){const err=new Error(typeof body?.error==='string'?body.error:`HTTP_${r.status}`) as Error&{status?:number;body?:any};err.status=r.status;err.body=body;throw err}
-      const incoming=(Array.isArray(body.questions)?body.questions:body.question?[body.question]:[]) as InterviewQuestion[];
-      const merged=mergeQuestionHistory(questionHistoryRef.current,incoming);setHistory(merged);return incoming.sort((a,b)=>a.order-b.order);
-    })();
-    batchRequests.current.set(startOrder,promise);
-    try{return await promise}finally{batchRequests.current.delete(startOrder)}
+    if(!draft||startOrder>20)return[];const count=Math.min(5,21-startOrder);const existing=plannedBase.filter(q=>q.order>=startOrder&&q.order<startOrder+count);if(existing.length===count)return existing.sort((a,b)=>a.order-b.order);const pending=batchRequests.current.get(startOrder);if(pending)return pending;
+    const promise=(async()=>{const normalizedAnswers=uniqueAnswersByOrder(currentAnswers);const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers,plannedQuestions:plannedBase,startOrder,batchSize:count})});const body=await r.json();if(!r.ok){const err=new Error(typeof body?.error==='string'?body.error:`HTTP_${r.status}`) as Error&{status?:number;body?:any};err.status=r.status;err.body=body;throw err}const incoming=(Array.isArray(body.questions)?body.questions:body.question?[body.question]:[]) as InterviewQuestion[];const merged=mergeQuestionHistory(questionHistoryRef.current,incoming);setHistory(merged);return incoming.sort((a,b)=>a.order-b.order)})();
+    batchRequests.current.set(startOrder,promise);try{return await promise}finally{batchRequests.current.delete(startOrder)}
   }
 
   function prefetchAfter(order:number,currentAnswers:InterviewAnswer[]){const start=PREFETCH_BATCH_AFTER[order];if(!start)return;void requestBatch(start,currentAnswers,questionHistoryRef.current).catch(()=>{})}
 
   async function goToOrder(order:number,currentAnswers:InterviewAnswer[],historyBase=questionHistoryRef.current){
-    if(order>20){await finalize(currentAnswers);return}
-    const existing=historyBase.find(item=>item.order===order)||questionHistoryRef.current.find(item=>item.order===order);
-    if(existing){const history=mergeQuestionHistory(historyBase,questionHistoryRef.current);applyQuestion(existing,history,currentAnswers);return}
-    setBusy(true);setError('');
-    try{const questions=await requestBatch(order,currentAnswers,historyBase);const history=questionHistoryRef.current;const q=questions.find(item=>item.order===order)||history.find(item=>item.order===order);if(!q){setError('다음 질문 묶음을 불러오지 못했어요. 다시 시도해주세요.');return}applyQuestion(q,history,currentAnswers)}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}
+    if(order>20){await finalize(currentAnswers);return}const existing=historyBase.find(item=>item.order===order)||questionHistoryRef.current.find(item=>item.order===order);if(existing){const history=mergeQuestionHistory(historyBase,questionHistoryRef.current);applyQuestion(existing,history,currentAnswers);return}setBusy(true);setError('');try{const questions=await requestBatch(order,currentAnswers,historyBase);const history=questionHistoryRef.current;const q=questions.find(item=>item.order===order)||history.find(item=>item.order===order);if(!q){setError('다음 질문 묶음을 불러오지 못했어요. 다시 시도해주세요.');return}applyQuestion(q,history,currentAnswers)}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}
   }
 
   async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);batchRequests.current.clear();setBusy(true);setError('');try{const first=await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
 
   function buildCurrentAnswer(){
     if(!question)return null;const type=responseTypeOf(question);const config=responseConfigOf(question);const customAnswer=custom.trim();const reasonText=reason.trim();let answer='';let answerSource:'choice'|'custom'|'structured'='structured';
-    if(type==='fill_blank'||type==='dialogue_choice'||type==='owner_meta'){answer=(customAnswer||selected).trim();answerSource=customAnswer?'custom':'choice'}
-    else if(type==='sentence_continue'||type==='in_character_response'){answer=customAnswer;answerSource='custom'}
-    else if(type==='bipolar_scale'){if(selected){const right=Math.max(0,Math.min(100,Math.round(sliderValue)));const left=100-right;answer=`${config.leftLabel||'A'} ${left}% / ${config.rightLabel||'B'} ${right}%`}}
-    else if(type==='ranking'){if(ranking.length===question.options.length)answer=ranking.map((item,index)=>`${index+1}위 ${item}`).join(' > ')}
-    else if(type==='forced_choice'){answer=selected;answerSource='choice'}
-    else if(type==='multi_select'){if(multiSelected.length)answer=`복수 선택: ${multiSelected.join(', ')}`}
-    else if(type==='least_likely'){if(selected)answer=`가장 하지 않을 것: ${selected}`;answerSource='choice'}
-    else if(type==='slider'){answer=`${sliderValue}/100 (${config.minLabel||'낮음'} ↔ ${config.maxLabel||'높음'})`}
-    else if(type==='relationship_matrix'){const rows=config.rows||[];if(rows.length&&rows.every(row=>matrixAnswers[row]))answer=rows.map(row=>`${row}: ${matrixAnswers[row]}`).join(' / ')}
-    else if(type==='inner_outer'){if(customAnswer&&secondary.trim())answer=`속마음: ${customAnswer} / 실제 행동: ${secondary.trim()}`;answerSource='custom'}
-    else if(type==='temporal_compare'){if(selected&&secondary)answer=`${config.leftLabel||'처음'}: ${selected} / ${config.rightLabel||'나중'}: ${secondary}`}
-    else if(type==='condition_followup'){if(selected&&secondary)answer=`기본 상황: ${selected} / 조건 변경 후: ${secondary}`}
-    if(!answer.trim())return null;
-    const responseData:ResponseData={selected,custom,multiSelected,ranking,sliderValue,matrixAnswers,secondary};
-    return {order:question.order,question:question.question,answer:answer.trim(),...(reasonText?{reason:reasonText}:{}),branchContext:{category:question.category,mode:question.mode,format:question.format,responseType:type,targetHook:question.targetHook,hypothesis:question.hypothesis,answerSource,responseData}} satisfies InterviewAnswer;
+    if(type==='fill_blank'||type==='dialogue_choice'||type==='owner_meta'){answer=(customAnswer||selected).trim();answerSource=customAnswer?'custom':'choice'}else if(type==='sentence_continue'||type==='in_character_response'){answer=customAnswer;answerSource='custom'}else if(type==='bipolar_scale'){if(selected){const right=Math.max(0,Math.min(100,Math.round(sliderValue)));const left=100-right;answer=`${config.leftLabel||'A'} ${left}% / ${config.rightLabel||'B'} ${right}%`}}else if(type==='ranking'){if(ranking.length===question.options.length)answer=ranking.map((item,index)=>`${index+1}위 ${item}`).join(' > ')}else if(type==='forced_choice'){answer=selected;answerSource='choice'}else if(type==='multi_select'){if(multiSelected.length)answer=`복수 선택: ${multiSelected.join(', ')}`}else if(type==='least_likely'){if(selected)answer=`가장 하지 않을 것: ${selected}`;answerSource='choice'}else if(type==='slider'){answer=`${sliderValue}/100 (${config.minLabel||'낮음'} ↔ ${config.maxLabel||'높음'})`}else if(type==='relationship_matrix'){const rows=config.rows||[];if(rows.length&&rows.every(row=>matrixAnswers[row]))answer=rows.map(row=>`${row}: ${matrixAnswers[row]}`).join(' / ')}else if(type==='inner_outer'){if(customAnswer&&secondary.trim())answer=`속마음: ${customAnswer} / 실제 행동: ${secondary.trim()}`;answerSource='custom'}else if(type==='temporal_compare'){if(selected&&secondary)answer=`${config.leftLabel||'처음'}: ${selected} / ${config.rightLabel||'나중'}: ${secondary}`}else if(type==='condition_followup'){if(selected&&secondary)answer=`기본 상황: ${selected} / 조건 변경 후: ${secondary}`}
+    if(!answer.trim())return null;const responseData:ResponseData={selected,custom,multiSelected,ranking,sliderValue,matrixAnswers,secondary};return {order:question.order,question:question.question,answer:answer.trim(),...(reasonText?{reason:reasonText}:{}),branchContext:{category:question.category,mode:question.mode,format:question.format,responseType:type,targetHook:question.targetHook,hypothesis:question.hypothesis,answerSource,responseData}} satisfies InterviewAnswer;
   }
 
   async function answerCurrent(){
-    if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=activeQuestionIndex<questionHistory.length-1;
-    const next=editingPast?uniqueAnswersByOrder([...answers.filter(answer=>answer.order<current.order),current]):upsertAnswer(answers,current);
-    const nextHistory=editingPast?questionHistory.filter(item=>item.order<=current.order):questionHistory;
-    setAnswers(next);if(editingPast)setHistory(nextHistory);
-    if(question.order===20){const missing=firstMissingOrder(next);if(missing!==null){const repairedAnswers=next.filter(answer=>answer.order<missing);const repairedHistory=nextHistory.filter(item=>item.order<missing);setAnswers(repairedAnswers);setHistory(repairedHistory);await goToOrder(missing,repairedAnswers,repairedHistory);return}await finalize(next);return}
-    if(!editingPast)prefetchAfter(question.order,next);
-    await goToOrder(question.order+1,next,nextHistory);
+    if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=answers.some(answer=>answer.order>current.order);const next=editingPast?uniqueAnswersByOrder([...answers.filter(answer=>answer.order<current.order),current]):upsertAnswer(answers,current);const nextHistory=editingPast?questionHistory.filter(item=>item.order<=current.order):questionHistory;setAnswers(next);if(editingPast){batchRequests.current.clear();setHistory(nextHistory)}
+    if(question.order===20){const missing=firstMissingOrder(next);if(missing!==null){const repairedAnswers=next.filter(answer=>answer.order<missing);const repairedHistory=nextHistory.filter(item=>item.order<missing);setAnswers(repairedAnswers);setHistory(repairedHistory);await goToOrder(missing,repairedAnswers,repairedHistory);return}await finalize(next);return}if(!editingPast)prefetchAfter(question.order,next);await goToOrder(question.order+1,next,nextHistory);
   }
 
   function previousQuestion(){if(busy||!question)return;const previous=questionHistory.filter(item=>item.order<question.order).at(-1);if(previous)applyQuestion(previous,questionHistory,answers)}
@@ -173,7 +139,7 @@ export function AnalyzeFlow(){
     if(type==='fill_blank')return <><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div><div className="field"><label className="label">직접 빈칸 채우기</label><textarea disabled={busy} className="input" style={{minHeight:76,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div></>;
     if(type==='sentence_continue')return <div className="field"><label className="label">문장을 이어 써주세요</label><textarea disabled={busy} className="input" style={{minHeight:120,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>;
     if(type==='dialogue_choice')return <><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>“{o}”</button>)}</div><div className="field"><label className="label">직접 대사 입력</label><textarea disabled={busy} className="input" style={{minHeight:76,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div></>;
-    if(type==='bipolar_scale')return <div className="bipolar-control"><div className="bipolar-labels"><strong>{config.leftLabel||'A'}</strong><strong>{config.rightLabel||'B'}</strong></div><div className="bipolar-track"><input aria-label="A와 B 사이에서 가까운 위치 선택" disabled={busy} className="bipolar-range" type="range" min={0} max={100} step={1} value={sliderValue} onChange={e=>{setSliderValue(Number(e.target.value));setSelected('dial')}} /></div><div className="bipolar-hints"><span>A에 가까움</span><span>반반</span><span>B에 가까움</span></div>{selected&&<div className="bipolar-current">{sliderValue===50?'정중앙':sliderValue<50?`${config.leftLabel||'A'} 쪽에 더 가까움`:`${config.rightLabel||'B'} 쪽에 더 가까움`}</div>}</div>;
+    if(type==='bipolar_scale')return <div className="bipolar-control"><div className="bipolar-labels"><strong>{config.leftLabel||'A'}</strong><strong>{config.rightLabel||'B'}</strong></div><div className="bipolar-track"><input aria-label="A와 B 사이에서 가까운 위치 선택" disabled={busy} className="bipolar-range" type="range" min={0} max={100} step={1} value={sliderValue} onPointerDown={()=>setSelected('dial')} onKeyDown={()=>setSelected('dial')} onChange={e=>{setSliderValue(Number(e.target.value));setSelected('dial')}} /></div><div className="bipolar-hints"><span>A에 가까움</span><span>반반</span><span>B에 가까움</span></div>{selected&&<div className="bipolar-current">{sliderValue===50?'정중앙':sliderValue<50?`${config.leftLabel||'A'} 쪽에 더 가까움`:`${config.rightLabel||'B'} 쪽에 더 가까움`}</div>}</div>;
     if(type==='ranking'){const remaining=question.options.filter(o=>!ranking.includes(o));return <div style={{marginTop:18}}><p className="muted">중요한 순서대로 눌러주세요. 먼저 누른 항목이 1위가 됩니다.</p>{ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=><div key={item} style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',border:'1px solid var(--line)',borderRadius:12}}><strong style={{minWidth:40}}>{index+1}위</strong><span style={{flex:1}}>{item}</span><button className="btn" disabled={busy||index===0} style={{padding:'6px 9px'}} onClick={()=>moveRank(index,-1)}>↑</button><button className="btn" disabled={busy||index===ranking.length-1} style={{padding:'6px 9px'}} onClick={()=>moveRank(index,1)}>↓</button><button className="btn" disabled={busy} style={{padding:'6px 9px'}} onClick={()=>removeRank(item)}>×</button></div>)}</div>}{remaining.length>0&&<div className="options">{remaining.map(o=><button disabled={busy} key={o} className="option" onClick={()=>addRank(o)}>{o}</button>)}</div>}</div>}
     if(type==='forced_choice')return <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div>;
     if(type==='multi_select')return <><p className="muted" style={{marginTop:18}}>해당되는 것을 모두 골라주세요.{config.maxSelections?` 최대 ${config.maxSelections}개까지 선택할 수 있어요.`:''}</p><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${multiSelected.includes(o)?'selected':''}`} onClick={()=>toggleMulti(o)}>{multiSelected.includes(o)?'✓ ':''}{o}</button>)}</div></>;
@@ -188,7 +154,7 @@ export function AnalyzeFlow(){
   }
 
   const confidence=draft?.analysisConfidence??0;
-  const viewingPastQuestion=!!question&&questionHistory.some(item=>item.order>question.order);
+  const viewingPastQuestion=!!question&&answers.some(answer=>answer.order>question.order);
   const savedAtCurrent=question?answers.find(answer=>answer.order===question.order):undefined;
   const currentBuilt=buildCurrentAnswer();
   const currentAnswerChanged=!!savedAtCurrent&&!!currentBuilt&&(currentBuilt.answer!==savedAtCurrent.answer||(currentBuilt.reason||'')!==(savedAtCurrent.reason||''));
