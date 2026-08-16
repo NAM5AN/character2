@@ -83,7 +83,6 @@ export function AnalyzeFlow(){
 
   async function nextQuestion(code:string, currentAnswers=answers, historyBase=questionHistory){
     if(!draft)return;
-    // Keep the just-submitted answer visible while the next question is being generated.
     setBusy(true); setError('');
     try{
       const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers,accessCode:code})});
@@ -94,7 +93,6 @@ export function AnalyzeFlow(){
       setQuestionHistory(nextHistory);
       setQuestion(body.question);
       setActiveQuestionIndex(nextHistory.length-1);
-      // Clear the input only after the replacement question has actually arrived.
       setSelected(''); setCustom(''); setReason('');
       setStage('interview');
     }finally{setBusy(false)}
@@ -127,8 +125,6 @@ export function AnalyzeFlow(){
 
     const editingPast=activeQuestionIndex<questionHistory.length-1;
     if(editingPast){
-      // Adaptive questions after this point were generated from the old answer.
-      // Replace this answer, discard the downstream branch, then regenerate it.
       const next=[...answers.slice(0,activeQuestionIndex),current];
       const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);
       setAnswers(next);
@@ -180,13 +176,17 @@ export function AnalyzeFlow(){
 
   return <>
     <AccessCodeModal open={accessModal} onClose={()=>setAccessModal(false)} onValidated={async()=>{const fn=pendingAction;setPendingAction(null);if(fn)await fn();}} />
-    {stage==='input' && <div className="card">
-      <div className="field"><label className="label">캐릭터 이름</label><input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
-      <div className="field"><label className="label">공개 프로필</label><textarea className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
-      <div className="field"><label className="label">비밀 프로필 <span className="muted">(선택)</span></label><textarea className="textarea" value={secretProfileText} onChange={e=>setSecretProfileText(e.target.value)} placeholder="오너만 알고 있던 비밀 설정, 숨겨진 동기, 과거, 공개 프로필에 적지 않았던 내용을 붙여넣으세요. 없다면 비워두면 됩니다." /></div>
+    {stage==='input' && <div className="card" aria-busy={busy}>
+      <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
+      <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
+      <div className="field"><label className="label">비밀 프로필 <span className="muted">(선택)</span></label><textarea disabled={busy} className="textarea" value={secretProfileText} onChange={e=>setSecretProfileText(e.target.value)} placeholder="오너만 알고 있던 비밀 설정, 숨겨진 동기, 과거, 공개 프로필에 적지 않았던 내용을 붙여넣으세요. 없다면 비워두면 됩니다." /></div>
       <div className="notice">공개 프로필과 비밀 프로필은 서로 다른 정보층으로 구분해 함께 분석합니다. 비밀 프로필 원문은 공유 코드로 보는 Character Passport에 직접 노출하지 않습니다.</div>
+      {busy&&<div role="status" aria-live="polite" style={{marginTop:18,padding:'18px 20px',border:'1px solid var(--line)',borderRadius:16,background:'var(--accent-soft)',display:'flex',gap:16,alignItems:'flex-start'}}>
+        <div className="loading" style={{fontSize:18,fontWeight:900,whiteSpace:'nowrap'}}>AI 분석 중 <i className="dot"/><i className="dot"/><i className="dot"/></div>
+        <div><strong style={{display:'block',marginBottom:5}}>프로필을 읽고 있어요.</strong><p className="muted" style={{margin:0,lineHeight:1.6}}>공개·비밀 프로필을 비교하고 캐릭터 설정, 사실 근거, AI 추론을 정리하는 중입니다. 분석이 끝나면 자동으로 다음 화면으로 이동해요.</p></div>
+      </div>}
       {error&&<p className="error">{error}</p>}
-      <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={()=>gate(parse)}>{busy?<span className="loading">분석 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
+      <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={()=>gate(parse)}>{busy?<span className="loading">AI 분석 진행 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
     </div>}
 
     {stage==='review' && draft && <div className="stack">
