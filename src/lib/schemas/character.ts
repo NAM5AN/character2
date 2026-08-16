@@ -6,7 +6,9 @@ export const inferenceSchema = z.object({
   id: z.string(),
   text: z.string().min(1),
   confidence: z.number().min(0).max(100),
-  evidence: z.array(z.string().min(1).max(220)).min(2).max(4),
+  // New analyses provide 2-4 grounded profile anchors. Default [] keeps
+  // previously saved Character Passports readable.
+  evidence: z.array(z.string().min(1).max(220)).max(4).default([]),
   ownerVerdict: verdictSchema.default('unreviewed'),
 });
 
