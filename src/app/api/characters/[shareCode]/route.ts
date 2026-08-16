@@ -7,6 +7,7 @@ import { characterReportPreviewSchema } from '@/lib/character-report';
 import { validateAccessCode } from '@/lib/settings';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { DETAIL_REPORT_VERSION, generatePaidDetail } from '@/lib/ai/detail-report';
+import { CHARACTER_DEEP_ANALYSIS_SKILL_VERSION } from '@/lib/ai/character-deep-analysis-skill';
 import { apiError } from '@/lib/http';
 
 const detailBundleSchema=z.object({
@@ -58,9 +59,11 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
 
     if(bundle.detail){
       const rawDetail=record(bundle.detail);
-      const currentVersion=rawDetail.detailVersion===DETAIL_REPORT_VERSION;
+      const currentVersion=
+        rawDetail.detailVersion===DETAIL_REPORT_VERSION &&
+        rawDetail.skillVersion===CHARACTER_DEEP_ANALYSIS_SKILL_VERSION;
       // 공유 코드로 보는 사람은 기존 캐시를 그대로 사용합니다. 캐릭터 생성 브라우저에서만
-      // 구버전 상세 리포트를 새 해석 엔진으로 한 번 갱신합니다.
+      // 엔진 또는 분석 스킬 버전이 바뀐 상세 리포트를 한 번 갱신합니다.
       if(currentVersion||!body.editToken){
         const analysis=finalAnalysisSchema.parse(bundle.detail);
         return NextResponse.json({detail:{analysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true}});
@@ -89,12 +92,13 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     }
 
     const analysis=await generatePaidDetail(bundle.seed,bundle.publicProfileText,privateSource);
+    const storedAnalysis={...analysis,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION};
     const {data:saved,error:saveError}=await sb.rpc('character2_save_detail',{
-      p_share_code:shareCode,p_access_code:body.accessCode.trim(),p_detail_json:analysis,
+      p_share_code:shareCode,p_access_code:body.accessCode.trim(),p_detail_json:storedAnalysis,
     });
     if(saveError)throw saveError;
     if(saved!==true)throw new Error('DETAIL_SAVE_FAILED');
-    const publicAnalysis=finalAnalysisSchema.parse(analysis);
+    const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
     return NextResponse.json({detail:{analysis:publicAnalysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
   }catch(error){return apiError(error)}
 }
