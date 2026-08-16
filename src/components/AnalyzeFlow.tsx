@@ -413,8 +413,8 @@ export function AnalyzeFlow(){
     </>;
 
     if(type==='temporal_compare')return <div className="two-col" style={{marginTop:20}}>
-      <div className="field"><label className="label">{config.leftLabel||'직후'}</label><select disabled={busy} className="input" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
-      <div className="field"><label className="label">{config.rightLabel||'시간이 지난 뒤'}</label><select disabled={busy} className="input" value={secondary} onChange={e=>setSecondary(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+      <div className="field"><label className="label">{config.leftLabel||'직후'}</label><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div></div>
+      <div className="field"><label className="label">{config.rightLabel||'시간이 지난 뒤'}</label><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${secondary===o?'selected':''}`} onClick={()=>setSecondary(o)}>{o}</button>)}</div></div>
     </div>;
 
     if(type==='condition_followup')return <>
