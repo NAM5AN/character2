@@ -1,16 +1,19 @@
+import { z } from 'zod';
 import type { CharacterPassport } from '@/lib/schemas/character';
 
-export type CharacterReportPreview = {
-  name: string;
-  shareCode: string;
-  oneLineSummary: string;
-  summary: {
-    outerSelf: string;
-    innerSelf: string;
-    conflictStyle: string;
-    affectionStyle: string;
-  };
-};
+export const characterReportPreviewSchema = z.object({
+  name: z.string().min(1),
+  shareCode: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
+  oneLineSummary: z.string(),
+  summary: z.object({
+    outerSelf: z.string(),
+    innerSelf: z.string(),
+    conflictStyle: z.string(),
+    affectionStyle: z.string(),
+  }),
+});
+
+export type CharacterReportPreview = z.infer<typeof characterReportPreviewSchema>;
 
 function compactFallback(text: string, max = 160) {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -29,10 +32,10 @@ export function buildCharacterReportPreview(passport: CharacterPassport): Charac
     affectionStyle: compactFallback(analysis.affectionStyle),
   };
 
-  return {
+  return characterReportPreviewSchema.parse({
     name: passport.basicProfile.name,
     shareCode: passport.shareCode,
     oneLineSummary: analysis.oneLineSummary,
     summary,
-  };
+  });
 }
