@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
-import type { InterviewQuestion } from '@/lib/schemas/question';
+import type { InterviewQuestion, QuestionResponseType } from '@/lib/schemas/question';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { CharacterReportView } from '@/components/CharacterReportView';
 
@@ -22,9 +22,52 @@ type SavedAnalysisSession={
   selected:string;
   custom:string;
   reason:string;
+  multiSelected?:string[];
+  ranking?:string[];
+  sliderValue?:number;
+  matrixAnswers?:Record<string,string>;
+  secondary?:string;
+};
+
+type ResponseData={
+  selected?:string;
+  custom?:string;
+  multiSelected?:string[];
+  ranking?:string[];
+  sliderValue?:number;
+  matrixAnswers?:Record<string,string>;
+  secondary?:string;
 };
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
+
+const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={
+  fill_blank:'빈칸 채우기',
+  sentence_continue:'문장 이어쓰기',
+  dialogue_choice:'대사 고르기',
+  bipolar_scale:'두 문장 사이',
+  ranking:'순위 매기기',
+  forced_choice:'둘 중 하나',
+  multi_select:'복수 선택',
+  least_likely:'가장 하지 않을 것',
+  slider:'가능성 슬라이더',
+  relationship_matrix:'관계별 반응',
+  inner_outer:'속마음 · 실제 행동',
+  temporal_compare:'시간별 반응',
+  condition_followup:'조건 변화 비교',
+  in_character_response:'캐릭터 대사 직접 쓰기',
+  owner_meta:'오너 메타 질문',
+};
+
+function responseTypeOf(question:InterviewQuestion):QuestionResponseType{
+  const candidate=(question as InterviewQuestion&{responseType?:QuestionResponseType}).responseType;
+  if(candidate)return candidate;
+  return question.format==='free_response'?'in_character_response':'fill_blank';
+}
+
+function responseConfigOf(question:InterviewQuestion){
+  return (question as InterviewQuestion&{responseConfig?:InterviewQuestion['responseConfig']}).responseConfig||{rows:[],columns:[]};
+}
 
 function isSavedSession(value:unknown):value is SavedAnalysisSession{
   if(!value||typeof value!=='object')return false;
@@ -35,8 +78,16 @@ function isSavedSession(value:unknown):value is SavedAnalysisSession{
 function hasMeaningfulProgress(saved:SavedAnalysisSession){
   return !!(
     saved.name.trim()||saved.profileText.trim()||saved.secretProfileText.trim()||saved.draft||
-    saved.answers.length||saved.question||saved.questionHistory.length||saved.selected||saved.custom.trim()||saved.reason.trim()
+    saved.answers.length||saved.question||saved.questionHistory.length||saved.selected||saved.custom.trim()||saved.reason.trim()||
+    saved.multiSelected?.length||saved.ranking?.length||saved.secondary?.trim()||Object.keys(saved.matrixAnswers||{}).length
   );
+}
+
+function responseDataFromAnswer(answer:InterviewAnswer|undefined):ResponseData{
+  if(!answer?.branchContext||typeof answer.branchContext!=='object')return{};
+  const raw=(answer.branchContext as Record<string,unknown>).responseData;
+  if(!raw||typeof raw!=='object')return{};
+  return raw as ResponseData;
 }
 
 export function AnalyzeFlow(){
@@ -52,12 +103,28 @@ export function AnalyzeFlow(){
   const [selected,setSelected]=useState('');
   const [custom,setCustom]=useState('');
   const [reason,setReason]=useState('');
+  const [multiSelected,setMultiSelected]=useState<string[]>([]);
+  const [ranking,setRanking]=useState<string[]>([]);
+  const [sliderValue,setSliderValue]=useState(50);
+  const [matrixAnswers,setMatrixAnswers]=useState<Record<string,string>>({});
+  const [secondary,setSecondary]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [result,setResult]=useState<FinalizeResult|null>(null);
   const [resumeCandidate,setResumeCandidate]=useState<SavedAnalysisSession|null>(null);
   const hydrated=useRef(false);
   const persistenceEnabled=useRef(false);
+
+  function resetResponseDraft(){
+    setSelected('');
+    setCustom('');
+    setReason('');
+    setMultiSelected([]);
+    setRanking([]);
+    setSliderValue(50);
+    setMatrixAnswers({});
+    setSecondary('');
+  }
 
   function restoreSavedSession(saved:SavedAnalysisSession){
     const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
@@ -78,6 +145,11 @@ export function AnalyzeFlow(){
     setSelected(typeof saved.selected==='string'?saved.selected:'');
     setCustom(typeof saved.custom==='string'?saved.custom:'');
     setReason(typeof saved.reason==='string'?saved.reason:'');
+    setMultiSelected(Array.isArray(saved.multiSelected)?saved.multiSelected:[]);
+    setRanking(Array.isArray(saved.ranking)?saved.ranking:[]);
+    setSliderValue(typeof saved.sliderValue==='number'?saved.sliderValue:50);
+    setMatrixAnswers(saved.matrixAnswers&&typeof saved.matrixAnswers==='object'?saved.matrixAnswers:{});
+    setSecondary(typeof saved.secondary==='string'?saved.secondary:'');
     setError('');
 
     if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');
@@ -95,9 +167,7 @@ export function AnalyzeFlow(){
     setQuestion(null);
     setQuestionHistory([]);
     setActiveQuestionIndex(0);
-    setSelected('');
-    setCustom('');
-    setReason('');
+    resetResponseDraft();
     setBusy(false);
     setError('');
     setResult(null);
@@ -148,13 +218,18 @@ export function AnalyzeFlow(){
           selected,
           custom,
           reason,
+          multiSelected,
+          ranking,
+          sliderValue,
+          matrixAnswers,
+          secondary,
         };
         if(hasMeaningfulProgress(saved))localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));
         else localStorage.removeItem(ANALYSIS_SESSION_KEY);
       }catch{}
     },150);
     return()=>window.clearTimeout(timer);
-  },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason]);
+  },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary]);
 
   function continueSavedAnalysis(){
     if(!resumeCandidate)return;
@@ -177,20 +252,191 @@ export function AnalyzeFlow(){
   async function parse(){setBusy(true);setError('');try{const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}setDraft(body.draft);setStage('review')}finally{setBusy(false)}}
   function verdict(id:string,ownerVerdict:'confirmed'|'ambiguous'|'rejected'){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>{if(x.id!==id)return x;if(ownerVerdict==='confirmed'){const {ownerFeedback:_ownerFeedback,...rest}=x;return {...rest,ownerVerdict}}return {...x,ownerVerdict}})})}
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
-  function restoreAnswerFor(index:number,q:InterviewQuestion){const saved=answers[index];setQuestion(q);setActiveQuestionIndex(index);if(!saved){setSelected('');setCustom('');setReason('');return}const matched=q.options.includes(saved.answer);setSelected(matched?saved.answer:'');setCustom(matched?'':saved.answer);setReason(saved.reason||'')}
-  async function nextQuestion(currentAnswers=answers,historyBase=questionHistory){if(!draft)return;setBusy(true);setError('');try{const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}if(body.done){await finalize(currentAnswers);return}const nextHistory=[...historyBase,body.question];setQuestionHistory(nextHistory);setQuestion(body.question);setActiveQuestionIndex(nextHistory.length-1);setSelected('');setCustom('');setReason('');setStage('interview')}finally{setBusy(false)}}
-  function buildCurrentAnswer(){if(!question)return null;const customAnswer=custom.trim();const answer=(customAnswer||selected).trim();if(!answer)return null;const reasonText=reason.trim();return {order:question.order,question:question.question,answer,...(reasonText?{reason:reasonText}:{}),branchContext:{category:question.category,mode:question.mode,format:question.format,targetHook:question.targetHook,hypothesis:question.hypothesis,answerSource:customAnswer?'custom':'choice'}} satisfies InterviewAnswer}
+
+  function restoreAnswerFor(index:number,q:InterviewQuestion){
+    const saved=answers[index];
+    const data=responseDataFromAnswer(saved);
+    setQuestion(q);
+    setActiveQuestionIndex(index);
+    resetResponseDraft();
+    if(!saved)return;
+    if(Object.keys(data).length){
+      setSelected(typeof data.selected==='string'?data.selected:'');
+      setCustom(typeof data.custom==='string'?data.custom:'');
+      setMultiSelected(Array.isArray(data.multiSelected)?data.multiSelected:[]);
+      setRanking(Array.isArray(data.ranking)?data.ranking:[]);
+      setSliderValue(typeof data.sliderValue==='number'?data.sliderValue:50);
+      setMatrixAnswers(data.matrixAnswers&&typeof data.matrixAnswers==='object'?data.matrixAnswers:{});
+      setSecondary(typeof data.secondary==='string'?data.secondary:'');
+    }else{
+      const matched=q.options.includes(saved.answer);
+      setSelected(matched?saved.answer:'');
+      setCustom(matched?'':saved.answer);
+    }
+    setReason(saved.reason||'');
+  }
+
+  async function nextQuestion(currentAnswers=answers,historyBase=questionHistory){if(!draft)return;setBusy(true);setError('');try{const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}if(body.done){await finalize(currentAnswers);return}const nextHistory=[...historyBase,body.question];setQuestionHistory(nextHistory);setQuestion(body.question);setActiveQuestionIndex(nextHistory.length-1);resetResponseDraft();setStage('interview')}finally{setBusy(false)}}
+
+  function buildCurrentAnswer(){
+    if(!question)return null;
+    const type=responseTypeOf(question);
+    const config=responseConfigOf(question);
+    const customAnswer=custom.trim();
+    const reasonText=reason.trim();
+    let answer='';
+    let answerSource:'choice'|'custom'|'structured'='structured';
+
+    if(type==='fill_blank'||type==='dialogue_choice'||type==='owner_meta'){
+      answer=(customAnswer||selected).trim();
+      answerSource=customAnswer?'custom':'choice';
+    }else if(type==='sentence_continue'||type==='in_character_response'){
+      answer=customAnswer;
+      answerSource='custom';
+    }else if(type==='bipolar_scale'){
+      if(selected)answer=`${config.leftLabel||'A'} ← ${selected}/5 → ${config.rightLabel||'B'}`;
+    }else if(type==='ranking'){
+      if(ranking.length===question.options.length)answer=ranking.map((item,index)=>`${index+1}위 ${item}`).join(' > ');
+    }else if(type==='forced_choice'){
+      answer=selected;
+      answerSource='choice';
+    }else if(type==='multi_select'){
+      if(multiSelected.length)answer=`복수 선택: ${multiSelected.join(', ')}`;
+    }else if(type==='least_likely'){
+      if(selected)answer=`가장 하지 않을 것: ${selected}`;
+      answerSource='choice';
+    }else if(type==='slider'){
+      answer=`${sliderValue}/100 (${config.minLabel||'낮음'} ↔ ${config.maxLabel||'높음'})`;
+    }else if(type==='relationship_matrix'){
+      const rows=config.rows||[];
+      if(rows.length&&rows.every(row=>matrixAnswers[row]))answer=rows.map(row=>`${row}: ${matrixAnswers[row]}`).join(' / ');
+    }else if(type==='inner_outer'){
+      if(customAnswer&&secondary.trim())answer=`속마음: ${customAnswer} / 실제 행동: ${secondary.trim()}`;
+      answerSource='custom';
+    }else if(type==='temporal_compare'){
+      if(selected&&secondary)answer=`${config.leftLabel||'처음'}: ${selected} / ${config.rightLabel||'나중'}: ${secondary}`;
+    }else if(type==='condition_followup'){
+      if(selected&&secondary)answer=`기본 상황: ${selected} / 조건 변경 후: ${secondary}`;
+    }
+
+    if(!answer.trim())return null;
+    const responseData:ResponseData={selected,custom,multiSelected,ranking,sliderValue,matrixAnswers,secondary};
+    return {
+      order:question.order,
+      question:question.question,
+      answer:answer.trim(),
+      ...(reasonText?{reason:reasonText}:{}),
+      branchContext:{
+        category:question.category,
+        mode:question.mode,
+        format:question.format,
+        responseType:type,
+        targetHook:question.targetHook,
+        hypothesis:question.hypothesis,
+        answerSource,
+        responseData,
+      },
+    } satisfies InterviewAnswer;
+  }
+
   async function answerCurrent(){if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=activeQuestionIndex<questionHistory.length-1;if(editingPast){const next=[...answers.slice(0,activeQuestionIndex),current];const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);setAnswers(next);setQuestionHistory(nextHistory);if(next.length===20)await finalize(next);else await nextQuestion(next,nextHistory);return}const next=[...answers,current];setAnswers(next);if(next.length===20)await finalize(next);else await nextQuestion(next,questionHistory)}
   function previousQuestion(){if(busy||activeQuestionIndex<=0)return;const i=activeQuestionIndex-1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
   function forwardQuestion(){if(busy||activeQuestionIndex>=questionHistory.length-1)return;const i=activeQuestionIndex+1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
   async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
 
+  function toggleMulti(option:string){
+    const max=question?responseConfigOf(question).maxSelections:undefined;
+    setMultiSelected(current=>{
+      if(current.includes(option))return current.filter(item=>item!==option);
+      if(max&&current.length>=max)return current;
+      return [...current,option];
+    });
+  }
+
+  function addRank(option:string){setRanking(current=>current.includes(option)?current:[...current,option])}
+  function removeRank(option:string){setRanking(current=>current.filter(item=>item!==option))}
+  function moveRank(index:number,direction:-1|1){setRanking(current=>{const next=[...current];const target=index+direction;if(target<0||target>=next.length)return current;[next[index],next[target]]=[next[target],next[index]];return next})}
+
+  function renderResponseControls(){
+    if(!question)return null;
+    const type=responseTypeOf(question);
+    const config=responseConfigOf(question);
+
+    if(type==='fill_blank')return <>
+      <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>
+      <div className="field"><label className="label">직접 빈칸 채우기</label><textarea disabled={busy} className="input" style={{minHeight:76,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div>
+    </>;
+
+    if(type==='sentence_continue')return <div className="field"><label className="label">문장을 이어 써주세요</label><textarea disabled={busy} className="input" style={{minHeight:120,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>;
+
+    if(type==='dialogue_choice')return <>
+      <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>“{o}”</button>)}</div>
+      <div className="field"><label className="label">직접 대사 입력</label><textarea disabled={busy} className="input" style={{minHeight:76,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div>
+    </>;
+
+    if(type==='bipolar_scale')return <div style={{marginTop:20}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:16,fontWeight:800,fontSize:14}}><span>{config.leftLabel}</span><span style={{textAlign:'right'}}>{config.rightLabel}</span></div>
+      <div className="options" style={{gridTemplateColumns:'repeat(5,minmax(0,1fr))',marginTop:10}}>{[
+        ['1','A에 매우 가까움'],['2','A에 조금 가까움'],['3','반반'],['4','B에 조금 가까움'],['5','B에 매우 가까움'],
+      ].map(([value,label])=><button disabled={busy} key={value} className={`option ${selected===value?'selected':''}`} style={{padding:'14px 8px'}} onClick={()=>setSelected(value)}>{label}</button>)}</div>
+    </div>;
+
+    if(type==='ranking'){
+      const remaining=question.options.filter(o=>!ranking.includes(o));
+      return <div style={{marginTop:18}}>
+        <p className="muted">중요한 순서대로 눌러주세요. 먼저 누른 항목이 1위가 됩니다.</p>
+        {ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=><div key={item} style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',border:'1px solid var(--line)',borderRadius:12}}><strong style={{minWidth:40}}>{index+1}위</strong><span style={{flex:1}}>{item}</span><button className="btn" disabled={busy||index===0} style={{padding:'6px 9px'}} onClick={()=>moveRank(index,-1)}>↑</button><button className="btn" disabled={busy||index===ranking.length-1} style={{padding:'6px 9px'}} onClick={()=>moveRank(index,1)}>↓</button><button className="btn" disabled={busy} style={{padding:'6px 9px'}} onClick={()=>removeRank(item)}>×</button></div>)}</div>}
+        {remaining.length>0&&<div className="options">{remaining.map(o=><button disabled={busy} key={o} className="option" onClick={()=>addRank(o)}>{o}</button>)}</div>}
+      </div>;
+    }
+
+    if(type==='forced_choice')return <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div>;
+
+    if(type==='multi_select')return <>
+      <p className="muted" style={{marginTop:18}}>해당되는 것을 모두 골라주세요.{config.maxSelections?` 최대 ${config.maxSelections}개까지 선택할 수 있어요.`:''}</p>
+      <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${multiSelected.includes(o)?'selected':''}`} onClick={()=>toggleMulti(o)}>{multiSelected.includes(o)?'✓ ':''}{o}</button>)}</div>
+    </>;
+
+    if(type==='least_likely')return <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div>;
+
+    if(type==='slider')return <div style={{marginTop:24}}>
+      <div style={{textAlign:'center',fontSize:34,fontWeight:900,marginBottom:10}}>{sliderValue}<span className="muted" style={{fontSize:16}}> / 100</span></div>
+      <input disabled={busy} type="range" min={0} max={100} step={1} value={sliderValue} onChange={e=>setSliderValue(Number(e.target.value))} style={{width:'100%'}} />
+      <div style={{display:'flex',justifyContent:'space-between',gap:20,marginTop:8,fontSize:13,fontWeight:700}}><span>{config.minLabel}</span><span style={{textAlign:'right'}}>{config.maxLabel}</span></div>
+    </div>;
+
+    if(type==='relationship_matrix')return <div style={{marginTop:20}}>{config.rows.map(row=><div key={row} style={{padding:'14px 0',borderBottom:'1px solid var(--line)'}}><div className="label" style={{marginBottom:8}}>{row}</div><div className="options">{config.columns.map(column=><button disabled={busy} key={column} className={`option ${matrixAnswers[row]===column?'selected':''}`} onClick={()=>setMatrixAnswers(current=>({...current,[row]:column}))}>{column}</button>)}</div></div>)}</div>;
+
+    if(type==='inner_outer')return <>
+      <div className="field"><label className="label">속으로 가장 먼저 드는 생각</label><textarea disabled={busy} className="input" style={{minHeight:100,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>
+      <div className="field"><label className="label">{config.prompt2||'실제로 겉으로 보이는 행동'}</label><textarea disabled={busy} className="input" style={{minHeight:100,resize:'vertical'}} value={secondary} onChange={e=>setSecondary(e.target.value)} /></div>
+    </>;
+
+    if(type==='temporal_compare')return <div className="two-col" style={{marginTop:20}}>
+      <div className="field"><label className="label">{config.leftLabel||'직후'}</label><select disabled={busy} className="input" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+      <div className="field"><label className="label">{config.rightLabel||'시간이 지난 뒤'}</label><select disabled={busy} className="input" value={secondary} onChange={e=>setSecondary(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+    </div>;
+
+    if(type==='condition_followup')return <>
+      <div className="field"><label className="label">기본 상황</label><select disabled={busy} className="input" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+      <div className="field"><label className="label">{config.prompt2}</label><select disabled={busy} className="input" value={secondary} onChange={e=>setSecondary(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+    </>;
+
+    if(type==='in_character_response')return <div className="field"><label className="label">캐릭터라면 뭐라고 말할까요?</label><textarea disabled={busy} className="input" style={{minHeight:130,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>;
+
+    return <>
+      <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>
+      <div className="field"><label className="label">직접 입력</label><textarea disabled={busy} className="input" style={{minHeight:84,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div>
+    </>;
+  }
+
   const confidence=draft?.analysisConfidence??0;
-  const freeResponse=question?.format==='free_response';
   const viewingPastQuestion=activeQuestionIndex<questionHistory.length-1;
   const savedAtCurrent=answers[activeQuestionIndex];
-  const currentDraftAnswer=(custom.trim()||selected).trim();
-  const currentAnswerChanged=!!savedAtCurrent&&(currentDraftAnswer!==savedAtCurrent.answer||reason.trim()!==(savedAtCurrent.reason||''));
+  const currentBuilt=buildCurrentAnswer();
+  const currentAnswerChanged=!!savedAtCurrent&&!!currentBuilt&&(currentBuilt.answer!==savedAtCurrent.answer||(currentBuilt.reason||'')!==(savedAtCurrent.reason||''));
+  const hasCurrentResponse=!!currentBuilt;
+  const responseType=question?responseTypeOf(question):null;
   const resumeProgress=resumeCandidate
     ? (resumeCandidate.stage==='interview'||resumeCandidate.stage==='finalizing')
       ? `인터뷰 ${Math.min(20,resumeCandidate.answers.length+(resumeCandidate.question?1:0))}/20 진행 중`
@@ -206,10 +452,7 @@ export function AnalyzeFlow(){
         <h3 style={{margin:'8px 0 8px'}}>작성하던 캐릭터 분석이 있어요.</h3>
         <p className="muted" style={{margin:'0 0 4px'}}>이전에 입력한 프로필과 답변을 불러와서 계속할까요?</p>
         <p style={{margin:'0 0 16px',fontWeight:800}}>{resumeCandidate.name||'이름 미입력'} · {resumeProgress}</p>
-        <div className="actions" style={{marginTop:0}}>
-          <button className="btn primary" onClick={continueSavedAnalysis}>이어하기</button>
-          <button className="btn" onClick={startFreshAnalysis}>처음부터 하기</button>
-        </div>
+        <div className="actions" style={{marginTop:0}}><button className="btn primary" onClick={continueSavedAnalysis}>이어하기</button><button className="btn" onClick={startFreshAnalysis}>처음부터 하기</button></div>
       </div>}
       <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy||!!resumeCandidate} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
       <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy||!!resumeCandidate} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
@@ -228,8 +471,14 @@ export function AnalyzeFlow(){
     </div>}
 
     {stage==='interview'&&question&&<div className="card question-card">
-      <div><div className="q-meta"><span>{question.order} / 20</span>{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{!freeResponse&&<div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>}<div className="field"><label className="label">{freeResponse?'직접 답변':'직접 입력'}</label><textarea disabled={busy} className="input" style={{minHeight:freeResponse?130:80,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div><div className="field"><label className="label">{freeResponse?'덧붙일 이유·맥락':'왜 그렇게 행동할까요?'} <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">이유를 적으면 다음 질문의 분기와 최종 캐해에 함께 반영돼요.</span></div></div>
-      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div>
+      <div>
+        <div className="q-meta"><span>{question.order} / 20</span>{responseType&&<span>{RESPONSE_TYPE_LABELS[responseType]}</span>}{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div>
+        <div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div>
+        <h2 className="q-title">{question.question}</h2>
+        {renderResponseControls()}
+        <div className="field"><label className="label">왜 그렇게 답했나요? <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">여기에 적은 이유·맥락은 원문 그대로 다음 질문과 최종 캐해에 반영돼요.</span></div>
+      </div>
+      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!hasCurrentResponse} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div>
     </div>}
 
     {stage==='finalizing'&&<div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>캐릭터 요약을 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 프로필을 합쳐 무료 요약을 만들고 있습니다. 상세 리포트는 결제 코드 확인 후에만 생성돼요.</p>{error&&<p className="error">{error}</p>}</div>}
