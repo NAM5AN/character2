@@ -74,25 +74,39 @@ function isDocumentMetaInference(text: string) {
   return patterns.some(pattern => pattern.test(normalized));
 }
 
-function normalizeEvidence(record: UnknownRecord) {
+function normalizeForEvidenceMatch(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(/[“”‘’"'`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeEvidence(record: UnknownRecord, sourceText: string) {
   const raw = record.evidence ?? record.evidences ?? record.grounds ?? record.basis ?? record.sources ?? record.anchors;
   const array = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : [];
+  const normalizedSource = normalizeForEvidenceMatch(sourceText);
+
   return [...new Set(array
     .map(item => typeof item === 'string' ? item.trim() : '')
-    .filter(Boolean))]
+    .filter(Boolean)
+    .filter(item => {
+      const normalized = normalizeForEvidenceMatch(item);
+      return normalized.length >= 4 && normalizedSource.includes(normalized);
+    }))]
     .slice(0, 4);
 }
 
-function normalizeInferences(items: unknown[]) {
+function normalizeInferences(items: unknown[], sourceText: string) {
   return items.flatMap((item, index) => {
     const record = asRecord(item);
     if (!Object.keys(record).length) return [];
     const text = pickString(record, ['text', 'inference', 'hypothesis', 'summary', 'content', 'description', 'claim', 'interpretation']);
     if (!text || isDocumentMetaInference(text)) return [];
 
-    const evidence = normalizeEvidence(record);
-    // A review card must represent an actual interpretation built from at least
-    // two profile anchors. One-anchor restatements are facts, not inferences.
+    const evidence = normalizeEvidence(record, sourceText);
+    // New review cards require at least two distinct excerpts that the server
+    // can verify actually exist in the supplied public/secret profile text.
     if (evidence.length < 2) return [];
 
     const confidence = normalizeScore(record.confidence ?? record.score ?? record.probability ?? record.certainty, 60);
@@ -120,10 +134,11 @@ export async function POST(request: Request) {
       instructions: PARSER_INSTRUCTIONS,
       schema: initialCharacterDraftSchema,
       maxOutputTokens: 3000,
-      input: `캐릭터 이름: ${body.name}\n\n공개 프로필:\n${body.profileText}${secretSection}\n\n공개 프로필과 비밀 프로필은 서로 다른 정보층으로 읽되, aiInferences에는 문서의 차이·누락·표기 문제를 적지 말고 캐릭터 자체의 행동 규칙·관계 방식·가치·동기에 대한 해석만 적으세요.\n\n중요: aiInferences는 프로필 문장을 다시 말하는 요약이 아닙니다. 서로 다른 프로필 단서 2개 이상을 연결했을 때만 한 단계 높은 해석을 만드세요. 추론에 등장하는 모든 조건·동기·관계 규칙은 evidence에서 직접 뒷받침되거나 evidence 사이의 관계에서 자연스럽게 나와야 합니다. 근거 없는 심리 조건을 새로 만들지 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidence} 배열로 출력하세요. evidence는 공개/비밀 프로필에 실제로 존재하는 서로 다른 근거 단서 2~4개의 짧은 문자열 배열입니다. id와 ownerVerdict는 서버가 생성합니다.`,
+      input: `캐릭터 이름: ${body.name}\n\n공개 프로필:\n${body.profileText}${secretSection}\n\n공개 프로필과 비밀 프로필은 서로 다른 정보층으로 읽되, aiInferences에는 문서의 차이·누락·표기 문제를 적지 말고 캐릭터 자체의 행동 규칙·관계 방식·가치·동기에 대한 해석만 적으세요.\n\n중요: aiInferences는 프로필 문장을 다시 말하는 요약이 아닙니다. 서로 다른 프로필 단서 2개 이상을 연결했을 때만 한 단계 높은 해석을 만드세요. 추론에 등장하는 모든 조건·동기·관계 규칙은 evidence에서 직접 뒷받침되거나 evidence 사이의 관계에서 자연스럽게 나와야 합니다. 근거 없는 심리 조건을 새로 만들지 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidence} 배열로 출력하세요. evidence는 요약문이 아니라 공개/비밀 프로필 원문에 실제로 존재하는 짧은 구절을 그대로 발췌한 문자열 2~4개여야 합니다. 서버가 원문에 실제로 존재하는지 검사합니다. id와 ownerVerdict는 서버가 생성합니다.`,
     });
 
     const basic = asRecord(raw.basicProfile);
+    const sourceText = `${body.profileText}\n${body.secretProfileText}`;
     const draft = characterDraftSchema.parse({
       basicProfile: {
         name: body.name,
@@ -135,7 +150,7 @@ export async function POST(request: Request) {
       traits: normalizeTraitRecord(raw.traits),
       relationshipTraits: normalizeTraitRecord(raw.relationshipTraits),
       confirmedFacts: normalizeFacts(raw.confirmedFacts),
-      aiInferences: normalizeInferences(raw.aiInferences),
+      aiInferences: normalizeInferences(raw.aiInferences, sourceText),
       analysisConfidence: normalizeScore(raw.analysisConfidence, 65),
     });
 
