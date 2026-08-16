@@ -6,12 +6,12 @@ export const inferenceSchema = z.object({
   id: z.string(),
   text: z.string().min(1),
   confidence: z.number().min(0).max(100),
-  // New analyses provide 2-4 grounded profile anchors. Default [] keeps
-  // previously saved Character Passports readable.
-  evidence: z.array(z.string().min(1).max(220)).max(4).default([]),
+  // New analyses ground each inference in server-generated profile fact IDs.
+  // Defaults keep previously saved Character Passports readable.
+  evidenceIds: z.array(z.string().regex(/^fact_\d{3,}$/)).max(4).default([]),
+  evidence: z.array(z.string().min(1).max(260)).max(4).default([]),
   ownerVerdict: verdictSchema.default('unreviewed'),
   // Optional owner clarification/correction for ambiguous or rejected AI reads.
-  // Kept optional for backward compatibility with previously saved passports.
   ownerFeedback: z.string().max(1200).optional(),
 });
 
