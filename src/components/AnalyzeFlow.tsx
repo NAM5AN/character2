@@ -49,7 +49,20 @@ export function AnalyzeFlow(){
   }
 
   function verdict(id:string,ownerVerdict:'confirmed'|'ambiguous'|'rejected'){
-    if(!draft)return; setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerVerdict}:x)});
+    if(!draft)return;
+    setDraft({...draft,aiInferences:draft.aiInferences.map(x=>{
+      if(x.id!==id)return x;
+      if(ownerVerdict==='confirmed'){
+        const {ownerFeedback: _ownerFeedback,...rest}=x;
+        return {...rest,ownerVerdict};
+      }
+      return {...x,ownerVerdict};
+    })});
+  }
+
+  function inferenceFeedback(id:string,ownerFeedback:string){
+    if(!draft)return;
+    setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)});
   }
 
   async function nextQuestion(code:string, currentAnswers=answers){
@@ -111,7 +124,7 @@ export function AnalyzeFlow(){
 
     {stage==='review' && draft && <div className="stack">
       <div className="card"><div className="eyebrow">AI first read</div><h2 style={{marginTop:10}}>{draft.basicProfile.name}을 이렇게 이해했어요.</h2><div className="two-col"><div><div className="label">분석 정밀도</div><div style={{fontSize:40,fontWeight:900}}>{Math.round(confidence)}%</div></div><div><div className="label">확인된 설정</div><div style={{fontSize:40,fontWeight:900}}>{draft.confirmedFacts.length}</div></div></div><div className="progress" style={{marginTop:16}}><span style={{width:`${confidence}%`}}/></div></div>
-      <div className="card"><h3>AI 추론 검수</h3><p className="muted">프로필의 서로 다른 근거를 연결해 한 단계 더 해석한 내용만 표시합니다. 근거를 보고 맞음·애매함·아님을 골라주세요.</p>{draft.aiInferences.map(x=><div className="inference" key={x.id}><div className="inference-top"><p>{x.text}</p><span className="muted">{Math.round(x.confidence)}%</span></div>{x.evidence.length>0&&<div style={{marginTop:10}}><div className="label">근거</div><div className="tags" style={{marginTop:7}}>{x.evidence.map((e,i)=><span className="tag" key={`${x.id}-e-${i}`}>{e}</span>)}</div></div>}<div className="pills"><button className={`pill ${x.ownerVerdict==='confirmed'?'active':''}`} onClick={()=>verdict(x.id,'confirmed')}>맞음</button><button className={`pill ${x.ownerVerdict==='ambiguous'?'active':''}`} onClick={()=>verdict(x.id,'ambiguous')}>애매함</button><button className={`pill ${x.ownerVerdict==='rejected'?'active':''}`} onClick={()=>verdict(x.id,'rejected')}>아님</button></div></div>)}</div>
+      <div className="card"><h3>AI 추론 검수</h3><p className="muted">프로필의 서로 다른 근거를 연결해 한 단계 더 해석한 내용만 표시합니다. 애매하거나 틀린 해석은 직접 보충해주면 이후 질문과 최종 캐해에 반영돼요.</p>{draft.aiInferences.map(x=><div className="inference" key={x.id}><div className="inference-top"><p>{x.text}</p><span className="muted">{Math.round(x.confidence)}%</span></div>{x.evidence.length>0&&<div style={{marginTop:10}}><div className="label">근거</div><div className="tags" style={{marginTop:7}}>{x.evidence.map((e,i)=><span className="tag" key={`${x.id}-e-${i}`}>{e}</span>)}</div></div>}<div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginTop:10}}><div className="pills" style={{marginTop:0}}><button className={`pill ${x.ownerVerdict==='confirmed'?'active':''}`} onClick={()=>verdict(x.id,'confirmed')}>맞음</button><button className={`pill ${x.ownerVerdict==='ambiguous'?'active':''}`} onClick={()=>verdict(x.id,'ambiguous')}>애매함</button><button className={`pill ${x.ownerVerdict==='rejected'?'active':''}`} onClick={()=>verdict(x.id,'rejected')}>아님</button></div>{(x.ownerVerdict==='ambiguous'||x.ownerVerdict==='rejected')&&<div style={{flex:'1 1 320px',minWidth:240}}><label className="label">{x.ownerVerdict==='ambiguous'?'어떤 부분이 맞고, 어떤 부분이 다른가요?':'실제로는 어떤가요?'}</label><textarea className="input" style={{minHeight:84,resize:'vertical',marginTop:7}} maxLength={1200} value={x.ownerFeedback||''} onChange={e=>inferenceFeedback(x.id,e.target.value)} placeholder={x.ownerVerdict==='ambiguous'?'예: 앞부분은 맞지만, 가까운 사람에게는 오히려 반대로 행동해요.':'예: 실제로는 부탁을 거절하는 데 부담이 없고, 급한 일만 도와줘요.'}/><span className="muted">여기에 적은 내용은 AI 추론보다 오너의 직접 설정으로 우선 반영돼요.</span></div>}</div></div>)}</div>
       <div className="actions"><button className="btn primary" onClick={()=>gate(c=>nextQuestion(c,[]))}>20문항 인터뷰 시작</button><button className="btn" onClick={()=>setStage('input')}>프로필 다시 입력</button></div>
     </div>}
 
