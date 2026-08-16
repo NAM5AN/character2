@@ -71,6 +71,22 @@ h3 { letter-spacing: -.03em; }
 .options { display:grid; gap:9px; }
 .option { width:100%; text-align:left; border:1px solid var(--line); border-radius:12px; padding:15px; background:white; }
 .option:hover,.option.selected { border-color:var(--ink); background:#f8f5ef; }
+.bipolar-control { margin-top:24px; padding:22px 20px 18px; border:1px solid var(--line); border-radius:18px; background:#fff; }
+.bipolar-labels { display:grid; grid-template-columns:1fr 1fr; gap:24px; font-size:14px; line-height:1.45; }
+.bipolar-labels strong:last-child { text-align:right; }
+.bipolar-track { position:relative; margin:24px 4px 10px; }
+.bipolar-track::before { content:""; position:absolute; left:50%; top:50%; width:1px; height:28px; background:var(--line); transform:translate(-50%,-50%); pointer-events:none; }
+.bipolar-range { appearance:none; -webkit-appearance:none; width:100%; height:34px; margin:0; background:transparent; cursor:grab; }
+.bipolar-range:active { cursor:grabbing; }
+.bipolar-range::-webkit-slider-runnable-track { height:8px; border-radius:999px; background:linear-gradient(90deg,var(--accent-soft),var(--line) 50%,#eee5dc); border:1px solid var(--line); }
+.bipolar-range::-webkit-slider-thumb { -webkit-appearance:none; width:28px; height:28px; border-radius:50%; background:var(--ink); border:5px solid var(--paper); box-shadow:0 0 0 2px var(--ink),0 4px 12px #0002; margin-top:-11px; }
+.bipolar-range::-moz-range-track { height:8px; border-radius:999px; background:linear-gradient(90deg,var(--accent-soft),var(--line) 50%,#eee5dc); border:1px solid var(--line); }
+.bipolar-range::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:var(--ink); border:5px solid var(--paper); box-shadow:0 0 0 2px var(--ink),0 4px 12px #0002; }
+.bipolar-range:focus-visible { outline:2px solid var(--ink); outline-offset:5px; border-radius:999px; }
+.bipolar-hints { display:grid; grid-template-columns:1fr 1fr 1fr; color:var(--muted); font-size:11px; font-weight:700; }
+.bipolar-hints span:nth-child(2) { text-align:center; }
+.bipolar-hints span:last-child { text-align:right; }
+.bipolar-current { margin-top:14px; text-align:center; font-size:13px; font-weight:800; }
 .result-hero { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:end; padding-bottom:28px; border-bottom:1px solid var(--line); }
 .share-code { font-size:34px; letter-spacing:.12em; font-weight:900; font-family:monospace; }
 .result-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
@@ -99,4 +115,6 @@ h3 { letter-spacing: -.03em; }
   .result-hero { grid-template-columns:1fr; }
   .question-card { min-height:440px; }
   .q-title { font-size:25px; }
+  .bipolar-control { padding:18px 14px 16px; }
+  .bipolar-labels { gap:14px; font-size:13px; }
 }
