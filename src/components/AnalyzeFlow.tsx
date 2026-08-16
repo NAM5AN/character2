@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion } from '@/lib/schemas/question';
 import type { CharacterReportPreview } from '@/lib/character-report';
@@ -7,6 +7,24 @@ import { CharacterReportView } from '@/components/CharacterReportView';
 
 type Stage = 'input'|'review'|'interview'|'finalizing'|'done';
 type FinalizeResult={preview:CharacterReportPreview;shareCode:string;editToken:string};
+type SavedStage='input'|'review'|'interview'|'finalizing';
+type SavedAnalysisSession={
+  version:1;
+  stage:SavedStage;
+  name:string;
+  profileText:string;
+  secretProfileText:string;
+  draft:CharacterDraft|null;
+  answers:InterviewAnswer[];
+  question:InterviewQuestion|null;
+  questionHistory:InterviewQuestion[];
+  activeQuestionIndex:number;
+  selected:string;
+  custom:string;
+  reason:string;
+};
+
+const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 
 export function AnalyzeFlow(){
   const [stage,setStage]=useState<Stage>('input');
@@ -24,6 +42,69 @@ export function AnalyzeFlow(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [result,setResult]=useState<FinalizeResult|null>(null);
+  const hydrated=useRef(false);
+  const persistenceEnabled=useRef(true);
+
+  useEffect(()=>{
+    try{
+      const raw=sessionStorage.getItem(ANALYSIS_SESSION_KEY);
+      if(!raw)return;
+      const saved=JSON.parse(raw) as Partial<SavedAnalysisSession>;
+      if(saved.version!==1)return;
+
+      const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
+      const restoredAnswers=Array.isArray(saved.answers)?saved.answers as InterviewAnswer[]:[];
+      const restoredHistory=Array.isArray(saved.questionHistory)?saved.questionHistory as InterviewQuestion[]:[];
+      const requestedIndex=Number.isInteger(saved.activeQuestionIndex)?Number(saved.activeQuestionIndex):Math.max(0,restoredHistory.length-1);
+      const restoredIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
+      const restoredQuestion=(saved.question&&typeof saved.question==='object'?saved.question:null) as InterviewQuestion|null || restoredHistory[restoredIndex] || null;
+
+      setName(typeof saved.name==='string'?saved.name:'');
+      setProfileText(typeof saved.profileText==='string'?saved.profileText:'');
+      setSecretProfileText(typeof saved.secretProfileText==='string'?saved.secretProfileText:'');
+      setDraft(restoredDraft);
+      setAnswers(restoredAnswers);
+      setQuestionHistory(restoredHistory);
+      setQuestion(restoredQuestion);
+      setActiveQuestionIndex(restoredIndex);
+      setSelected(typeof saved.selected==='string'?saved.selected:'');
+      setCustom(typeof saved.custom==='string'?saved.custom:'');
+      setReason(typeof saved.reason==='string'?saved.reason:'');
+
+      if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');
+      else if(saved.stage==='review'&&restoredDraft)setStage('review');
+      else setStage('input');
+    }catch{
+      sessionStorage.removeItem(ANALYSIS_SESSION_KEY);
+    }finally{
+      hydrated.current=true;
+    }
+  },[]);
+
+  useEffect(()=>{
+    if(!hydrated.current||!persistenceEnabled.current||stage==='done')return;
+    const timer=window.setTimeout(()=>{
+      try{
+        const saved:SavedAnalysisSession={
+          version:1,
+          stage:stage as SavedStage,
+          name,
+          profileText,
+          secretProfileText,
+          draft,
+          answers,
+          question,
+          questionHistory,
+          activeQuestionIndex,
+          selected,
+          custom,
+          reason,
+        };
+        sessionStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));
+      }catch{}
+    },150);
+    return()=>window.clearTimeout(timer);
+  },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason]);
 
   function handleApiError(status:number,body:any){setError(body?.error==='RATE_LIMITED'?'요청이 너무 많아요. 잠시 뒤 다시 시도해주세요.':`처리 중 오류가 발생했어요. (${body?.error||status})`)}
   async function parse(){setBusy(true);setError('');try{const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}setDraft(body.draft);setStage('review')}finally{setBusy(false)}}
@@ -35,7 +116,7 @@ export function AnalyzeFlow(){
   async function answerCurrent(){if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=activeQuestionIndex<questionHistory.length-1;if(editingPast){const next=[...answers.slice(0,activeQuestionIndex),current];const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);setAnswers(next);setQuestionHistory(nextHistory);if(next.length===20)await finalize(next);else await nextQuestion(next,nextHistory);return}const next=[...answers,current];setAnswers(next);if(next.length===20)await finalize(next);else await nextQuestion(next,questionHistory)}
   function previousQuestion(){if(busy||activeQuestionIndex<=0)return;const i=activeQuestionIndex-1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
   function forwardQuestion(){if(busy||activeQuestionIndex>=questionHistory.length-1)return;const i=activeQuestionIndex+1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
-  async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
+  async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
 
   const confidence=draft?.analysisConfidence??0;
   const freeResponse=question?.format==='free_response';
