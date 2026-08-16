@@ -65,6 +65,19 @@ export async function POST(request: Request) {
     const editToken = createEditToken();
     const characterId = crypto.randomUUID();
     const { name, age, gender, profileText } = body.draft.basicProfile;
+
+    // Raw grounding excerpts/IDs can point into the secret profile, and owner
+    // corrections may also contain private settings. Use them for analysis but
+    // do not expose those raw materials through the read-only share passport.
+    const sharedInferences = body.draft.aiInferences.map(inference => ({
+      id: inference.id,
+      text: inference.text,
+      confidence: inference.confidence,
+      evidenceIds: [],
+      evidence: [],
+      ownerVerdict: inference.ownerVerdict,
+    }));
+
     const passport = characterPassportSchema.parse({
       schemaVersion: 'character-passport/1.0',
       characterId,
@@ -73,10 +86,10 @@ export async function POST(request: Request) {
       traits: body.draft.traits,
       relationshipTraits: body.draft.relationshipTraits,
       confirmedFacts: body.draft.confirmedFacts,
-      aiInferences: body.draft.aiInferences,
+      aiInferences: sharedInferences,
       interview: { version: 'interview/1.0', completedCount: 20, answers: body.answers },
       analysis,
-      engineVersions: { parser: 'parser/1.2', interview: 'interview/1.3', analysis: 'analysis/1.3' },
+      engineVersions: { parser: 'parser/1.3', interview: 'interview/1.3', analysis: 'analysis/1.3' },
     });
 
     const { data: saved, error: saveError } = await supabase.rpc('character2_create_character', {
