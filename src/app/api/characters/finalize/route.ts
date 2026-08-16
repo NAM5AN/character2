@@ -33,11 +33,31 @@ export async function POST(request: Request) {
     const body = requestSchema.parse(await request.json());
     if (!(await validateAccessCode(body.accessCode))) throw new Error('CODE_INVALID');
 
+    const inferenceReview = {
+      confirmed: body.draft.aiInferences
+        .filter(x => x.ownerVerdict === 'confirmed')
+        .map(x => ({ text: x.text, evidence: x.evidence })),
+      ambiguous: body.draft.aiInferences
+        .filter(x => x.ownerVerdict === 'ambiguous')
+        .map(x => ({ text: x.text, evidence: x.evidence, ownerFeedback: x.ownerFeedback?.trim() || '' })),
+      rejectedCorrections: body.draft.aiInferences
+        .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
+        .map(x => ({ rejectedInference: x.text, ownerCorrection: x.ownerFeedback!.trim() })),
+    };
+
+    const analysisDraft = {
+      basicProfile: body.draft.basicProfile,
+      traits: body.draft.traits,
+      relationshipTraits: body.draft.relationshipTraits,
+      confirmedFacts: body.draft.confirmedFacts,
+      analysisConfidence: body.draft.analysisConfidence,
+    };
+
     const analysis = await askClaudeJson({
       system: FINAL_ANALYSIS_SYSTEM,
       schema: finalAnalysisSchema,
       maxTokens: 3500,
-      input: `캐릭터 데이터:\n${JSON.stringify(body.draft)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n공개 프로필과 비밀 프로필을 모두 근거로 최종 캐해를 작성하되, 비밀 프로필 원문을 길게 인용하거나 그대로 복사하지 마세요.\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
+      input: `캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n오너 검수 피드백 사용 규칙:\n- rejectedCorrections.ownerCorrection은 오너가 직접 알려준 실제 설정으로 취급하세요.\n- rejectedCorrections.rejectedInference는 틀린 AI 추론이므로 사실, 가능성, 분석 근거로 절대 재사용하지 마세요.\n- ambiguous.ownerFeedback이 있으면 그 피드백을 AI 추론 문장보다 우선하세요. 추론 원문은 일부만 맞을 수 있는 불확실한 해석입니다.\n- ambiguous.ownerFeedback이 없으면 해당 추론은 확정 근거가 아니라 가능성 수준으로만 취급하세요.\n- confirmed에 있는 추론만 오너가 그대로 맞다고 확인한 해석입니다.\n- 오너가 직접 쓴 검수 피드백과 인터뷰 답변/이유는 AI 추론보다 우선순위가 높은 근거입니다.\n\n공개 프로필과 비밀 프로필을 모두 근거로 최종 캐해를 작성하되, 비밀 프로필 원문을 길게 인용하거나 그대로 복사하지 마세요.\n\n최종 캐해 JSON을 작성하세요. 출력 키는 oneLineSummary, outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints입니다. coreValues/desires/fears/misunderstoodPoints/contradictions/interestingPoints는 문자열 배열입니다.`,
     });
 
     const supabase = getSupabaseServer();
@@ -56,7 +76,7 @@ export async function POST(request: Request) {
       aiInferences: body.draft.aiInferences,
       interview: { version: 'interview/1.0', completedCount: 20, answers: body.answers },
       analysis,
-      engineVersions: { parser: 'parser/1.1', interview: 'interview/1.1', analysis: 'analysis/1.1' },
+      engineVersions: { parser: 'parser/1.2', interview: 'interview/1.3', analysis: 'analysis/1.3' },
     });
 
     const { data: saved, error: saveError } = await supabase.rpc('character2_create_character', {
