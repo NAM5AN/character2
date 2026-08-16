@@ -25,6 +25,17 @@ function BulletList({items}:{items:string[]}){
   return <ul style={{margin:'0',paddingLeft:22,lineHeight:1.8,color:'#444'}}>{items.map((item,index)=><li key={`${index}-${item.slice(0,18)}`} style={{margin:index===0?0:'7px 0 0'}}>{item}</li>)}</ul>;
 }
 
+function apiErrorInfo(body:unknown,status:number){
+  const record=body&&typeof body==='object'?body as Record<string,unknown>:{};
+  const code=typeof record.error==='string'&&record.error.trim()?record.error.trim():`HTTP_${status}`;
+  const details=typeof record.details==='string'&&record.details.trim()?record.details.trim():'';
+  return {code,details};
+}
+
+function formatError(message:string,code:string,details=''){
+  return `${message}\n오류 코드: ${code}${details?`\n상세: ${details}`:''}`;
+}
+
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
   const [unlockOpen,setUnlockOpen]=useState(false);
   const [detail,setDetail]=useState<DetailPayload|null>(null);
@@ -42,20 +53,26 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     try{
       const token=editToken();
       const r=await fetch(`/api/characters/${preview.shareCode}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessCode:code,...(token?{editToken:token}:{})})});
-      const body=await r.json();
+      const body=await r.json().catch(()=>({}));
       if(!r.ok){
+        const apiError=apiErrorInfo(body,r.status);
         if(r.status===401){localStorage.removeItem('chara_ai_access_code');setUnlockOpen(true)}
-        if(body?.error==='DETAIL_OWNER_SOURCE_REQUIRED'){
-          setError('상세 리포트가 아직 생성되지 않았어요. 최초 1회는 이 캐릭터를 만든 브라우저에서 상세보기를 열어야 해요.');
-        }else if(body?.error==='EDIT_TOKEN_INVALID'){
-          setError('이 브라우저의 캐릭터 생성 권한을 확인하지 못했어요. 최초 상세 생성은 캐릭터를 만든 브라우저에서 진행해주세요.');
+        if(apiError.code==='DETAIL_OWNER_SOURCE_REQUIRED'){
+          setError(formatError('상세 리포트가 아직 생성되지 않았어요. 최초 1회는 이 캐릭터를 만든 브라우저에서 상세보기를 열어야 해요.',apiError.code,apiError.details));
+        }else if(apiError.code==='EDIT_TOKEN_INVALID'){
+          setError(formatError('이 브라우저의 캐릭터 생성 권한을 확인하지 못했어요. 최초 상세 생성은 캐릭터를 만든 브라우저에서 진행해주세요.',apiError.code,apiError.details));
+        }else if(apiError.code==='CODE_INVALID'){
+          setError(formatError('이용 코드를 다시 확인해주세요.',apiError.code,apiError.details));
         }else{
-          setError(body?.error==='CODE_INVALID'?'이용 코드를 다시 확인해주세요.':`상세 리포트를 불러오지 못했어요. (${body?.error||r.status})`);
+          setError(formatError('상세 리포트를 불러오지 못했어요.',apiError.code,apiError.details));
         }
         return;
       }
       setDetail(body.detail);
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
+    }catch(cause){
+      const details=cause instanceof Error?cause.message:String(cause);
+      setError(formatError('상세 리포트 요청 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
     }finally{setBusy(false)}
   }
 
@@ -96,7 +113,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       </div>
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>상세 리포트 생성 중 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{margin:'8px 0 0',lineHeight:1.6}}>캐릭터의 행동 원리와 관계 패턴을 깊게 해석하고 있어요. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p></div>}
-      {error&&<p className="error">{error}</p>}
+      {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
