@@ -75,6 +75,24 @@ function isSavedSession(value:unknown):value is SavedAnalysisSession{
   return saved.version===1&&typeof saved.stage==='string';
 }
 
+function uniqueAnswersByOrder(items:InterviewAnswer[]){
+  const byOrder=new Map<number,InterviewAnswer>();
+  for(const item of items){
+    if(Number.isInteger(item.order)&&item.order>=1&&item.order<=20)byOrder.set(item.order,item);
+  }
+  return [...byOrder.values()].sort((a,b)=>a.order-b.order);
+}
+
+function upsertAnswer(items:InterviewAnswer[],answer:InterviewAnswer){
+  return uniqueAnswersByOrder([...items.filter(item=>item.order!==answer.order),answer]);
+}
+
+function firstMissingOrder(items:InterviewAnswer[]){
+  const orders=new Set(uniqueAnswersByOrder(items).map(item=>item.order));
+  for(let order=1;order<=20;order+=1)if(!orders.has(order))return order;
+  return null;
+}
+
 function hasMeaningfulProgress(saved:SavedAnalysisSession){
   return !!(
     saved.name.trim()||saved.profileText.trim()||saved.secretProfileText.trim()||saved.draft||
@@ -128,7 +146,7 @@ export function AnalyzeFlow(){
 
   function restoreSavedSession(saved:SavedAnalysisSession){
     const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
-    const restoredAnswers=Array.isArray(saved.answers)?saved.answers as InterviewAnswer[]:[];
+    const restoredAnswers=Array.isArray(saved.answers)?uniqueAnswersByOrder(saved.answers as InterviewAnswer[]):[];
     const restoredHistory=Array.isArray(saved.questionHistory)?saved.questionHistory as InterviewQuestion[]:[];
     const requestedIndex=Number.isInteger(saved.activeQuestionIndex)?Number(saved.activeQuestionIndex):Math.max(0,restoredHistory.length-1);
     const restoredIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
@@ -254,7 +272,7 @@ export function AnalyzeFlow(){
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
 
   function restoreAnswerFor(index:number,q:InterviewQuestion){
-    const saved=answers[index];
+    const saved=answers.find(answer=>answer.order===q.order);
     const data=responseDataFromAnswer(saved);
     setQuestion(q);
     setActiveQuestionIndex(index);
@@ -276,7 +294,7 @@ export function AnalyzeFlow(){
     setReason(saved.reason||'');
   }
 
-  async function nextQuestion(currentAnswers=answers,historyBase=questionHistory){if(!draft)return;setBusy(true);setError('');try{const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}if(body.done){await finalize(currentAnswers);return}const nextHistory=[...historyBase,body.question];setQuestionHistory(nextHistory);setQuestion(body.question);setActiveQuestionIndex(nextHistory.length-1);resetResponseDraft();setStage('interview')}finally{setBusy(false)}}
+  async function nextQuestion(currentAnswers=answers,historyBase=questionHistory){if(!draft)return;setBusy(true);setError('');try{const normalizedAnswers=uniqueAnswersByOrder(currentAnswers);const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}if(body.done){await finalize(normalizedAnswers);return}const nextHistory=[...historyBase.filter(item=>item.order!==body.question.order),body.question].sort((a,b)=>a.order-b.order);setQuestionHistory(nextHistory);setQuestion(body.question);setActiveQuestionIndex(nextHistory.findIndex(item=>item.order===body.question.order));resetResponseDraft();setStage('interview')}finally{setBusy(false)}}
 
   function buildCurrentAnswer(){
     if(!question)return null;
@@ -339,10 +357,38 @@ export function AnalyzeFlow(){
     } satisfies InterviewAnswer;
   }
 
-  async function answerCurrent(){if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=activeQuestionIndex<questionHistory.length-1;if(editingPast){const next=[...answers.slice(0,activeQuestionIndex),current];const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);setAnswers(next);setQuestionHistory(nextHistory);if(next.length===20)await finalize(next);else await nextQuestion(next,nextHistory);return}const next=[...answers,current];setAnswers(next);if(next.length===20)await finalize(next);else await nextQuestion(next,questionHistory)}
+  async function answerCurrent(){
+    if(!question)return;
+    const current=buildCurrentAnswer();
+    if(!current)return;
+    const editingPast=activeQuestionIndex<questionHistory.length-1;
+    const next=editingPast
+      ? uniqueAnswersByOrder([...answers.filter(answer=>answer.order<current.order),current])
+      : upsertAnswer(answers,current);
+    const nextHistory=editingPast
+      ? questionHistory.filter(item=>item.order<=current.order)
+      : questionHistory;
+    setAnswers(next);
+    if(editingPast)setQuestionHistory(nextHistory);
+
+    if(question.order===20){
+      const missing=firstMissingOrder(next);
+      if(missing!==null){
+        const repairedAnswers=next.filter(answer=>answer.order<missing);
+        const repairedHistory=nextHistory.filter(item=>item.order<missing);
+        setAnswers(repairedAnswers);
+        setQuestionHistory(repairedHistory);
+        await nextQuestion(repairedAnswers,repairedHistory);
+        return;
+      }
+      await finalize(next);
+      return;
+    }
+    await nextQuestion(next,nextHistory);
+  }
   function previousQuestion(){if(busy||activeQuestionIndex<=0)return;const i=activeQuestionIndex-1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
   function forwardQuestion(){if(busy||activeQuestionIndex>=questionHistory.length-1)return;const i=activeQuestionIndex+1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
-  async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
+  async function finalize(finalAnswers=answers){if(!draft)return;const normalizedAnswers=uniqueAnswersByOrder(finalAnswers);if(normalizedAnswers.length!==20){setStage('interview');setError('답변 순서를 복구하는 중이에요. 마지막으로 완료하지 못한 질문부터 다시 이어주세요.');return}setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
 
   function toggleMulti(option:string){
     const max=question?responseConfigOf(question).maxSelections:undefined;
@@ -432,14 +478,14 @@ export function AnalyzeFlow(){
 
   const confidence=draft?.analysisConfidence??0;
   const viewingPastQuestion=activeQuestionIndex<questionHistory.length-1;
-  const savedAtCurrent=answers[activeQuestionIndex];
+  const savedAtCurrent=question?answers.find(answer=>answer.order===question.order):undefined;
   const currentBuilt=buildCurrentAnswer();
   const currentAnswerChanged=!!savedAtCurrent&&!!currentBuilt&&(currentBuilt.answer!==savedAtCurrent.answer||(currentBuilt.reason||'')!==(savedAtCurrent.reason||''));
   const hasCurrentResponse=!!currentBuilt;
   const responseType=question?responseTypeOf(question):null;
   const resumeProgress=resumeCandidate
     ? (resumeCandidate.stage==='interview'||resumeCandidate.stage==='finalizing')
-      ? `인터뷰 ${Math.min(20,resumeCandidate.answers.length+(resumeCandidate.question?1:0))}/20 진행 중`
+      ? `인터뷰 ${Math.min(20,uniqueAnswersByOrder(resumeCandidate.answers).length+(resumeCandidate.question?1:0))}/20 진행 중`
       : resumeCandidate.stage==='review'
         ? '프로필 분석과 AI 추론 검수 단계'
         : '프로필 작성 중'
