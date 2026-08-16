@@ -37,7 +37,6 @@ const RESPONSE_TYPE_LABELS = {
   dialogue_choice: '대사 고르기',
   bipolar_scale: '두 문장 사이 강도 선택',
   ranking: '순위 매기기',
-  forced_choice: '둘 중 하나 선택',
   multi_select: '복수 선택',
   least_likely: '가장 하지 않을 것 고르기',
   slider: '가능성 슬라이더',
@@ -45,7 +44,6 @@ const RESPONSE_TYPE_LABELS = {
   inner_outer: '속마음과 실제 행동 분리',
   temporal_compare: '시간에 따른 반응 비교',
   condition_followup: '조건이 바뀌었을 때 비교',
-  in_character_response: '캐릭터 대사 직접 쓰기',
   owner_meta: '오너 메타 질문',
 } as const;
 
@@ -59,7 +57,6 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   dialogue_choice: '캐릭터가 실제로 할 법한 첫마디를 고르게 하세요. options는 짧은 실제 대사 3~5개이며 allowCustom=true입니다.',
   bipolar_scale: '서로 반대되는 두 판단 중 어느 쪽에 더 가까운지 5단계로 고르게 합니다. options=[]이고 responseConfig.leftLabel/rightLabel에 짧고 대등한 두 문장을 넣으세요.',
   ranking: '서로 다른 가치·판단·행동 기준 4~5개를 options에 넣어 전부 순위 매기게 하세요. 항목끼리 겹치지 않게 하세요.',
-  forced_choice: '둘 다 포기하기 어려운 두 선택을 정확히 2개 options로 만드세요. 단순 선악 비교가 아니라 캐릭터 해석이 갈리는 양자택일이어야 합니다.',
   multi_select: '동시에 일어날 수 있는 행동이나 반응 4~6개를 options에 넣으세요. 여러 개를 고를 수 있어야 하므로 상호배타적으로 만들지 마세요. 필요하면 responseConfig.maxSelections에 2~4를 넣으세요.',
   least_likely: 'options 3~5개 중 이 캐릭터가 가장 하지 않을 것 하나를 고르게 하세요. 질문도 반드시 가장 하지 않을 것을 묻는 형태로 쓰세요.',
   slider: '0~100 가능성/강도를 고르게 하세요. options=[]이고 responseConfig.minLabel/maxLabel에 0과 100이 뜻하는 상태를 각각 넣으세요.',
@@ -67,7 +64,6 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 question은 첫 번째 항목, responseConfig.prompt2는 두 번째 항목을 묻습니다.',
   temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
   condition_followup: '기본 상황에서 한 번 고른 뒤 조건 하나만 바뀌었을 때 다시 고르게 합니다. options는 두 질문에서 공통으로 쓸 3~5개 반응이며 responseConfig.prompt2에 바뀐 조건을 포함한 두 번째 질문을 넣으세요.',
-  in_character_response: '누군가 캐릭터에게 직접 말을 건 상황에서 캐릭터가 뭐라고 답할지 오너가 캐릭터 말투로 직접 쓰게 하세요. options=[]이고 allowCustom=true입니다.',
   owner_meta: '캐릭터를 오래 본 오너만 답하기 좋은 메타 질문을 만드세요. 예: 남들이 자주 오해하는 부분, 오너가 가장 중요하게 보는 간극. options는 3~5개 후보이며 allowCustom=true입니다.',
 };
 
