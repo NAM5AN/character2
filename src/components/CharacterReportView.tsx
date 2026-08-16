@@ -46,10 +46,10 @@ function estimatedProgress(elapsed:number){
 }
 
 function progressStage(progress:number){
-  if(progress<22)return '입력 자료 정리 중';
-  if(progress<60)return '행동 패턴과 숨은 심리 분석 중';
-  if(progress<82)return '가설·모순·반례 검증 중';
-  return '최종 상세 리포트 작성 중';
+  if(progress<22)return '이 캐릭터가 들려준 이야기부터 천천히 살펴보는 중';
+  if(progress<60)return '말과 행동 사이에 숨은 마음을 들여다보는 중';
+  if(progress<82)return '서로 다른 모습들이 왜 함께 나타나는지 맞춰보는 중';
+  return '이 캐릭터만의 속마음을 리포트로 정리하는 중';
 }
 
 function remainingLabel(elapsed:number){
