@@ -6,6 +6,7 @@ export async function askClaudeJson<T>(args: {
   input: string;
   schema: z.ZodType<T>;
   maxTokens?: number;
+  allowFallback?: boolean;
 }): Promise<T> {
   const primaryModel = process.env.ANTHROPIC_MODEL || 'anthropic/claude-sonnet-5';
   try {
@@ -19,6 +20,7 @@ export async function askClaudeJson<T>(args: {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
+    if (args.allowFallback === false) throw error;
 
     const fallbackModel = process.env.CLAUDE_JSON_FALLBACK_MODEL || 'openai/gpt-5.6-luna';
     return generateValidatedJson({
