@@ -31,7 +31,50 @@ const FORMAT_LABELS = {
   free_response: '자유서술형',
 } as const;
 
+const RESPONSE_TYPE_LABELS = {
+  fill_blank: '빈칸 채우기',
+  sentence_continue: '문장 이어쓰기',
+  dialogue_choice: '대사 고르기',
+  bipolar_scale: '두 문장 사이 강도 선택',
+  ranking: '순위 매기기',
+  forced_choice: '둘 중 하나 선택',
+  multi_select: '복수 선택',
+  least_likely: '가장 하지 않을 것 고르기',
+  slider: '가능성 슬라이더',
+  relationship_matrix: '관계별 반응표',
+  inner_outer: '속마음과 실제 행동 분리',
+  temporal_compare: '시간에 따른 반응 비교',
+  condition_followup: '조건이 바뀌었을 때 비교',
+  in_character_response: '캐릭터 대사 직접 쓰기',
+  owner_meta: '오너 메타 질문',
+} as const;
+
+type ResponseType = keyof typeof RESPONSE_TYPE_LABELS;
+const RESPONSE_TYPES = Object.keys(RESPONSE_TYPE_LABELS) as ResponseType[];
 const RECENT_FULL_HISTORY = 4;
+
+const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
+  fill_blank: '질문 안에 ________ 빈칸을 하나 넣으세요. options는 서로 다른 3~5개 후보를 만들고 allowCustom=true로 하세요. responseConfig는 빈 객체 수준으로 두세요.',
+  sentence_continue: '캐릭터의 생각이나 판단을 이어 쓰게 하는 미완성 문장으로 만드세요. options=[]이고 allowCustom=true입니다. 사용자가 직접 한 문장으로 이어 쓸 수 있어야 합니다.',
+  dialogue_choice: '캐릭터가 실제로 할 법한 첫마디를 고르게 하세요. options는 짧은 실제 대사 3~5개이며 allowCustom=true입니다.',
+  bipolar_scale: '서로 반대되는 두 판단 중 어느 쪽에 더 가까운지 5단계로 고르게 합니다. options=[]이고 responseConfig.leftLabel/rightLabel에 짧고 대등한 두 문장을 넣으세요.',
+  ranking: '서로 다른 가치·판단·행동 기준 4~5개를 options에 넣어 전부 순위 매기게 하세요. 항목끼리 겹치지 않게 하세요.',
+  forced_choice: '둘 다 포기하기 어려운 두 선택을 정확히 2개 options로 만드세요. 단순 선악 비교가 아니라 캐릭터 해석이 갈리는 양자택일이어야 합니다.',
+  multi_select: '동시에 일어날 수 있는 행동이나 반응 4~6개를 options에 넣으세요. 여러 개를 고를 수 있어야 하므로 상호배타적으로 만들지 마세요. 필요하면 responseConfig.maxSelections에 2~4를 넣으세요.',
+  least_likely: 'options 3~5개 중 이 캐릭터가 가장 하지 않을 것 하나를 고르게 하세요. 질문도 반드시 가장 하지 않을 것을 묻는 형태로 쓰세요.',
+  slider: '0~100 가능성/강도를 고르게 하세요. options=[]이고 responseConfig.minLabel/maxLabel에 0과 100이 뜻하는 상태를 각각 넣으세요.',
+  relationship_matrix: '같은 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]입니다. responseConfig.rows에는 2~4개의 관계 상대, columns에는 2~4개의 짧은 반응 선택지를 넣으세요.',
+  inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 question은 첫 번째 항목, responseConfig.prompt2는 두 번째 항목을 묻습니다.',
+  temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
+  condition_followup: '기본 상황에서 한 번 고른 뒤 조건 하나만 바뀌었을 때 다시 고르게 합니다. options는 두 질문에서 공통으로 쓸 3~5개 반응이며 responseConfig.prompt2에 바뀐 조건을 포함한 두 번째 질문을 넣으세요.',
+  in_character_response: '누군가 캐릭터에게 직접 말을 건 상황에서 캐릭터가 뭐라고 답할지 오너가 캐릭터 말투로 직접 쓰게 하세요. options=[]이고 allowCustom=true입니다.',
+  owner_meta: '캐릭터를 오래 본 오너만 답하기 좋은 메타 질문을 만드세요. 예: 남들이 자주 오해하는 부분, 오너가 가장 중요하게 보는 간극. options는 3~5개 후보이며 allowCustom=true입니다.',
+};
+
+const RESPONSE_TYPE_SYSTEM = `응답 UI 형식은 질문 format과 별개의 축입니다.
+이번 요청에서는 서버가 responseType을 하나 고정해서 제공합니다. 반드시 그 responseType을 그대로 출력하세요.
+responseType에 따라 options와 responseConfig 구조가 달라지며, 아래 개별 규칙이 기존의 일반적인 '선택지 3~5개' 규칙보다 우선합니다.
+최종 JSON 키는 order, category, mode, format, responseType, responseConfig, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.`;
 
 function contextString(value: unknown, key: string) {
   if (!value || typeof value !== 'object') return '';
@@ -46,6 +89,35 @@ function trailingCount(values: string[], target: string) {
     count += 1;
   }
   return count;
+}
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function chooseResponseType(args: {
+  name: string;
+  order: number;
+  history: Array<{ responseType: string; targetHook: string }>;
+}) {
+  const counts = Object.fromEntries(RESPONSE_TYPES.map(type => [type, 0])) as Record<ResponseType, number>;
+  for (const item of args.history) {
+    if (item.responseType in counts) counts[item.responseType as ResponseType] += 1;
+  }
+
+  const missing = RESPONSE_TYPES.filter(type => counts[type] === 0);
+  const lastType = args.history.at(-1)?.responseType || '';
+  const pool = missing.length
+    ? missing
+    : RESPONSE_TYPES.filter(type => type !== lastType && counts[type] < 3);
+  const candidates = pool.length ? pool : RESPONSE_TYPES.filter(type => type !== lastType);
+  const seed = hashString(`${args.name}:${args.order}:${args.history.map(x => x.targetHook).join('|')}`);
+  return candidates[seed % candidates.length];
 }
 
 export async function POST(request: Request) {
@@ -87,7 +159,7 @@ export async function POST(request: Request) {
     const history = body.answers.map(answer => {
       const format = contextString(answer.branchContext, 'format');
       const storedSource = contextString(answer.branchContext, 'answerSource');
-      const answerSource = storedSource === 'choice' || storedSource === 'custom'
+      const answerSource = storedSource === 'choice' || storedSource === 'custom' || storedSource === 'structured'
         ? storedSource
         : format === 'free_response'
           ? 'custom'
@@ -100,6 +172,7 @@ export async function POST(request: Request) {
         category: contextString(answer.branchContext, 'category'),
         mode: contextString(answer.branchContext, 'mode'),
         format,
+        responseType: contextString(answer.branchContext, 'responseType'),
         targetHook: contextString(answer.branchContext, 'targetHook'),
         hypothesis: contextString(answer.branchContext, 'hypothesis'),
         answerSource,
@@ -109,23 +182,22 @@ export async function POST(request: Request) {
     const recentHistory = history.slice(-RECENT_FULL_HISTORY);
     const olderHistory = history.slice(0, Math.max(0, history.length - RECENT_FULL_HISTORY));
 
-    // 오래된 객관식 중 오너 추가 서술이 없는 항목만 짧게 압축한다.
     const settledKnowledge = olderHistory
       .filter(item => item.answerSource === 'choice' && !item.reason)
       .map(item => ({
         order: item.order,
         category: item.category,
+        responseType: item.responseType,
         targetHook: item.targetHook,
         selectedAnswer: item.answer,
       }));
 
-    // 오너가 직접 쓴 답변/이유는 오래되어도 원문을 그대로 보존한다.
-    // answerSource가 없는 구버전 답변도 안전하게 원문 보존으로 처리한다.
     const ownerVerbatim = olderHistory
       .filter(item => item.answerSource !== 'choice' || !!item.reason)
       .map(item => ({
         order: item.order,
         category: item.category,
+        responseType: item.responseType,
         targetHook: item.targetHook,
         question: item.question,
         ...(item.answerSource === 'choice'
@@ -150,6 +222,10 @@ export async function POST(request: Request) {
       ]),
     );
 
+    const responseTypeCounts = Object.fromEntries(
+      RESPONSE_TYPES.map(type => [type, history.filter(item => item.responseType === type).length]),
+    );
+
     const unmetCategories = Object.entries(CATEGORY_TARGETS)
       .filter(([category, target]) => (categoryCounts[category] || 0) < target)
       .map(([category, target]) => `${category} ${(categoryCounts[category] || 0)}/${target}`);
@@ -165,6 +241,11 @@ export async function POST(request: Request) {
     const freeResponseCount = formatCounts.free_response || 0;
     const lastFormat = history.at(-1)?.format || '';
     const usedHooks = history.map(item => item.targetHook).filter(Boolean);
+    const responseType = chooseResponseType({
+      name: body.draft.basicProfile.name,
+      order,
+      history: history.map(item => ({ responseType: item.responseType, targetHook: item.targetHook })),
+    });
 
     const modeRules = order === 1
       ? '첫 문항이므로 mode는 pivot으로 시작하세요.'
@@ -183,9 +264,9 @@ export async function POST(request: Request) {
       : `category 순서는 자유입니다. 캐릭터상 정보가치가 가장 높은 영역을 고르되 부족 영역도 고려하세요: ${unmetCategories.join(', ') || '없음'}`;
 
     const question = await askOpenAIJson({
-      instructions: QUESTION_INSTRUCTIONS,
+      instructions: `${QUESTION_INSTRUCTIONS}\n\n${RESPONSE_TYPE_SYSTEM}`,
       schema: interviewQuestionSchema,
-      maxOutputTokens: 1050,
+      maxOutputTokens: 1400,
       input: `현재 문항 번호: ${order}/20
 
 캐릭터 데이터:
@@ -195,97 +276,79 @@ ${JSON.stringify(compactDraft)}
 - ownerCorrections의 각 문장은 오너가 직접 확정한 캐릭터 사실입니다. 이미 답이 끝난 CLOSED KNOWLEDGE입니다.
 - ownerCorrections에 적힌 행동, 이유, 조건, 예외, 우선순위, 관계 차이는 다시 질문하지 마세요.
 - 같은 내용을 단어만 바꾸거나 상황만 살짝 바꿔 재확인하는 것도 금지합니다.
-- ownerCorrections를 질문의 출발점으로 사용할 수는 있지만, 반드시 correction에 아직 답이 없는 '인접한 새 정보'만 물어야 합니다.
-- 예: 오너가 '자기 일정과 겹치면 바로 거절하고 죄책감도 없다'고 정정했다면, '일정이 겹치면 무엇을 먼저 보나?', '거절할 때 죄책감이 있나?'는 금지입니다.
-- 그 대신 정말 필요하다면 '누구에게는 그 기준이 달라지는가?', '본인이 먼저 도움을 청할 때도 같은 기준인가?'처럼 정정문에 답이 없는 별도 축을 볼 수 있습니다.
-- 단, 그런 인접 질문도 다른 캐릭터 Hook보다 정보가치가 낮다면 굳이 이어 묻지 말고 pivot하세요.
-
-- ownerClarifiedAmbiguities.ownerFeedback도 오너가 직접 말한 부분은 CLOSED KNOWLEDGE입니다. 그 문장에 이미 포함된 내용은 재질문하지 마세요.
-- relatedInference는 왜 애매함이 생겼는지 이해하기 위한 배경일 뿐이며 ownerFeedback과 충돌하면 ownerFeedback이 정답입니다.
+- ownerCorrections를 질문의 출발점으로 사용할 수는 있지만, 반드시 correction에 아직 답이 없는 인접한 새 정보만 물어야 합니다.
+- ownerClarifiedAmbiguities.ownerFeedback도 오너가 직접 말한 부분은 CLOSED KNOWLEDGE입니다.
+- relatedInference는 배경일 뿐이며 ownerFeedback과 충돌하면 ownerFeedback이 정답입니다.
 - unresolvedAmbiguities는 아직 오너 설명이 없으므로 약한 참고만 가능합니다.
 - confirmedInferences는 오너가 맞다고 확인한 해석입니다.
 - unreviewed/rejected AI 추론 원문은 질문 근거로 사용하지 않습니다.
 
+중복 방지용 인터뷰 기억:
+- 오래된 객관식 확정 내용 settledKnowledge: ${JSON.stringify(settledKnowledge)}
+- 오래되어도 원문 보존한 오너 직접서술/이유 ownerVerbatim: ${JSON.stringify(ownerVerbatim)}
+- 최근 ${RECENT_FULL_HISTORY}문답 전체 recentHistory: ${JSON.stringify(recentHistory)}
+- 지금까지 겨냥한 targetHook 전체 usedHooks: ${JSON.stringify(usedHooks)}
+
 중복 방지 규칙:
-- 질문을 만들기 전에 반드시 '이 질문의 답이 이미 ownerCorrections, ownerClarifiedAmbiguities.ownerFeedback, 프로필 명시 사실, 아래 인터뷰 기억 안에 들어 있는가?'를 검사하세요.
-- settledKnowledge는 오래된 객관식 문답에서 이미 확정된 내용입니다. 같은 판단을 다시 묻지 마세요.
-- ownerVerbatim의 directAnswer/originalAnswer/reason은 오너가 직접 쓴 원문이므로 요약하거나 의미를 축소하지 말고 그대로 근거로 사용하세요.
-- recentHistory는 최근 ${RECENT_FULL_HISTORY}문답의 전체 원문입니다.
-- usedHooks는 지금까지 겨냥한 축 전체입니다. 같은 Hook을 다시 쓰는 것은 branch로 새 조건을 확인할 가치가 있을 때만 허용됩니다.
-- 답이 이미 있으면 그 질문 후보를 폐기하고 다른 targetHook을 고르세요.
-- 새 질문은 기존 확정 정보를 다시 측정하는 것이 아니라, 아직 비어 있는 정보를 추가해야 합니다.
+- 질문을 만들기 전에 답이 이미 ownerCorrections, ownerClarifiedAmbiguities.ownerFeedback, 프로필 명시 사실, settledKnowledge, ownerVerbatim, recentHistory 안에 있는지 검사하세요.
+- ownerVerbatim의 directAnswer/originalAnswer/reason은 오너가 직접 쓴 원문이므로 의미를 축소하지 말고 그대로 근거로 사용하세요.
+- 같은 targetHook은 branch로 새로운 조건을 구분할 가치가 있을 때만 다시 사용할 수 있습니다.
+- 이미 답이 있으면 후보를 폐기하고 다른 미확인 지점을 고르세요.
 
 연계형 질문 허용 규칙:
 - 매 문항마다 새 상황으로 바꿀 필요는 없습니다. 같은 상황에서 한 번 더 물어야 원래 답의 조건·예외·우선순위가 드러난다면 branch로 이어갈 수 있습니다.
-- 특히 직전 답변이 직전 hypothesis, 프로필에서 예상된 패턴, 또는 지금까지 강해진 해석과 반대 방향이라면 즉시 다른 주제로 넘기지 말고 그 차이가 왜 생겼는지 구분하는 후속 질문을 우선 검토하세요.
-- 후속 질문은 '아까 답 정말 맞나요?' 같은 재확인이 아니라, 서로 다른 해석을 가르는 새로운 판단 조건을 하나 추가해야 합니다.
-- 예: 예상과 달리 갈등 상황에서 먼저 사과한다고 답했다면, 같은 갈등 상황 안에서 '본인 잘못이 없다고 확신할 때도 먼저 관계를 수습하는가'처럼 해석을 가르는 조건을 한 번 더 볼 수 있습니다.
-- branch에서는 직전 targetHook과 동일하거나 매우 가까운 Hook을 1회 더 다뤄도 됩니다. 단, 이전 답에 이미 포함된 내용을 그대로 묻지 마세요.
+- 특히 직전 답변이 직전 hypothesis, 프로필에서 예상된 패턴, 또는 지금까지 강해진 해석과 반대 방향이라면 그 차이를 구분하는 후속 질문을 우선 검토하세요.
+- 후속 질문은 재확인이 아니라 서로 다른 해석을 가르는 새로운 판단 조건을 하나 추가해야 합니다.
 - 같은 상황의 연계 질문이 두 문항 연속 이어졌다면 다음에는 pivot 또는 counter로 전환하세요.
-- 직전 답이 이미 충분히 명확하거나 후속 질문으로 얻을 새 정보가 적다면 억지로 연계하지 말고 pivot하세요.
+- 후속 질문의 정보가치가 낮다면 억지로 branch하지 마세요.
 
 중요한 증거 사용 규칙:
-- 오너의 직접 정정/보충, 직접입력 답변, 인터뷰의 reason은 가장 높은 우선순위의 캐릭터 근거입니다.
-- 객관식 selectedAnswer보다 오너가 직접 쓴 reason이 더 구체적이면 reason을 우선하세요.
-- confirmedFacts의 어떤 항목도 종류만으로 중요하거나 중요하지 않다고 판단하지 마세요.
-- 프로필/비밀 프로필이 의미를 직접 설명하거나, 서로 독립적인 여러 행동·관계·사건·답변이 같은 의미를 지지하면 강한 Hook으로 사용할 수 있습니다.
+- 오너 직접 정정/보충, 인터뷰 답변과 이유는 가장 높은 우선순위의 캐릭터 근거입니다.
+- 프로필/비밀 프로필이 의미를 직접 설명하거나 서로 독립적인 여러 행동·관계·사건·답변이 같은 의미를 지지하면 강한 Hook으로 사용할 수 있습니다.
 - 반복되지만 의미가 불명확한 항목은 중간 강도의 단서입니다. 중요성을 단정하지 않는 질문만 허용됩니다.
 - 한 번 등장했고 의미가 설명되지 않은 항목은 약한 단서입니다. 심리적 의미를 전제로 질문하지 마세요.
-
-인터뷰 기억:
-[최근 ${RECENT_FULL_HISTORY}문답 — 질문/답변/이유 원문]
-${JSON.stringify(recentHistory)}
-
-[오래된 객관식 확정 정보 — 압축본]
-${JSON.stringify(settledKnowledge)}
-
-[오너 직접 작성 원문 — 절대 압축/재서술 금지]
-${JSON.stringify(ownerVerbatim)}
-
-[지금까지 사용한 targetHook 전체]
-${JSON.stringify(usedHooks)}
-
-답변 이유 활용:
-- ownerVerbatim과 recentHistory의 reason은 글자 그대로 보존된 오너 원문입니다.
-- 선택한 보기보다 reason이 더 구체적이면 reason을 우선해 캐릭터의 행동 규칙을 이해하세요.
-- 직접입력 답변은 객관식 요약보다 높은 정보량을 가진 원자료로 취급하세요.
-- 이미 적힌 directAnswer/reason의 내용을 다시 확인하지 마세요.
-- 직전 답변/이유가 기존 해석과 충돌하거나 예상 밖의 조건을 드러냈다면, 그 충돌을 해소하면 캐해 폭이 넓어지는지 먼저 판단하고 가치가 있으면 같은 맥락의 branch를 1회 허용하세요.
-- 단순히 더 자세히 듣고 싶다는 이유만으로 branch하지 말고, 후속 답변에 따라 실제 해석이 달라질 때만 이어가세요.
 
 현재 커버리지:
 - category counts: ${JSON.stringify(categoryCounts)}
 - format counts: ${JSON.stringify(formatCounts)}
+- responseType counts: ${JSON.stringify(responseTypeCounts)}
 - 최근 mode: ${JSON.stringify(recentModes)}
 - 최근 format: ${JSON.stringify(recentFormats)}
-- 이미 겨냥한 targetHook: ${JSON.stringify(usedHooks)}
 
 이번 문항의 진행 제약:
 ${modeRules}
 ${formatRules}
 ${coverageRule}
 
+이번 문항의 답변 UI 형식은 서버가 고정했습니다.
+- responseType=${responseType} (${RESPONSE_TYPE_LABELS[responseType]})
+- 반드시 responseType 값을 정확히 "${responseType}"로 출력하세요.
+- 세부 제작 규칙: ${RESPONSE_TYPE_RULES[responseType]}
+- responseConfig에서 사용하지 않는 필드는 생략하거나 빈 배열로 두세요.
+- 답변 UI 형식을 맞추기 위해 캐릭터와 무관한 질문을 만들면 안 됩니다. 같은 미확인 Hook을 이 UI에 자연스럽게 표현하세요.
+
 질문 선택 절차:
-1. 현재 캐릭터에서 아직 답이 없는 의문 후보를 2~4개 내부적으로 만드세요. 직전 답변을 한 번 더 파고들면 해석이 크게 갈리는 경우에는 같은 상황의 후속 후보도 반드시 포함하세요.
-2. 각 후보가 오너 정정/보충, 프로필, settledKnowledge, ownerVerbatim, recentHistory에 이미 답이 있는지 검사하고, 있으면 제거하세요.
+1. 현재 캐릭터에서 아직 답이 없는 의문 후보를 2~4개 내부적으로 만드세요. 직전 답변을 한 번 더 파고들면 해석이 크게 갈리는 경우에는 같은 상황의 후속 후보도 포함하세요.
+2. 각 후보가 오너 정정/보충, 프로필, 인터뷰 기억에 이미 답이 있는지 검사하고 있으면 제거하세요.
 3. 남은 후보 중 한 문항으로 해석이 가장 많이 달라질 지점을 targetHook으로 고르세요.
-4. 최근 답변에서 실제 미확인 정보가 이어지거나 기존 hypothesis와 충돌해 한 번 더 구분할 가치가 있으면 branch를 선택할 수 있습니다. 이 경우 같은 상황을 1회 이어가도 됩니다. 다른 고유 Hook이 더 중요하면 pivot, 강해진 해석의 현실적 예외를 확인하는 편이 더 유용하면 counter를 고르세요.
-5. 질문은 한 가지 판단만 묻고 짧게 작성하세요.
+4. 최근 답변에서 실제 미확인 정보가 이어지거나 기존 hypothesis와 충돌해 한 번 더 구분할 가치가 있으면 branch를 선택할 수 있습니다. 다른 Hook이 더 중요하면 pivot, 강해진 해석의 예외가 더 중요하면 counter를 고르세요.
+5. 고른 Hook을 이번 responseType에 자연스럽게 맞춰 질문하세요.
 
 길이 강제:
-- question은 최대 90자이며 70자 안팎을 목표로 합니다.
+- question은 최대 120자이며 가능하면 70자 안팎을 목표로 합니다.
 - 각 option은 최대 65자이며 50자 안팎을 목표로 합니다.
-- 질문과 보기에 긴 배경설명이나 여러 조건을 겹치지 마세요.
+- 긴 배경설명이나 여러 조건을 겹치지 마세요.
 
-선택지 설계:
-- 예상 후보 1~2개와 다른 캐해를 열 수 있는 경쟁 후보 1~2개를 함께 넣으세요.
-- 필요하면 조건부 후보 1개를 추가하세요.
-- 한 보기에는 핵심 행동이나 판단 하나만 적으세요.
-- free_response일 때 options=[]로 출력하세요.
+선택지 품질:
+- responseType에 options가 필요한 경우 예상 후보와 경쟁 후보가 함께 있어야 합니다.
+- 어느 보기도 도덕적으로 더 좋은 답처럼 보이지 않게 합니다.
+- 성격 라벨 대신 실제 말, 행동, 선택, 판단 기준으로 씁니다.
+- responseType이 options=[]를 요구하면 반드시 빈 배열로 출력합니다.
 
 출력 규칙:
 - order=${order}
-- 출력 키는 order, category, mode, format, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.`,
+- responseType=${responseType}
+- 출력 키는 order, category, mode, format, responseType, responseConfig, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.`,
     });
 
     return NextResponse.json({ done: false, question });
