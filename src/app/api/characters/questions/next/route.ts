@@ -31,6 +31,8 @@ const FORMAT_LABELS = {
   free_response: '자유서술형',
 } as const;
 
+const RECENT_FULL_HISTORY = 4;
+
 function contextString(value: unknown, key: string) {
   if (!value || typeof value !== 'object') return '';
   const candidate = (value as Record<string, unknown>)[key];
@@ -82,17 +84,57 @@ export async function POST(request: Request) {
       analysisConfidence: body.draft.analysisConfidence,
     };
 
-    const history = body.answers.map(answer => ({
-      order: answer.order,
-      question: answer.question,
-      answer: answer.answer,
-      reason: answer.reason || '',
-      category: contextString(answer.branchContext, 'category'),
-      mode: contextString(answer.branchContext, 'mode'),
-      format: contextString(answer.branchContext, 'format'),
-      targetHook: contextString(answer.branchContext, 'targetHook'),
-      hypothesis: contextString(answer.branchContext, 'hypothesis'),
-    }));
+    const history = body.answers.map(answer => {
+      const format = contextString(answer.branchContext, 'format');
+      const storedSource = contextString(answer.branchContext, 'answerSource');
+      const answerSource = storedSource === 'choice' || storedSource === 'custom'
+        ? storedSource
+        : format === 'free_response'
+          ? 'custom'
+          : 'unknown';
+      return {
+        order: answer.order,
+        question: answer.question,
+        answer: answer.answer,
+        reason: answer.reason || '',
+        category: contextString(answer.branchContext, 'category'),
+        mode: contextString(answer.branchContext, 'mode'),
+        format,
+        targetHook: contextString(answer.branchContext, 'targetHook'),
+        hypothesis: contextString(answer.branchContext, 'hypothesis'),
+        answerSource,
+      };
+    });
+
+    const recentHistory = history.slice(-RECENT_FULL_HISTORY);
+    const olderHistory = history.slice(0, Math.max(0, history.length - RECENT_FULL_HISTORY));
+
+    // 오래된 객관식 중 오너 추가 서술이 없는 항목만 짧게 압축한다.
+    const settledKnowledge = olderHistory
+      .filter(item => item.answerSource === 'choice' && !item.reason)
+      .map(item => ({
+        order: item.order,
+        category: item.category,
+        targetHook: item.targetHook,
+        selectedAnswer: item.answer,
+      }));
+
+    // 오너가 직접 쓴 답변/이유는 오래되어도 원문을 그대로 보존한다.
+    // answerSource가 없는 구버전 답변도 안전하게 원문 보존으로 처리한다.
+    const ownerVerbatim = olderHistory
+      .filter(item => item.answerSource !== 'choice' || !!item.reason)
+      .map(item => ({
+        order: item.order,
+        category: item.category,
+        targetHook: item.targetHook,
+        question: item.question,
+        ...(item.answerSource === 'choice'
+          ? { selectedAnswer: item.answer }
+          : item.answerSource === 'custom'
+            ? { directAnswer: item.answer }
+            : { originalAnswer: item.answer }),
+        ...(item.reason ? { reason: item.reason } : {}),
+      }));
 
     const categoryCounts = Object.fromEntries(
       Object.keys(CATEGORY_TARGETS).map(category => [
@@ -165,10 +207,13 @@ ${JSON.stringify(compactDraft)}
 - unreviewed/rejected AI 추론 원문은 질문 근거로 사용하지 않습니다.
 
 중복 방지 규칙:
-- 질문을 만들기 전에 반드시 '이 질문의 답이 이미 ownerCorrections, ownerClarifiedAmbiguities.ownerFeedback, 프로필 명시 사실, 이전 answer/reason 안에 들어 있는가?'를 검사하세요.
+- 질문을 만들기 전에 반드시 '이 질문의 답이 이미 ownerCorrections, ownerClarifiedAmbiguities.ownerFeedback, 프로필 명시 사실, 아래 인터뷰 기억 안에 들어 있는가?'를 검사하세요.
+- settledKnowledge는 오래된 객관식 문답에서 이미 확정된 내용입니다. 같은 판단을 다시 묻지 마세요.
+- ownerVerbatim의 directAnswer/originalAnswer/reason은 오너가 직접 쓴 원문이므로 요약하거나 의미를 축소하지 말고 그대로 근거로 사용하세요.
+- recentHistory는 최근 ${RECENT_FULL_HISTORY}문답의 전체 원문입니다.
+- usedHooks는 지금까지 겨냥한 축 전체입니다. 같은 Hook을 다시 쓰는 것은 branch로 새 조건을 확인할 가치가 있을 때만 허용됩니다.
 - 답이 이미 있으면 그 질문 후보를 폐기하고 다른 targetHook을 고르세요.
 - 새 질문은 기존 확정 정보를 다시 측정하는 것이 아니라, 아직 비어 있는 정보를 추가해야 합니다.
-- 이미 확정된 사실의 세부 표현을 바꾸는 것만으로는 새 정보가 아닙니다.
 
 연계형 질문 허용 규칙:
 - 매 문항마다 새 상황으로 바꿀 필요는 없습니다. 같은 상황에서 한 번 더 물어야 원래 답의 조건·예외·우선순위가 드러난다면 branch로 이어갈 수 있습니다.
@@ -180,20 +225,32 @@ ${JSON.stringify(compactDraft)}
 - 직전 답이 이미 충분히 명확하거나 후속 질문으로 얻을 새 정보가 적다면 억지로 연계하지 말고 pivot하세요.
 
 중요한 증거 사용 규칙:
-- 오너의 직접 정정/보충, 인터뷰 답변과 이유는 가장 높은 우선순위의 캐릭터 근거입니다.
+- 오너의 직접 정정/보충, 직접입력 답변, 인터뷰의 reason은 가장 높은 우선순위의 캐릭터 근거입니다.
+- 객관식 selectedAnswer보다 오너가 직접 쓴 reason이 더 구체적이면 reason을 우선하세요.
 - confirmedFacts의 어떤 항목도 종류만으로 중요하거나 중요하지 않다고 판단하지 마세요.
 - 프로필/비밀 프로필이 의미를 직접 설명하거나, 서로 독립적인 여러 행동·관계·사건·답변이 같은 의미를 지지하면 강한 Hook으로 사용할 수 있습니다.
 - 반복되지만 의미가 불명확한 항목은 중간 강도의 단서입니다. 중요성을 단정하지 않는 질문만 허용됩니다.
 - 한 번 등장했고 의미가 설명되지 않은 항목은 약한 단서입니다. 심리적 의미를 전제로 질문하지 마세요.
 
-지금까지의 실제 문답과 내부 질문 메타데이터:
-${JSON.stringify(history)}
+인터뷰 기억:
+[최근 ${RECENT_FULL_HISTORY}문답 — 질문/답변/이유 원문]
+${JSON.stringify(recentHistory)}
+
+[오래된 객관식 확정 정보 — 압축본]
+${JSON.stringify(settledKnowledge)}
+
+[오너 직접 작성 원문 — 절대 압축/재서술 금지]
+${JSON.stringify(ownerVerbatim)}
+
+[지금까지 사용한 targetHook 전체]
+${JSON.stringify(usedHooks)}
 
 답변 이유 활용:
-- reason이 있으면 answer와 함께 중요한 근거로 사용하세요.
+- ownerVerbatim과 recentHistory의 reason은 글자 그대로 보존된 오너 원문입니다.
 - 선택한 보기보다 reason이 더 구체적이면 reason을 우선해 캐릭터의 행동 규칙을 이해하세요.
-- answer/reason에 이미 적힌 내용을 다시 확인하지 마세요.
-- 직전 answer/reason이 기존 해석과 충돌하거나 예상 밖의 조건을 드러냈다면, 그 충돌을 해소하면 캐해 폭이 넓어지는지 먼저 판단하고 가치가 있으면 같은 맥락의 branch를 1회 허용하세요.
+- 직접입력 답변은 객관식 요약보다 높은 정보량을 가진 원자료로 취급하세요.
+- 이미 적힌 directAnswer/reason의 내용을 다시 확인하지 마세요.
+- 직전 답변/이유가 기존 해석과 충돌하거나 예상 밖의 조건을 드러냈다면, 그 충돌을 해소하면 캐해 폭이 넓어지는지 먼저 판단하고 가치가 있으면 같은 맥락의 branch를 1회 허용하세요.
 - 단순히 더 자세히 듣고 싶다는 이유만으로 branch하지 말고, 후속 답변에 따라 실제 해석이 달라질 때만 이어가세요.
 
 현재 커버리지:
@@ -210,7 +267,7 @@ ${coverageRule}
 
 질문 선택 절차:
 1. 현재 캐릭터에서 아직 답이 없는 의문 후보를 2~4개 내부적으로 만드세요. 직전 답변을 한 번 더 파고들면 해석이 크게 갈리는 경우에는 같은 상황의 후속 후보도 반드시 포함하세요.
-2. 각 후보가 오너 정정/보충, 프로필, 이전 answer/reason에 이미 답이 있는지 검사하고, 있으면 제거하세요.
+2. 각 후보가 오너 정정/보충, 프로필, settledKnowledge, ownerVerbatim, recentHistory에 이미 답이 있는지 검사하고, 있으면 제거하세요.
 3. 남은 후보 중 한 문항으로 해석이 가장 많이 달라질 지점을 targetHook으로 고르세요.
 4. 최근 답변에서 실제 미확인 정보가 이어지거나 기존 hypothesis와 충돌해 한 번 더 구분할 가치가 있으면 branch를 선택할 수 있습니다. 이 경우 같은 상황을 1회 이어가도 됩니다. 다른 고유 Hook이 더 중요하면 pivot, 강해진 해석의 현실적 예외를 확인하는 편이 더 유용하면 counter를 고르세요.
 5. 질문은 한 가지 판단만 묻고 짧게 작성하세요.
