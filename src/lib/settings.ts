@@ -3,7 +3,7 @@ import { sha256 } from '@/lib/crypto';
 
 const DEFAULT_ACCESS_CODE_HASH = '320b77859300260cb195f00c39de7212a7d859c61eb90cdd627c061f97923a7e';
 const DEFAULT_SETTINGS = {
-  postype_url: '',
+  postype_url: 'https://posty.pe/pbacizvc',
   ai_access_code_hash: DEFAULT_ACCESS_CODE_HASH,
   code_version: 1,
 };
@@ -16,7 +16,7 @@ export async function getAppSettings() {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) return DEFAULT_SETTINGS;
     return {
-      postype_url: row.postype_url || '',
+      postype_url: row.postype_url || DEFAULT_SETTINGS.postype_url,
       ai_access_code_hash: '',
       code_version: row.code_version ?? 1,
     };
