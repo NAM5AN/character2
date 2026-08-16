@@ -6,12 +6,9 @@ export const inferenceSchema = z.object({
   id: z.string(),
   text: z.string().min(1),
   confidence: z.number().min(0).max(100),
-  // New analyses ground each inference in server-generated profile fact IDs.
-  // Defaults keep previously saved Character Passports readable.
   evidenceIds: z.array(z.string().regex(/^fact_\d{3,}$/)).max(4).default([]),
   evidence: z.array(z.string().min(1).max(260)).max(4).default([]),
   ownerVerdict: verdictSchema.default('unreviewed'),
-  // Optional owner clarification/correction for ambiguous or rejected AI reads.
   ownerFeedback: z.string().max(1200).optional(),
 });
 
@@ -43,8 +40,6 @@ const publicBasicProfileSchema = z.object({
   profileText: z.string().min(20),
 });
 
-// AI parser output is intentionally loose. The server normalizes this into
-// CharacterDraft instead of trusting model-chosen field names/types.
 export const initialCharacterDraftSchema = z.object({
   basicProfile: z.record(z.string(), z.unknown()).optional().default({}),
   traits: z.record(z.string(), z.unknown()).optional().default({}),
@@ -73,9 +68,53 @@ export const analysisTypeSummarySchema = z.object({
 });
 
 const reportListSchema = z.array(z.string().min(8).max(80)).min(2).max(5);
+const analysisSeedSchema = z.array(z.string().min(20).max(140)).min(6).max(10);
 
-// Loose transport schema. AI providers occasionally emit paragraph fields as
-// string arrays; the server normalizes these before strict length validation.
+// First paid-AI-independent result layer: only the public teaser summary plus
+// compact non-verbatim seeds for later paid detail generation.
+export const summaryAnalysisRawSchema = z.object({
+  oneLineSummary: z.unknown(),
+  summary: z.record(z.string(), z.unknown()).optional().default({}),
+  analysisSeeds: z.unknown(),
+}).passthrough();
+
+export const summaryAnalysisGenerationSchema = z.object({
+  oneLineSummary: z.string().min(25).max(80),
+  summary: analysisTypeSummarySchema,
+  analysisSeeds: analysisSeedSchema,
+});
+
+// Detail generation runs only after a valid paid code is supplied.
+export const detailAnalysisRawSchema = z.object({
+  outerSelf: z.unknown(),
+  innerSelf: z.unknown(),
+  coreValues: z.unknown(),
+  desires: z.unknown(),
+  fears: z.unknown(),
+  conflictStyle: z.unknown(),
+  affectionStyle: z.unknown(),
+  misunderstoodPoints: z.unknown(),
+  contradictions: z.unknown(),
+  interestingPoints: z.unknown(),
+  detailedReport: z.unknown(),
+}).passthrough();
+
+export const detailAnalysisGenerationSchema = z.object({
+  outerSelf: z.string().min(180).max(360),
+  innerSelf: z.string().min(180).max(360),
+  coreValues: reportListSchema,
+  desires: reportListSchema,
+  fears: reportListSchema,
+  conflictStyle: z.string().min(180).max(360),
+  affectionStyle: z.string().min(180).max(360),
+  misunderstoodPoints: reportListSchema,
+  contradictions: reportListSchema,
+  interestingPoints: reportListSchema,
+  detailedReport: z.string().min(700).max(1400),
+});
+
+// Legacy combined transport/generation schemas remain for old saved passports
+// and diagnostics created before lazy detail generation was introduced.
 export const finalAnalysisRawSchema = z.object({
   oneLineSummary: z.unknown(),
   summary: z.record(z.string(), z.unknown()).optional().default({}),
@@ -92,25 +131,12 @@ export const finalAnalysisRawSchema = z.object({
   detailedReport: z.unknown(),
 }).passthrough();
 
-// Strict schema used after server normalization for new AI generation.
 export const finalAnalysisGenerationSchema = z.object({
   oneLineSummary: z.string().min(25).max(80),
   summary: analysisTypeSummarySchema,
-  outerSelf: z.string().min(180).max(360),
-  innerSelf: z.string().min(180).max(360),
-  coreValues: reportListSchema,
-  desires: reportListSchema,
-  fears: reportListSchema,
-  conflictStyle: z.string().min(180).max(360),
-  affectionStyle: z.string().min(180).max(360),
-  misunderstoodPoints: reportListSchema,
-  contradictions: reportListSchema,
-  interestingPoints: reportListSchema,
-  detailedReport: z.string().min(700).max(1400),
+  ...detailAnalysisGenerationSchema.shape,
 });
 
-// Compatibility schema for stored passports. New layered fields are optional so
-// previously issued 8-character share codes remain readable.
 export const finalAnalysisSchema = z.object({
   oneLineSummary: z.string(),
   summary: analysisTypeSummarySchema.optional(),
@@ -155,4 +181,6 @@ export type InterviewAnswer = z.infer<typeof interviewAnswerSchema>;
 export type CharacterPassport = z.infer<typeof characterPassportSchema>;
 export type FinalAnalysis = z.infer<typeof finalAnalysisSchema>;
 export type FinalAnalysisGeneration = z.infer<typeof finalAnalysisGenerationSchema>;
+export type SummaryAnalysisGeneration = z.infer<typeof summaryAnalysisGenerationSchema>;
+export type DetailAnalysisGeneration = z.infer<typeof detailAnalysisGenerationSchema>;
 export type AnalysisTypeSummary = z.infer<typeof analysisTypeSummarySchema>;
