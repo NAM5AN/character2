@@ -10,18 +10,15 @@ type DetailPayload={analysis:FinalAnalysis;confirmedFactCount:number;inferenceCo
 function paragraphChunks(text:string){
   const normalized=text.replace(/\r\n?/g,'\n').trim();
   if(!normalized)return[];
-  const explicit=normalized.split(/\n{2,}/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
-  if(explicit.length>1)return explicit;
-  const sentences=(normalized.match(/[^.!?。！？]+[.!?。！？]?/gu)||[normalized]).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
-  if(sentences.length<=2)return[normalized.replace(/\s+/g,' ').trim()];
-  const chunks:string[]=[];
-  for(let i=0;i<sentences.length;i+=2)chunks.push(sentences.slice(i,i+2).join(' '));
-  return chunks;
+  return normalized
+    .split(/\n{2,}/)
+    .map(block=>block.replace(/[ \t]+/g,' ').replace(/\n+/g,' ').trim())
+    .filter(Boolean);
 }
 
 function ParagraphText({text}:{text:string}){
   const chunks=paragraphChunks(text);
-  return <div>{chunks.map((chunk,index)=><p key={`${index}-${chunk.slice(0,18)}`} style={{margin:index===0?0:'14px 0 0',lineHeight:1.85,color:'#444'}}>{chunk}</p>)}</div>;
+  return <div>{chunks.map((chunk,index)=><p key={`${index}-${chunk.slice(0,18)}`} style={{margin:index===0?0:'18px 0 0',lineHeight:1.85,color:'#444'}}>{chunk}</p>)}</div>;
 }
 
 function BulletList({items}:{items:string[]}){
