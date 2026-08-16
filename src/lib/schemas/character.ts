@@ -6,6 +6,7 @@ export const inferenceSchema = z.object({
   id: z.string(),
   text: z.string().min(1),
   confidence: z.number().min(0).max(100),
+  evidence: z.array(z.string().min(1).max(220)).min(2).max(4),
   ownerVerdict: verdictSchema.default('unreviewed'),
 });
 
