@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
 
 type DetailPayload={analysis:FinalAnalysis;confirmedFactCount:number;inferenceCount:number;cached?:boolean};
+
+const DETAIL_ESTIMATE_SECONDS=75;
 
 function paragraphChunks(text:string){
   const normalized=text.replace(/\r\n?/g,'\n').trim();
@@ -36,11 +38,46 @@ function formatError(message:string,code:string,details=''){
   return `${message}\n오류 코드: ${code}${details?`\n상세: ${details}`:''}`;
 }
 
+function estimatedProgress(elapsed:number){
+  if(elapsed<12)return Math.min(30,8+elapsed*1.8);
+  if(elapsed<42)return Math.min(69,30+(elapsed-12)*1.3);
+  if(elapsed<70)return Math.min(92,69+(elapsed-42)*.82);
+  return Math.min(97,92+(elapsed-70)*.15);
+}
+
+function progressStage(progress:number){
+  if(progress<22)return '입력 자료 정리 중';
+  if(progress<60)return '행동 패턴과 숨은 심리 분석 중';
+  if(progress<82)return '가설·모순·반례 검증 중';
+  return '최종 상세 리포트 작성 중';
+}
+
+function remainingLabel(elapsed:number){
+  if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '예상 시간보다 조금 더 걸리고 있어요';
+  const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
+  return `예상 남은 시간 약 ${remaining}초`;
+}
+
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
   const [unlockOpen,setUnlockOpen]=useState(false);
   const [detail,setDetail]=useState<DetailPayload|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [progress,setProgress]=useState(0);
+  const [elapsedSeconds,setElapsedSeconds]=useState(0);
+
+  useEffect(()=>{
+    if(!busy)return;
+    const startedAt=Date.now();
+    const tick=()=>{
+      const elapsed=Math.floor((Date.now()-startedAt)/1000);
+      setElapsedSeconds(elapsed);
+      setProgress(Math.round(estimatedProgress(elapsed)));
+    };
+    tick();
+    const timer=window.setInterval(tick,1000);
+    return ()=>window.clearInterval(timer);
+  },[busy]);
 
   function editToken(){
     if(creatorEditToken)return creatorEditToken;
@@ -49,7 +86,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   }
 
   async function loadDetail(code:string){
-    setBusy(true);setError('');
+    setProgress(8);setElapsedSeconds(0);setBusy(true);setError('');
     try{
       const token=editToken();
       const r=await fetch(`/api/characters/${preview.shareCode}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessCode:code,...(token?{editToken:token}:{})})});
@@ -68,6 +105,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         }
         return;
       }
+      setProgress(100);
       setDetail(body.detail);
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
     }catch(cause){
@@ -112,7 +150,20 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'상세 리포트 생성 중…':'더 자세히 보기'}</button>
       </div>
 
-      {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>상세 리포트 생성 중 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{margin:'8px 0 0',lineHeight:1.6}}>캐릭터의 행동 원리와 관계 패턴을 깊게 해석하고 있어요. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p></div>}
+      {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div className="loading" style={{fontWeight:900}}>{progressStage(progress)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
+          <strong style={{fontSize:20}}>{progress}%</strong>
+        </div>
+        <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:12}}>
+          <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',gap:14,flexWrap:'wrap',marginTop:10,fontSize:13}}>
+          <span className="muted">경과 {elapsedSeconds}초</span>
+          <span className="muted">{remainingLabel(elapsedSeconds)}</span>
+        </div>
+        <p className="muted" style={{margin:'10px 0 0',lineHeight:1.6}}>보통 약 40초~1분 30초 정도 걸려요. 진행률은 평균 소요시간을 기준으로 한 예상치이며, 실제 AI 처리 단계와 정확히 일치하지 않을 수 있습니다. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p>
+      </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
