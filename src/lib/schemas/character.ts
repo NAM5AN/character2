@@ -68,18 +68,39 @@ export const analysisTypeSummarySchema = z.object({
 });
 
 const reportListSchema = z.array(z.string().min(8).max(80)).min(2).max(5);
-const analysisSeedSchema = z.array(z.string().min(20).max(140)).min(6).max(10);
+const evidenceTextSchema = z.string().min(12).max(190);
+
+const interviewEvidenceSchema = z.object({
+  order: z.number().int().min(1).max(20),
+  finding: z.string().min(18).max(190),
+});
+
+export const characterEvidencePackSchema = z.object({
+  version: z.literal('evidence-pack/2.0'),
+  publicProfileEvidence: z.array(evidenceTextSchema).min(2).max(32),
+  secretProfileEvidence: z.array(evidenceTextSchema).max(28).default([]),
+  ownerReviewEvidence: z.array(evidenceTextSchema).max(20).default([]),
+  interviewEvidence: z.array(interviewEvidenceSchema).length(20),
+  behaviorRules: z.array(evidenceTextSchema).min(2).max(14),
+  relationshipPatterns: z.array(evidenceTextSchema).min(2).max(12),
+  emotionalPatterns: z.array(evidenceTextSchema).min(2).max(12),
+  valuesAndMotives: z.array(evidenceTextSchema).min(2).max(12),
+  exceptionsAndConditions: z.array(evidenceTextSchema).min(2).max(12),
+  tensionsAndContradictions: z.array(evidenceTextSchema).min(1).max(10),
+  distinctiveDetails: z.array(evidenceTextSchema).min(1).max(16),
+  uncertainties: z.array(evidenceTextSchema).max(10).default([]),
+});
 
 export const summaryAnalysisRawSchema = z.object({
   oneLineSummary: z.unknown(),
   summary: z.record(z.string(), z.unknown()).optional().default({}),
-  analysisSeeds: z.unknown(),
+  evidencePack: z.record(z.string(), z.unknown()).optional().default({}),
 }).passthrough();
 
 export const summaryAnalysisGenerationSchema = z.object({
   oneLineSummary: z.string().min(25).max(80),
   summary: analysisTypeSummarySchema,
-  analysisSeeds: analysisSeedSchema,
+  evidencePack: characterEvidencePackSchema,
 });
 
 export const detailAnalysisRawSchema = z.object({
@@ -178,4 +199,5 @@ export type FinalAnalysis = z.infer<typeof finalAnalysisSchema>;
 export type FinalAnalysisGeneration = z.infer<typeof finalAnalysisGenerationSchema>;
 export type SummaryAnalysisGeneration = z.infer<typeof summaryAnalysisGenerationSchema>;
 export type DetailAnalysisGeneration = z.infer<typeof detailAnalysisGenerationSchema>;
+export type CharacterEvidencePack = z.infer<typeof characterEvidencePackSchema>;
 export type AnalysisTypeSummary = z.infer<typeof analysisTypeSummarySchema>;
