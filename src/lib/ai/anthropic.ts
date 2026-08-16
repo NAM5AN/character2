@@ -7,8 +7,9 @@ export async function askClaudeJson<T>(args: {
   schema: z.ZodType<T>;
   maxTokens?: number;
   allowFallback?: boolean;
+  model?: string;
 }): Promise<T> {
-  const primaryModel = process.env.ANTHROPIC_MODEL || 'anthropic/claude-sonnet-5';
+  const primaryModel = args.model || process.env.ANTHROPIC_MODEL || 'anthropic/claude-sonnet-5';
   try {
     return await generateValidatedJson({
       model: primaryModel,
