@@ -17,10 +17,17 @@ function applyCharacterDeepAnalysisSkill(system: string) {
 
   const skill = getCharacterDeepAnalysisSkill();
   const isReportWriter = system.includes('리포트를 쓰는 분석가');
-  const guide = isReportWriter ? skill.reportGuide : skill.analysisGuide;
+
+  if (isReportWriter) {
+    return [
+      skill.reportGuide,
+      '# 현재 호출의 세부 역할',
+      system,
+    ].join('\n\n---\n\n');
+  }
 
   return [
-    guide,
+    skill.analysisGuide,
     skill.qualityExamples,
     '# 현재 호출의 세부 역할',
     system,
