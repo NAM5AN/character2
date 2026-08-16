@@ -4,14 +4,12 @@ import { characterDraftSchema, interviewAnswerSchema } from '@/lib/schemas/chara
 import { interviewQuestionSchema } from '@/lib/schemas/question';
 import { askOpenAIJson } from '@/lib/ai/openai';
 import { QUESTION_INSTRUCTIONS } from '@/lib/ai/prompts';
-import { validateAccessCode } from '@/lib/settings';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 
 const requestSchema = z.object({
   draft: characterDraftSchema,
   answers: z.array(interviewAnswerSchema).max(19),
-  accessCode: z.string().min(1),
 });
 
 const CATEGORY_TARGETS = {
@@ -52,7 +50,6 @@ export async function POST(request: Request) {
   try {
     await assertRateLimit('question_next', 60, 60);
     const body = requestSchema.parse(await request.json());
-    if (!(await validateAccessCode(body.accessCode))) throw new Error('CODE_INVALID');
 
     const order = body.answers.length + 1;
     if (order > 20) return NextResponse.json({ done: true });
@@ -69,8 +66,6 @@ export async function POST(request: Request) {
       .filter(x => x.ownerVerdict === 'ambiguous' && !x.ownerFeedback?.trim())
       .map(x => ({ text: x.text, evidence: x.evidence }));
 
-    // Rejected inference text is intentionally NOT sent to the question model.
-    // The owner's correction replaces it as settled character knowledge.
     const ownerCorrections = body.draft.aiInferences
       .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
       .map(x => x.ownerFeedback!.trim());
