@@ -74,7 +74,25 @@ export const analysisTypeSummarySchema = z.object({
 
 const reportListSchema = z.array(z.string().min(8).max(80)).min(2).max(5);
 
-// Strict schema used only for new AI generation.
+// Loose transport schema. AI providers occasionally emit paragraph fields as
+// string arrays; the server normalizes these before strict length validation.
+export const finalAnalysisRawSchema = z.object({
+  oneLineSummary: z.unknown(),
+  summary: z.record(z.string(), z.unknown()).optional().default({}),
+  outerSelf: z.unknown(),
+  innerSelf: z.unknown(),
+  coreValues: z.unknown(),
+  desires: z.unknown(),
+  fears: z.unknown(),
+  conflictStyle: z.unknown(),
+  affectionStyle: z.unknown(),
+  misunderstoodPoints: z.unknown(),
+  contradictions: z.unknown(),
+  interestingPoints: z.unknown(),
+  detailedReport: z.unknown(),
+}).passthrough();
+
+// Strict schema used after server normalization for new AI generation.
 export const finalAnalysisGenerationSchema = z.object({
   oneLineSummary: z.string().min(25).max(80),
   summary: analysisTypeSummarySchema,
