@@ -57,13 +57,24 @@ export async function POST(request: Request) {
     const order = body.answers.length + 1;
     if (order > 20) return NextResponse.json({ done: true });
 
+    const confirmedInferences = body.draft.aiInferences
+      .filter(x => x.ownerVerdict === 'confirmed')
+      .map(x => ({ text: x.text, evidence: x.evidence }));
+    const ambiguousInferences = body.draft.aiInferences
+      .filter(x => x.ownerVerdict === 'ambiguous')
+      .map(x => ({ text: x.text, evidence: x.evidence, ownerFeedback: x.ownerFeedback?.trim() || '' }));
+    const ownerCorrections = body.draft.aiInferences
+      .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
+      .map(x => ({ rejectedInference: x.text, correction: x.ownerFeedback!.trim(), originalEvidence: x.evidence }));
+
     const compactDraft = {
       basicProfile: body.draft.basicProfile,
       traits: body.draft.traits,
       relationshipTraits: body.draft.relationshipTraits,
       confirmedFacts: body.draft.confirmedFacts,
-      confirmedInferences: body.draft.aiInferences.filter(x => x.ownerVerdict === 'confirmed'),
-      ambiguousInferences: body.draft.aiInferences.filter(x => x.ownerVerdict === 'ambiguous'),
+      confirmedInferences,
+      ambiguousInferences,
+      ownerCorrections,
       analysisConfidence: body.draft.analysisConfidence,
     };
 
@@ -134,10 +145,16 @@ export async function POST(request: Request) {
 캐릭터 데이터:
 ${JSON.stringify(compactDraft)}
 
-중요한 증거 사용 규칙:
-- confirmedInferences만 오너가 확인한 추론입니다. 이것만 강한 질문 근거로 사용할 수 있습니다.
-- ambiguousInferences는 불확실한 참고일 뿐입니다. 프로필 명시 사실이나 실제 답변이 추가로 지지하지 않으면 targetHook으로 삼지 마세요.
+AI 추론 검수에서 받은 오너 피드백 사용 규칙:
+- ownerCorrections.correction은 오너가 직접 알려준 설정이므로 강한 직접 증거입니다.
+- ownerCorrections.rejectedInference는 틀렸다고 판정된 AI 해석입니다. 절대 사실이나 가설의 근거로 재사용하지 마세요. correction만 사용하세요.
+- ambiguousInferences에 ownerFeedback이 있으면 그 피드백을 AI 추론 문장보다 우선하세요. AI 추론은 일부만 맞을 수 있는 미확정 맥락일 뿐입니다.
+- ambiguousInferences에 ownerFeedback이 없으면 약한 참고로만 보고, 별도 근거 없이는 질문 전제로 삼지 마세요.
+- confirmedInferences만 오너가 그대로 맞다고 확인한 AI 해석입니다.
 - unreviewed 추론은 아예 제공되지 않습니다.
+
+중요한 증거 사용 규칙:
+- 오너의 직접 답변, 답변 이유, AI 추론 검수의 정정/보충은 가장 높은 우선순위의 캐릭터 근거입니다.
 - confirmedFacts의 어떤 항목도 종류만으로 중요하거나 중요하지 않다고 판단하지 마세요.
 - 프로필/비밀 프로필이 의미를 직접 설명하거나, 서로 독립적인 여러 행동·관계·사건·답변이 같은 의미를 지지하면 강한 Hook으로 사용할 수 있습니다.
 - 반복되지만 의미가 불명확한 항목은 중간 강도의 단서입니다. 중요성을 단정하지 않는 질문만 허용됩니다.
@@ -165,7 +182,7 @@ ${formatRules}
 ${coverageRule}
 
 질문 선택 절차:
-1. 현재 캐릭터에서 아직 덜 확인됐거나 방금 답변/이유 때문에 새로 생긴 의문을 2~4개 내부적으로 비교하세요.
+1. 현재 캐릭터에서 아직 덜 확인됐거나 오너의 검수 피드백/최근 답변 때문에 새로 생긴 의문을 2~4개 내부적으로 비교하세요.
 2. 그중 한 문항으로 해석이 가장 많이 달라질 지점을 targetHook으로 고르세요.
 3. 최근 답변을 한 단계 더 볼 가치가 있으면 branch, 다른 확실한 고유 Hook이 더 중요하면 pivot, 강해진 해석의 예외를 볼 필요가 있으면 counter를 고르세요.
 4. 최근 형식을 반복하지 않고 가장 간단하게 물을 수 있는 format을 고르세요.
