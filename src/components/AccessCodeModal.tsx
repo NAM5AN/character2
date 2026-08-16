@@ -11,6 +11,13 @@ type Props = {
   submitLabel?: string;
 };
 
+function apiErrorText(body:unknown,status:number,fallback:string){
+  const record=body&&typeof body==='object'?body as Record<string,unknown>:{};
+  const code=typeof record.error==='string'&&record.error.trim()?record.error.trim():`HTTP_${status}`;
+  const details=typeof record.details==='string'&&record.details.trim()?record.details.trim():'';
+  return `${fallback}\n오류 코드: ${code}${details?`\n상세: ${details}`:''}`;
+}
+
 export function AccessCodeModal({
   open,
   onClose,
@@ -30,11 +37,19 @@ export function AccessCodeModal({
     setBusy(true); setError('');
     try{
       const r=await fetch('/api/access/validate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code})});
-      if(!r.ok){ localStorage.removeItem('chara_ai_access_code'); setError('현재 이용 코드와 일치하지 않아요. 포스타입에서 최신 코드를 확인해주세요.'); return; }
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok){
+        localStorage.removeItem('chara_ai_access_code');
+        setError(apiErrorText(body,r.status,'현재 이용 코드와 일치하지 않아요. 포스타입에서 최신 코드를 확인해주세요.'));
+        return;
+      }
       const normalized=code.trim();
       localStorage.setItem('chara_ai_access_code',normalized);
       onClose();
       await onValidated(normalized);
+    }catch(cause){
+      const details=cause instanceof Error?cause.message:String(cause);
+      setError(`요청 중 오류가 발생했어요.\n오류 코드: CLIENT_REQUEST_FAILED${details?`\n상세: ${details}`:''}`);
     }finally{setBusy(false)}
   }
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
@@ -47,7 +62,7 @@ export function AccessCodeModal({
       </div>
       {postype && <p><a className="btn soft" href={postype} target="_blank" rel="noreferrer">포스타입에서 코드 확인하기 ↗</a></p>}
       <div className="field"><label className="label">이용 코드</label><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} placeholder="예: CHARA82" /></div>
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" style={{whiteSpace:'pre-wrap'}}>{error}</div>}
       <div className="actions"><button className="btn primary" disabled={busy||!code.trim()} onClick={validate}>{busy?'확인 중…':submitLabel}</button><button className="btn" disabled={busy} onClick={onClose}>닫기</button></div>
     </div>
   </div>;
