@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas/character';
 import { askOpenAIJson } from '@/lib/ai/openai';
-import { validateAccessCode } from '@/lib/settings';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 
@@ -10,7 +9,6 @@ const requestSchema = z.object({
   name: z.string().min(1).max(80),
   profileText: z.string().min(20).max(50_000),
   secretProfileText: z.string().max(50_000).optional().default(''),
-  accessCode: z.string().min(1),
 });
 
 type UnknownRecord = Record<string, unknown>;
@@ -200,7 +198,6 @@ export async function POST(request: Request) {
   try {
     await assertRateLimit('character_parse', 10, 30);
     const body = requestSchema.parse(await request.json());
-    if (!(await validateAccessCode(body.accessCode))) throw new Error('CODE_INVALID');
 
     const sourceAnchors = buildSourceAnchors(body.profileText, body.secretProfileText);
 
