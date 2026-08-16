@@ -9,7 +9,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const deploymentSha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || '';
-  const deploymentVersion = deploymentSha ? deploymentSha.slice(0, 7) : 'local';
+  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID || '';
+  const deploymentUrl = process.env.VERCEL_URL || '';
+  const deploymentVersion = deploymentSha
+    ? deploymentSha.slice(0, 7)
+    : deploymentId
+      ? deploymentId.replace(/^dpl_/, '').slice(0, 7)
+      : deploymentUrl
+        ? deploymentUrl.split('-').at(-2)?.slice(0, 7) || 'vercel'
+        : 'local';
+  const deploymentTitle = deploymentSha || deploymentId || deploymentUrl || 'local development';
 
   return (
     <html lang="ko">
@@ -18,7 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <div className="container nav">
             <div className="brand-wrap">
               <Link href="/" className="brand">CHARA LAB</Link>
-              <span className="deploy-version" title={deploymentSha || 'local development'}>배포 {deploymentVersion}</span>
+              <span className="deploy-version" title={deploymentTitle}>배포 {deploymentVersion}</span>
             </div>
             <nav className="nav-links">
               <Link className="nav-link" href="/analyze">자캐 분석</Link>
