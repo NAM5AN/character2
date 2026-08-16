@@ -66,11 +66,16 @@ function validationReason(e:z.ZodError){return e.issues.slice(0,16).map(x=>`${x.
 
 async function generateSummary(input:string,body:z.infer<typeof requestSchema>,review:any):Promise<SummaryAnalysisGeneration>{
   let last='';
-  for(let attempt=0;attempt<3;attempt++){
-    const retry=attempt?`\n\n이전 생성은 형식/길이 검증에 실패했습니다. 원자료로 새로 작성하세요. 실패 원인: ${last}`:'';
-    const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:3000,input:`${input}${retry}`,allowFallback:false});
-    const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
-    if(parsed.success)return parsed.data;last=validationReason(parsed.error);
+  for(let attempt=0;attempt<2;attempt++){
+    const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식/길이 검증에 실패했습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 4개 필드를 최우선으로 완성하세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 원자료에서 새로 작성하세요. 실패 원인: ${last}`;
+    try{
+      const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:4000,maxAttempts:1,input:`${input}${retry}`,allowFallback:false});
+      const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
+      if(parsed.success)return parsed.data;
+      last=validationReason(parsed.error);
+    }catch(error){
+      last=error instanceof Error?error.message:String(error);
+    }
   }
   throw new Error(`AI_JSON_SCHEMA_FAILED: ${last||'SUMMARY_EVIDENCE_PACK_FAILED'}`);
 }
@@ -86,14 +91,14 @@ export async function POST(request:Request){
       rejectedCorrections:body.draft.aiInferences.filter(x=>x.ownerVerdict==='rejected'&&x.ownerFeedback?.trim()).map(x=>({ownerCorrection:x.ownerFeedback!.trim()})),
     };
     const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,analysisConfidence:body.draft.analysisConfidence};
-    const summaryInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n출력 규칙:\n- oneLineSummary: 25~80자.\n- summary.outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 70~160자.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성하면 됩니다. 각 항목은 필요한 만큼만, 최대 8개 정도로 간결하게 씁니다.\n- 원자료를 반복 복사하지 말고 여러 근거를 연결한 패턴만 적으세요.\n- 근거가 부족하면 빈 배열을 허용합니다.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
+    const summaryInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n출력 규칙:\n- oneLineSummary: 25~80자.\n- summary.outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 70~160자.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성합니다. 각 축은 정말 중요한 발견만 0~3개로 제한하세요.\n- 원자료를 반복 복사하지 말고 여러 근거를 연결한 패턴만 적으세요.\n- 근거가 부족한 축은 빈 배열로 두세요.\n- 사용자에게 보이는 oneLineSummary와 summary 4개 필드의 완결성이 evidencePack의 개수보다 항상 우선합니다.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
     const summaryResult=await generateSummary(summaryInput,body,inferenceReview);
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
 
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
     const sharedInferences=body.draft.aiInferences.map(x=>({id:x.id,text:x.text,confidence:x.confidence,evidenceIds:[],evidence:[],ownerVerdict:x.ownerVerdict}));
-    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.3',interview:'interview/1.4',analysis:'claude-only-summary-evidence/2.4'}});
+    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.3',interview:'interview/1.4',analysis:'claude-only-summary-evidence/2.5'}});
     const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,evidencePack:summaryResult.evidencePack};
     const privateSource={version:'detail-source/1.0',secretProfileText:body.draft.basicProfile.secretProfileText||'',ownerReview:inferenceReview,answers:body.answers,confirmedFacts:body.draft.confirmedFacts,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits};
     const {data:saved,error}=await sb.rpc('character2_create_character_preview_v2',{p_character_id:characterId,p_share_code:shareCode,p_name:name,p_schema_version:passport.schemaVersion,p_passport_json:passport,p_analysis_confidence:body.draft.analysisConfidence,p_engine_versions:passport.engineVersions,p_answers:body.answers,p_edit_token_hash:sha256(editToken),p_detail_seed_json:detailSeed,p_source_json:privateSource});
