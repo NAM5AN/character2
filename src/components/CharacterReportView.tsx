@@ -46,10 +46,10 @@ function estimatedProgress(elapsed:number){
 }
 
 function progressStage(progress:number){
-  if(progress<22)return '이 캐릭터가 들려준 이야기부터 천천히 살펴보는 중';
-  if(progress<60)return '말과 행동 사이에 숨은 마음을 들여다보는 중';
-  if(progress<82)return '서로 다른 모습들이 왜 함께 나타나는지 맞춰보는 중';
-  return '이 캐릭터만의 속마음을 리포트로 정리하는 중';
+  if(progress<22)return '프로필이랑 답변을 하나씩 확인하는 중';
+  if(progress<60)return '이 캐릭터의 평소 성향을 조금 더 알아보는 중';
+  if(progress<82)return '상황이나 상대에 따라 달라지는 반응을 확인하는 중';
+  return '확인한 내용을 바탕으로 상세 리포트 작성 중';
 }
 
 function remainingLabel(elapsed:number){
