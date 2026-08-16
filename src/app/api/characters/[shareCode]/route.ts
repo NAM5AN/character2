@@ -6,7 +6,7 @@ import { finalAnalysisSchema } from '@/lib/schemas/character';
 import { characterReportPreviewSchema } from '@/lib/character-report';
 import { validateAccessCode } from '@/lib/settings';
 import { assertRateLimit } from '@/lib/rate-limit';
-import { generatePaidDetail } from '@/lib/ai/detail-report';
+import { DETAIL_REPORT_VERSION, generatePaidDetail } from '@/lib/ai/detail-report';
 import { apiError } from '@/lib/http';
 
 const detailBundleSchema=z.object({
@@ -17,6 +17,8 @@ const detailBundleSchema=z.object({
   confirmedFactCount:z.coerce.number().int().nonnegative().default(0),
   inferenceCount:z.coerce.number().int().nonnegative().default(0),
 });
+
+function record(value:unknown):Record<string,unknown>{return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};}
 
 async function loadPreview(rawCode:string){
   const shareCode=normalizeShareCode(rawCode);
@@ -55,8 +57,14 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     const bundle=detailBundleSchema.parse(data);
 
     if(bundle.detail){
-      const analysis=finalAnalysisSchema.parse(bundle.detail);
-      return NextResponse.json({detail:{analysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true}});
+      const rawDetail=record(bundle.detail);
+      const currentVersion=rawDetail.detailVersion===DETAIL_REPORT_VERSION;
+      // 공유 코드로 보는 사람은 기존 캐시를 그대로 사용합니다. 캐릭터 생성 브라우저에서만
+      // 구버전 상세 리포트를 새 해석 엔진으로 한 번 갱신합니다.
+      if(currentVersion||!body.editToken){
+        const analysis=finalAnalysisSchema.parse(bundle.detail);
+        return NextResponse.json({detail:{analysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true}});
+      }
     }
 
     if(!bundle.seed&&bundle.legacyAnalysis){
@@ -67,7 +75,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     }
     if(!bundle.seed)return NextResponse.json({error:'DETAIL_SOURCE_NOT_AVAILABLE'},{status:409});
 
-    const seedRecord=bundle.seed&&typeof bundle.seed==='object'&&!Array.isArray(bundle.seed)?bundle.seed as Record<string,unknown>:{};
+    const seedRecord=record(bundle.seed);
     const needsRawSource=seedRecord.version==='detail-seed/2.0';
     let privateSource:unknown=undefined;
     if(needsRawSource){
@@ -86,7 +94,8 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     });
     if(saveError)throw saveError;
     if(saved!==true)throw new Error('DETAIL_SAVE_FAILED');
-    return NextResponse.json({detail:{analysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
+    const publicAnalysis=finalAnalysisSchema.parse(analysis);
+    return NextResponse.json({detail:{analysis:publicAnalysis,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
   }catch(error){return apiError(error)}
 }
 
