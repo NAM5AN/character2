@@ -46,10 +46,31 @@ function estimatedProgress(elapsed:number){
 }
 
 function progressStage(progress:number,name:string){
-  if(progress<22)return `${name}, 검사실 입장 완료`;
-  if(progress<60)return `${name}, 기본 성향 검사 진행 중`;
-  if(progress<82)return `${name}, 심층 성향 검사 진행 중`;
-  return `${name}, 결과지 작성 중`;
+  if(progress<22)return `${name}, 검사실에 데려왔어요`;
+  if(progress<60)return `${name}, 얌전히 검사 받는 중`;
+  if(progress<82)return `${name}, 정밀 검사 들어갑니다`;
+  return `${name}, 이제 결과만 남았어요`;
+}
+
+function compactPersonalityNote(text:string,name:string,max=72){
+  const escapedName=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const normalized=text
+    .replace(new RegExp(escapedName,'g'),'이 캐릭터')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(!normalized)return'';
+  const first=normalized.split(/(?<=[.!?。！？])\s+/u)[0]?.trim()||normalized;
+  if(first.length<=max)return first;
+  const cut=first.slice(0,max-1).trimEnd();
+  const stop=Math.max(cut.lastIndexOf(','),cut.lastIndexOf('·'),cut.lastIndexOf(' '));
+  return `${stop>Math.floor(max*.58)?cut.slice(0,stop):cut}…`;
+}
+
+function progressPersonalityNote(progress:number,preview:CharacterReportPreview){
+  if(progress<22)return compactPersonalityNote(preview.oneLineSummary,preview.name);
+  if(progress<60)return compactPersonalityNote(preview.summary.outerSelf,preview.name);
+  if(progress<82)return compactPersonalityNote(preview.summary.innerSelf,preview.name);
+  return compactPersonalityNote(preview.oneLineSummary,preview.name);
 }
 
 function remainingLabel(elapsed:number){
@@ -124,6 +145,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const previewBlur=[5,7.5,10] as const;
   const previewOpacity=[.68,.52,.34] as const;
   const previewWhite=[.04,.15,.3] as const;
+  const personalityNote=progressPersonalityNote(progress,preview);
 
   return <>
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 캐릭터 전체 정보를 바탕으로 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
@@ -155,6 +177,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <div className="loading" style={{fontWeight:900}}>{progressStage(progress,preview.name)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
           <strong style={{fontSize:20}}>{progress}%</strong>
         </div>
+        {personalityNote&&<div style={{marginTop:7,fontSize:13,lineHeight:1.55,color:'#6f6b64'}}>검사실 메모 · {personalityNote}</div>}
         <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:12}}>
           <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
         </div>
