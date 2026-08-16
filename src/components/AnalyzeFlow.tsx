@@ -26,6 +26,19 @@ type SavedAnalysisSession={
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 
+function isSavedSession(value:unknown):value is SavedAnalysisSession{
+  if(!value||typeof value!=='object')return false;
+  const saved=value as Partial<SavedAnalysisSession>;
+  return saved.version===1&&typeof saved.stage==='string';
+}
+
+function hasMeaningfulProgress(saved:SavedAnalysisSession){
+  return !!(
+    saved.name.trim()||saved.profileText.trim()||saved.secretProfileText.trim()||saved.draft||
+    saved.answers.length||saved.question||saved.questionHistory.length||saved.selected||saved.custom.trim()||saved.reason.trim()
+  );
+}
+
 export function AnalyzeFlow(){
   const [stage,setStage]=useState<Stage>('input');
   const [name,setName]=useState('');
@@ -42,40 +55,76 @@ export function AnalyzeFlow(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [result,setResult]=useState<FinalizeResult|null>(null);
+  const [resumeCandidate,setResumeCandidate]=useState<SavedAnalysisSession|null>(null);
   const hydrated=useRef(false);
-  const persistenceEnabled=useRef(true);
+  const persistenceEnabled=useRef(false);
+
+  function restoreSavedSession(saved:SavedAnalysisSession){
+    const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
+    const restoredAnswers=Array.isArray(saved.answers)?saved.answers as InterviewAnswer[]:[];
+    const restoredHistory=Array.isArray(saved.questionHistory)?saved.questionHistory as InterviewQuestion[]:[];
+    const requestedIndex=Number.isInteger(saved.activeQuestionIndex)?Number(saved.activeQuestionIndex):Math.max(0,restoredHistory.length-1);
+    const restoredIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
+    const restoredQuestion=(saved.question&&typeof saved.question==='object'?saved.question:null) as InterviewQuestion|null || restoredHistory[restoredIndex] || null;
+
+    setName(typeof saved.name==='string'?saved.name:'');
+    setProfileText(typeof saved.profileText==='string'?saved.profileText:'');
+    setSecretProfileText(typeof saved.secretProfileText==='string'?saved.secretProfileText:'');
+    setDraft(restoredDraft);
+    setAnswers(restoredAnswers);
+    setQuestionHistory(restoredHistory);
+    setQuestion(restoredQuestion);
+    setActiveQuestionIndex(restoredIndex);
+    setSelected(typeof saved.selected==='string'?saved.selected:'');
+    setCustom(typeof saved.custom==='string'?saved.custom:'');
+    setReason(typeof saved.reason==='string'?saved.reason:'');
+    setError('');
+
+    if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');
+    else if(saved.stage==='review'&&restoredDraft)setStage('review');
+    else setStage('input');
+  }
+
+  function clearProgressState(){
+    setStage('input');
+    setName('');
+    setProfileText('');
+    setSecretProfileText('');
+    setDraft(null);
+    setAnswers([]);
+    setQuestion(null);
+    setQuestionHistory([]);
+    setActiveQuestionIndex(0);
+    setSelected('');
+    setCustom('');
+    setReason('');
+    setBusy(false);
+    setError('');
+    setResult(null);
+  }
 
   useEffect(()=>{
     try{
-      const raw=sessionStorage.getItem(ANALYSIS_SESSION_KEY);
-      if(!raw)return;
-      const saved=JSON.parse(raw) as Partial<SavedAnalysisSession>;
-      if(saved.version!==1)return;
-
-      const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
-      const restoredAnswers=Array.isArray(saved.answers)?saved.answers as InterviewAnswer[]:[];
-      const restoredHistory=Array.isArray(saved.questionHistory)?saved.questionHistory as InterviewQuestion[]:[];
-      const requestedIndex=Number.isInteger(saved.activeQuestionIndex)?Number(saved.activeQuestionIndex):Math.max(0,restoredHistory.length-1);
-      const restoredIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
-      const restoredQuestion=(saved.question&&typeof saved.question==='object'?saved.question:null) as InterviewQuestion|null || restoredHistory[restoredIndex] || null;
-
-      setName(typeof saved.name==='string'?saved.name:'');
-      setProfileText(typeof saved.profileText==='string'?saved.profileText:'');
-      setSecretProfileText(typeof saved.secretProfileText==='string'?saved.secretProfileText:'');
-      setDraft(restoredDraft);
-      setAnswers(restoredAnswers);
-      setQuestionHistory(restoredHistory);
-      setQuestion(restoredQuestion);
-      setActiveQuestionIndex(restoredIndex);
-      setSelected(typeof saved.selected==='string'?saved.selected:'');
-      setCustom(typeof saved.custom==='string'?saved.custom:'');
-      setReason(typeof saved.reason==='string'?saved.reason:'');
-
-      if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');
-      else if(saved.stage==='review'&&restoredDraft)setStage('review');
-      else setStage('input');
+      const localRaw=localStorage.getItem(ANALYSIS_SESSION_KEY);
+      const legacyRaw=sessionStorage.getItem(ANALYSIS_SESSION_KEY);
+      const raw=localRaw||legacyRaw;
+      if(raw){
+        const parsed=JSON.parse(raw) as unknown;
+        if(isSavedSession(parsed)&&hasMeaningfulProgress(parsed)){
+          if(!localRaw)localStorage.setItem(ANALYSIS_SESSION_KEY,raw);
+          sessionStorage.removeItem(ANALYSIS_SESSION_KEY);
+          setResumeCandidate(parsed);
+          persistenceEnabled.current=false;
+        }else{
+          localStorage.removeItem(ANALYSIS_SESSION_KEY);
+          sessionStorage.removeItem(ANALYSIS_SESSION_KEY);
+          persistenceEnabled.current=true;
+        }
+      }else persistenceEnabled.current=true;
     }catch{
+      localStorage.removeItem(ANALYSIS_SESSION_KEY);
       sessionStorage.removeItem(ANALYSIS_SESSION_KEY);
+      persistenceEnabled.current=true;
     }finally{
       hydrated.current=true;
     }
@@ -100,11 +149,29 @@ export function AnalyzeFlow(){
           custom,
           reason,
         };
-        sessionStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));
+        if(hasMeaningfulProgress(saved))localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));
+        else localStorage.removeItem(ANALYSIS_SESSION_KEY);
       }catch{}
     },150);
     return()=>window.clearTimeout(timer);
   },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason]);
+
+  function continueSavedAnalysis(){
+    if(!resumeCandidate)return;
+    persistenceEnabled.current=false;
+    restoreSavedSession(resumeCandidate);
+    setResumeCandidate(null);
+    window.setTimeout(()=>{persistenceEnabled.current=true},0);
+  }
+
+  function startFreshAnalysis(){
+    persistenceEnabled.current=false;
+    localStorage.removeItem(ANALYSIS_SESSION_KEY);
+    sessionStorage.removeItem(ANALYSIS_SESSION_KEY);
+    setResumeCandidate(null);
+    clearProgressState();
+    window.setTimeout(()=>{persistenceEnabled.current=true},0);
+  }
 
   function handleApiError(status:number,body:any){setError(body?.error==='RATE_LIMITED'?'요청이 너무 많아요. 잠시 뒤 다시 시도해주세요.':`처리 중 오류가 발생했어요. (${body?.error||status})`)}
   async function parse(){setBusy(true);setError('');try{const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);return}setDraft(body.draft);setStage('review')}finally{setBusy(false)}}
@@ -116,7 +183,7 @@ export function AnalyzeFlow(){
   async function answerCurrent(){if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=activeQuestionIndex<questionHistory.length-1;if(editingPast){const next=[...answers.slice(0,activeQuestionIndex),current];const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);setAnswers(next);setQuestionHistory(nextHistory);if(next.length===20)await finalize(next);else await nextQuestion(next,nextHistory);return}const next=[...answers,current];setAnswers(next);if(next.length===20)await finalize(next);else await nextQuestion(next,questionHistory)}
   function previousQuestion(){if(busy||activeQuestionIndex<=0)return;const i=activeQuestionIndex-1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
   function forwardQuestion(){if(busy||activeQuestionIndex>=questionHistory.length-1)return;const i=activeQuestionIndex+1;const q=questionHistory[i];if(q)restoreAnswerFor(i,q)}
-  async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
+  async function finalize(finalAnswers=answers){if(!draft)return;setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});const body=await r.json();if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
 
   const confidence=draft?.analysisConfidence??0;
   const freeResponse=question?.format==='free_response';
@@ -124,16 +191,33 @@ export function AnalyzeFlow(){
   const savedAtCurrent=answers[activeQuestionIndex];
   const currentDraftAnswer=(custom.trim()||selected).trim();
   const currentAnswerChanged=!!savedAtCurrent&&(currentDraftAnswer!==savedAtCurrent.answer||reason.trim()!==(savedAtCurrent.reason||''));
+  const resumeProgress=resumeCandidate
+    ? (resumeCandidate.stage==='interview'||resumeCandidate.stage==='finalizing')
+      ? `인터뷰 ${Math.min(20,resumeCandidate.answers.length+(resumeCandidate.question?1:0))}/20 진행 중`
+      : resumeCandidate.stage==='review'
+        ? '프로필 분석과 AI 추론 검수 단계'
+        : '프로필 작성 중'
+    : '';
 
   return <>
     {stage==='input'&&<div className="card" aria-busy={busy}>
-      <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
-      <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
-      <div className="field"><label className="label">비밀 프로필 <span className="muted">(선택)</span></label><textarea disabled={busy} className="textarea" value={secretProfileText} onChange={e=>setSecretProfileText(e.target.value)} placeholder="오너만 알고 있던 비밀 설정, 숨겨진 동기, 과거, 공개 프로필에 적지 않았던 내용을 붙여넣으세요. 없다면 비워두면 됩니다." /></div>
+      {resumeCandidate&&<div style={{marginBottom:24,padding:'20px 22px',border:'1px solid var(--line)',borderRadius:16,background:'var(--accent-soft)'}}>
+        <div className="eyebrow">Saved progress</div>
+        <h3 style={{margin:'8px 0 8px'}}>작성하던 캐릭터 분석이 있어요.</h3>
+        <p className="muted" style={{margin:'0 0 4px'}}>이전에 입력한 프로필과 답변을 불러와서 계속할까요?</p>
+        <p style={{margin:'0 0 16px',fontWeight:800}}>{resumeCandidate.name||'이름 미입력'} · {resumeProgress}</p>
+        <div className="actions" style={{marginTop:0}}>
+          <button className="btn primary" onClick={continueSavedAnalysis}>이어하기</button>
+          <button className="btn" onClick={startFreshAnalysis}>처음부터 하기</button>
+        </div>
+      </div>}
+      <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy||!!resumeCandidate} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
+      <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy||!!resumeCandidate} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
+      <div className="field"><label className="label">비밀 프로필 <span className="muted">(선택)</span></label><textarea disabled={busy||!!resumeCandidate} className="textarea" value={secretProfileText} onChange={e=>setSecretProfileText(e.target.value)} placeholder="오너만 알고 있던 비밀 설정, 숨겨진 동기, 과거, 공개 프로필에 적지 않았던 내용을 붙여넣으세요. 없다면 비워두면 됩니다." /></div>
       <div className="notice">공개 프로필과 비밀 프로필은 서로 다른 정보층으로 구분해 함께 분석합니다. 비밀 프로필 원문은 공유 코드로 보는 Character Passport에 직접 노출하지 않습니다.</div>
       {busy&&<div role="status" aria-live="polite" style={{marginTop:18,padding:'18px 20px',border:'1px solid var(--line)',borderRadius:16,background:'var(--accent-soft)',display:'flex',gap:16,alignItems:'flex-start'}}><div className="loading" style={{fontSize:18,fontWeight:900,whiteSpace:'nowrap'}}>AI 분석 중 <i className="dot"/><i className="dot"/><i className="dot"/></div><div><strong style={{display:'block',marginBottom:5}}>프로필을 읽고 있어요.</strong><p className="muted" style={{margin:0,lineHeight:1.6}}>공개·비밀 프로필을 비교하고 캐릭터 설정, 사실 근거, AI 추론을 정리하는 중입니다. 분석이 끝나면 자동으로 다음 화면으로 이동해요.</p></div></div>}
       {error&&<p className="error">{error}</p>}
-      <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={parse}>{busy?<span className="loading">AI 분석 진행 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
+      <div className="actions"><button className="btn primary" disabled={busy||!!resumeCandidate||name.trim().length<1||profileText.trim().length<20} onClick={parse}>{busy?<span className="loading">AI 분석 진행 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
     </div>}
 
     {stage==='review'&&draft&&<div className="stack" aria-busy={busy}>
