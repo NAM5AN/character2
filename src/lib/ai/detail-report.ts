@@ -137,6 +137,7 @@ async function generateDetailFields(
       schema:detailAnalysisRawSchema,
       maxTokens:6200,
       input:`${baseInput}${retry}`,
+      allowFallback:false,
     });
     const parsed=detailAnalysisGenerationSchema.safeParse(normalizeDetail(raw));
     if(parsed.success)return parsed.data;
