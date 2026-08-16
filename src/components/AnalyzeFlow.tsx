@@ -1,14 +1,20 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import type { CharacterDraft, InterviewAnswer, CharacterPassport } from '@/lib/schemas/character';
+import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion } from '@/lib/schemas/question';
+import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
+import { CharacterReportView } from '@/components/CharacterReportView';
 
 type Stage = 'input'|'review'|'interview'|'finalizing'|'done';
 
+type FinalizeResult = {
+  preview: CharacterReportPreview;
+  shareCode: string;
+  editToken: string;
+};
+
 export function AnalyzeFlow(){
-  const router=useRouter();
   const [stage,setStage]=useState<Stage>('input');
   const [name,setName]=useState('');
   const [profileText,setProfileText]=useState('');
@@ -25,7 +31,7 @@ export function AnalyzeFlow(){
   const [error,setError]=useState('');
   const [accessModal,setAccessModal]=useState(false);
   const [pendingAction,setPendingAction]=useState<null|(()=>Promise<void>)>(null);
-  const [result,setResult]=useState<{passport:CharacterPassport;shareCode:string;editToken:string}|null>(null);
+  const [result,setResult]=useState<FinalizeResult|null>(null);
 
   function storedCode(){ return typeof window!=='undefined' ? localStorage.getItem('chara_ai_access_code')||'' : ''; }
   async function gate(action:(code:string)=>Promise<void>){
@@ -176,6 +182,7 @@ export function AnalyzeFlow(){
 
   return <>
     <AccessCodeModal open={accessModal} onClose={()=>setAccessModal(false)} onValidated={async()=>{const fn=pendingAction;setPendingAction(null);if(fn)await fn();}} />
+
     {stage==='input' && <div className="card" aria-busy={busy}>
       <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
       <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
@@ -201,11 +208,11 @@ export function AnalyzeFlow(){
 
     {stage==='interview' && question && <div className="card question-card">
       <div><div className="q-meta"><span>{question.order} / 20</span>{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{!freeResponse&&<div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>}<div className="field"><label className="label">{freeResponse?'직접 답변':'직접 입력'}</label><textarea disabled={busy} className="input" style={{minHeight:freeResponse?130:80,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} placeholder={freeResponse?'이 캐릭터라면 어떤지 자유롭게 적어주세요.':'선택지에 맞는 답이 없다면 직접 적어주세요.'} /></div><div className="field"><label className="label">{freeResponse?'덧붙일 이유·맥락':'왜 그렇게 행동할까요?'} <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} placeholder={freeResponse?'답변에 덧붙이고 싶은 이유나 예외가 있다면 적어주세요.':'그 행동을 하는 이유나, 사람·상황에 따라 달라지는 조건이 있다면 적어주세요.'} /><span className="muted">이유를 적으면 다음 질문의 분기와 최종 캐해에 함께 반영돼요.</span></div></div>
-      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!(selected||custom.trim())||(!viewingPastQuestion&&question.order<20&&false)} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 최종 캐해':'답변하고 다음 질문'}</button></div></div>
+      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 최종 캐해':'답변하고 다음 질문'}</button></div></div>
     </div>}
 
-    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>최종 캐해를 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 답변 이유, 공개·비밀 프로필을 합쳐 Character Passport를 만들고 있습니다.</p>{error&&<p className="error">{error}</p>}</div>}
+    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>최종 캐해를 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 답변 이유, 공개·비밀 프로필을 합쳐 요약과 상세 Character Report를 만들고 있습니다.</p>{error&&<p className="error">{error}</p>}</div>}
 
-    {stage==='done' && result && <div className="stack"><div className="card result-hero"><div><div className="eyebrow">Analysis complete</div><h2 style={{marginTop:10}}>Character Passport가 저장됐어요.</h2><p className="muted">다른 프로젝트나 다른 기기에서 이 코드로 캐릭터를 불러올 수 있습니다.</p></div><div><div className="label">공유 코드</div><div className="share-code">{result.shareCode}</div><button className="btn soft" onClick={()=>navigator.clipboard.writeText(result.shareCode)}>코드 복사</button></div></div><div className="actions"><button className="btn primary" onClick={()=>router.push(`/character/${result.shareCode}`)}>완성된 캐해 보기</button><button className="btn" onClick={()=>{setStage('input');setName('');setProfileText('');setSecretProfileText('');setDraft(null);setAnswers([]);setQuestion(null);setQuestionHistory([]);setActiveQuestionIndex(0);setSelected('');setCustom('');setReason('');setResult(null)}}>다른 캐릭터 분석</button></div></div>}
+    {stage==='done' && result && <CharacterReportView preview={result.preview}/>} 
   </>;
 }
