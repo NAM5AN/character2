@@ -70,8 +70,6 @@ export const analysisTypeSummarySchema = z.object({
 const reportListSchema = z.array(z.string().min(8).max(80)).min(2).max(5);
 const analysisSeedSchema = z.array(z.string().min(20).max(140)).min(6).max(10);
 
-// First paid-AI-independent result layer: only the public teaser summary plus
-// compact non-verbatim seeds for later paid detail generation.
 export const summaryAnalysisRawSchema = z.object({
   oneLineSummary: z.unknown(),
   summary: z.record(z.string(), z.unknown()).optional().default({}),
@@ -84,7 +82,6 @@ export const summaryAnalysisGenerationSchema = z.object({
   analysisSeeds: analysisSeedSchema,
 });
 
-// Detail generation runs only after a valid paid code is supplied.
 export const detailAnalysisRawSchema = z.object({
   outerSelf: z.unknown(),
   innerSelf: z.unknown(),
@@ -100,21 +97,19 @@ export const detailAnalysisRawSchema = z.object({
 }).passthrough();
 
 export const detailAnalysisGenerationSchema = z.object({
-  outerSelf: z.string().min(180).max(360),
-  innerSelf: z.string().min(180).max(360),
+  outerSelf: z.string().min(140).max(360),
+  innerSelf: z.string().min(140).max(360),
   coreValues: reportListSchema,
   desires: reportListSchema,
   fears: reportListSchema,
-  conflictStyle: z.string().min(180).max(360),
-  affectionStyle: z.string().min(180).max(360),
+  conflictStyle: z.string().min(140).max(360),
+  affectionStyle: z.string().min(140).max(360),
   misunderstoodPoints: reportListSchema,
   contradictions: reportListSchema,
   interestingPoints: reportListSchema,
   detailedReport: z.string().min(700).max(1400),
 });
 
-// Legacy combined transport/generation schemas remain for old saved passports
-// and diagnostics created before lazy detail generation was introduced.
 export const finalAnalysisRawSchema = z.object({
   oneLineSummary: z.unknown(),
   summary: z.record(z.string(), z.unknown()).optional().default({}),
