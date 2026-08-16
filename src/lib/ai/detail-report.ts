@@ -47,24 +47,36 @@ const DETAIL_SYSTEM = `당신은 자캐커뮤니티 캐릭터의 유료 상세 �
 근거에 없는 새로운 과거·관계·심리 원인을 창작하지 마세요.
 캐릭터를 임상적으로 진단하거나 정상/비정상으로 평가하지 마세요.
 서로 모순처럼 보이는 원자료가 있으면 하나를 지워 맞추지 말고 관계·상황·예외 조건에 따라 둘이 어떻게 동시에 성립하는지 검토하세요.
-사소한 물건·외형·습관은 중요하다고 단정하지도 사소하다고 버리지도 마세요. 원자료에서 반복되는지, 의미가 명시되는지, 다른 행동과 연결되는지를 보고 판단하세요.`;
+사소한 물건·외형·습관은 중요하다고 단정하지도 사소하다고 버리지도 마세요. 원자료에서 반복되는지, 의미가 명시되는지, 다른 행동과 연결되는지를 보고 판단하세요.
+사용자에게 보이는 긴 해석은 보고서처럼 딱딱한 항목 나열이 아니라 자연스럽게 읽히는 한국어 산문으로 작성하세요. 문단은 문장 수를 맞추기 위해 기계적으로 자르지 말고, 화제나 논리의 중심이 실제로 바뀌는 지점에서만 나누세요. 앞 문단의 결론이 다음 문단의 출발점으로 자연스럽게 이어지도록 접속과 흐름을 다듬으세요.`;
 
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as UnknownRecord : {};
 }
 
-function asText(value: unknown): string {
+function asInlineText(value: unknown): string {
   if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
-  if (Array.isArray(value)) return value.map(asText).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  if (value && typeof value === 'object') return Object.values(value as UnknownRecord).map(asText).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  if (Array.isArray(value)) return value.map(asInlineText).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  if (value && typeof value === 'object') return Object.values(value as UnknownRecord).map(asInlineText).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   return value == null ? '' : String(value).trim();
 }
 
+function asParagraphText(value: unknown): string {
+  if (typeof value !== 'string') return asInlineText(value);
+  const normalized=value.replace(/\r\n?/g,'\n').trim();
+  if(!normalized)return'';
+  return normalized
+    .split(/\n{2,}/)
+    .map(block=>block.replace(/[ \t]+/g,' ').replace(/\n+/g,' ').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 function clipText(text:string,max:number){
-  const normalized=text.replace(/\s+/g,' ').trim();
+  const normalized=text.trim();
   if(normalized.length<=max)return normalized;
   const cut=normalized.slice(0,max).trimEnd();
-  const stops=[cut.lastIndexOf('.'),cut.lastIndexOf('!'),cut.lastIndexOf('?')];
+  const stops=[cut.lastIndexOf('.'),cut.lastIndexOf('!'),cut.lastIndexOf('?'),cut.lastIndexOf('。'),cut.lastIndexOf('！'),cut.lastIndexOf('？')];
   const stop=Math.max(...stops);
   return (stop>=Math.floor(max*.62)?cut.slice(0,stop+1):cut).trim();
 }
@@ -76,7 +88,7 @@ function asList(value:unknown){
       ? value.split(/\n|(?:^|\s)[•·*-]\s+/)
       : [];
   return raw
-    .map(asText)
+    .map(asInlineText)
     .map(x=>clipText(x,80))
     .filter(x=>x.length>=8)
     .slice(0,5);
@@ -84,17 +96,17 @@ function asList(value:unknown){
 
 function normalizeDetail(raw:z.infer<typeof detailAnalysisRawSchema>){
   return {
-    outerSelf:clipText(asText(raw.outerSelf),360),
-    innerSelf:clipText(asText(raw.innerSelf),360),
+    outerSelf:clipText(asParagraphText(raw.outerSelf),360),
+    innerSelf:clipText(asParagraphText(raw.innerSelf),360),
     coreValues:asList(raw.coreValues),
     desires:asList(raw.desires),
     fears:asList(raw.fears),
-    conflictStyle:clipText(asText(raw.conflictStyle),360),
-    affectionStyle:clipText(asText(raw.affectionStyle),360),
+    conflictStyle:clipText(asParagraphText(raw.conflictStyle),360),
+    affectionStyle:clipText(asParagraphText(raw.affectionStyle),360),
     misunderstoodPoints:asList(raw.misunderstoodPoints),
     contradictions:asList(raw.contradictions),
     interestingPoints:asList(raw.interestingPoints),
-    detailedReport:clipText(asText(raw.detailedReport),1400),
+    detailedReport:clipText(asParagraphText(raw.detailedReport),1400),
   };
 }
 
@@ -128,10 +140,10 @@ async function generateDetailFields(
     sourceInput=buildLegacyInput(seed);
   }
 
-  const baseInput=`${sourceInput}\n\n출력 규칙:\n- outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 하나의 문자열입니다. 180~320자 정도를 목표로 충분히 구체적으로 쓰되 서버 허용 범위는 최소 140자, 최대 360자입니다.\n- coreValues / desires / fears / misunderstoodPoints / contradictions / interestingPoints: 각 2~5개 문자열 배열, 항목당 8~80자.\n- detailedReport: 하나의 문자열 700~1400자. 위 항목을 그대로 반복하지 말고 원자료에서 확인된 행동 원리, 관계 패턴, 예외 조건, 겉과 속의 간극, 중요한 모순과 고유 디테일이 어떻게 연결되는지 하나의 흐름으로 통합하세요.\n- 근거에 없는 새 사실을 만들지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
+  const baseInput=`${sourceInput}\n\n출력 규칙:\n- outerSelf / innerSelf / conflictStyle / affectionStyle: 각각 하나의 문자열입니다. 180~320자 정도를 목표로 충분히 구체적으로 쓰되 서버 허용 범위는 최소 140자, 최대 360자입니다. 한 흐름으로 읽히면 한 문단으로 두고, 관점이나 논리가 분명히 전환될 때만 최대 2문단으로 나누세요. 문단 사이에는 \\n\\n을 넣으세요.\n- coreValues / desires / fears / misunderstoodPoints / contradictions / interestingPoints: 각 2~5개 문자열 배열, 항목당 8~80자.\n- detailedReport: 하나의 문자열 700~1400자. 원자료에서 확인된 행동 원리, 관계 패턴, 예외 조건, 겉과 속의 간극, 중요한 모순과 고유 디테일을 하나의 해석 흐름으로 엮으세요. 보통 3~6개 문단이 적절하지만 문단 수를 맞추려고 자르지 마세요. 화제가 실제로 바뀌거나 앞 내용에서 다음 결론으로 넘어가는 자연스러운 전환점에서만 문단을 나누고, 문단 사이에는 \\n\\n을 넣으세요. 각 문단은 앞 문단과 논리적으로 이어져야 하며 같은 결론을 반복하지 마세요.\n- detailedReport 안에 별도의 소제목, 번호, 불릿을 넣지 마세요. 완결된 산문으로 쓰세요.\n- 근거에 없는 새 사실을 만들지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
 
   for(let attempt=0;attempt<3;attempt+=1){
-    const retry=attempt===0?'':`\n\n이전 생성은 서버 검증에 실패했습니다. 이전 출력을 수리하지 말고 같은 원자료를 처음부터 다시 읽어 새로 작성하세요. 실패 원인: ${lastReason}`;
+    const retry=attempt===0?'':`\n\n이전 생성은 서버 검증에 실패했습니다. 이전 출력을 수리하지 말고 같은 원자료를 처음부터 다시 읽어 새로 작성하세요. 실패 원인: ${lastReason}. 분량을 맞추기 위해 문장을 기계적으로 끊거나 문단을 균등하게 나누지 말고, 의미 전환에 따라 자연스럽게 구성하세요.`;
     const raw=await askClaudeJson({
       system:DETAIL_SYSTEM,
       schema:detailAnalysisRawSchema,
