@@ -60,12 +60,20 @@ export async function POST(request: Request) {
     const confirmedInferences = body.draft.aiInferences
       .filter(x => x.ownerVerdict === 'confirmed')
       .map(x => ({ text: x.text, evidence: x.evidence }));
-    const ambiguousInferences = body.draft.aiInferences
-      .filter(x => x.ownerVerdict === 'ambiguous')
-      .map(x => ({ text: x.text, evidence: x.evidence, ownerFeedback: x.ownerFeedback?.trim() || '' }));
+
+    const ownerClarifiedAmbiguities = body.draft.aiInferences
+      .filter(x => x.ownerVerdict === 'ambiguous' && x.ownerFeedback?.trim())
+      .map(x => ({ ownerFeedback: x.ownerFeedback!.trim(), relatedInference: x.text }));
+
+    const unresolvedAmbiguities = body.draft.aiInferences
+      .filter(x => x.ownerVerdict === 'ambiguous' && !x.ownerFeedback?.trim())
+      .map(x => ({ text: x.text, evidence: x.evidence }));
+
+    // Rejected inference text is intentionally NOT sent to the question model.
+    // The owner's correction replaces it as settled character knowledge.
     const ownerCorrections = body.draft.aiInferences
       .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
-      .map(x => ({ rejectedInference: x.text, correction: x.ownerFeedback!.trim(), originalEvidence: x.evidence }));
+      .map(x => x.ownerFeedback!.trim());
 
     const compactDraft = {
       basicProfile: body.draft.basicProfile,
@@ -73,7 +81,8 @@ export async function POST(request: Request) {
       relationshipTraits: body.draft.relationshipTraits,
       confirmedFacts: body.draft.confirmedFacts,
       confirmedInferences,
-      ambiguousInferences,
+      ownerClarifiedAmbiguities,
+      unresolvedAmbiguities,
       ownerCorrections,
       analysisConfidence: body.draft.analysisConfidence,
     };
@@ -124,7 +133,7 @@ export async function POST(request: Request) {
       ? '첫 문항이므로 mode는 pivot으로 시작하세요.'
       : branchStreak >= 2
         ? '직전 두 문항이 branch였으므로 이번 문항은 branch 금지입니다. pivot 또는 counter를 선택하세요.'
-        : '직전 답변이나 답변 이유에서 새로운 모순·예외·조건이 나왔다면 branch를 우선 검토하세요. 그렇지 않으면 pivot/counter 중 정보가치가 높은 쪽을 선택하세요.';
+        : '직전 인터뷰 답변/이유에서 아직 답하지 않은 새 의문이 생겼다면 branch를 검토하세요. 오너가 이미 명시적으로 정정·보충한 내용 자체는 branch 대상이 아닙니다.';
 
     const formatRules = [
       lastFormat ? `직전 형식은 ${lastFormat}(${FORMAT_LABELS[lastFormat as keyof typeof FORMAT_LABELS] || lastFormat})이므로 이번에는 다른 형식을 우선하세요.` : '',
@@ -145,29 +154,41 @@ export async function POST(request: Request) {
 캐릭터 데이터:
 ${JSON.stringify(compactDraft)}
 
-AI 추론 검수에서 받은 오너 피드백 사용 규칙:
-- ownerCorrections.correction은 오너가 직접 알려준 설정이므로 강한 직접 증거입니다.
-- ownerCorrections.rejectedInference는 틀렸다고 판정된 AI 해석입니다. 절대 사실이나 가설의 근거로 재사용하지 마세요. correction만 사용하세요.
-- ambiguousInferences에 ownerFeedback이 있으면 그 피드백을 AI 추론 문장보다 우선하세요. AI 추론은 일부만 맞을 수 있는 미확정 맥락일 뿐입니다.
-- ambiguousInferences에 ownerFeedback이 없으면 약한 참고로만 보고, 별도 근거 없이는 질문 전제로 삼지 마세요.
-- confirmedInferences만 오너가 그대로 맞다고 확인한 AI 해석입니다.
-- unreviewed 추론은 아예 제공되지 않습니다.
+오너 검수 피드백의 상태 규칙 — 매우 중요:
+- ownerCorrections의 각 문장은 오너가 직접 확정한 캐릭터 사실입니다. 이미 답이 끝난 CLOSED KNOWLEDGE입니다.
+- ownerCorrections에 적힌 행동, 이유, 조건, 예외, 우선순위, 관계 차이는 다시 질문하지 마세요.
+- 같은 내용을 단어만 바꾸거나 상황만 살짝 바꿔 재확인하는 것도 금지합니다.
+- ownerCorrections를 질문의 출발점으로 사용할 수는 있지만, 반드시 correction에 아직 답이 없는 '인접한 새 정보'만 물어야 합니다.
+- 예: 오너가 '자기 일정과 겹치면 바로 거절하고 죄책감도 없다'고 정정했다면, '일정이 겹치면 무엇을 먼저 보나?', '거절할 때 죄책감이 있나?'는 금지입니다.
+- 그 대신 정말 필요하다면 '누구에게는 그 기준이 달라지는가?', '본인이 먼저 도움을 청할 때도 같은 기준인가?'처럼 정정문에 답이 없는 별도 축을 볼 수 있습니다.
+- 단, 그런 인접 질문도 다른 캐릭터 Hook보다 정보가치가 낮다면 굳이 이어 묻지 말고 pivot하세요.
+
+- ownerClarifiedAmbiguities.ownerFeedback도 오너가 직접 말한 부분은 CLOSED KNOWLEDGE입니다. 그 문장에 이미 포함된 내용은 재질문하지 마세요.
+- relatedInference는 왜 애매함이 생겼는지 이해하기 위한 배경일 뿐이며 ownerFeedback과 충돌하면 ownerFeedback이 정답입니다.
+- unresolvedAmbiguities는 아직 오너 설명이 없으므로 약한 참고만 가능합니다.
+- confirmedInferences는 오너가 맞다고 확인한 해석입니다.
+- unreviewed/rejected AI 추론 원문은 질문 근거로 사용하지 않습니다.
+
+중복 방지 규칙:
+- 질문을 만들기 전에 반드시 '이 질문의 답이 이미 ownerCorrections, ownerClarifiedAmbiguities.ownerFeedback, 프로필 명시 사실, 이전 answer/reason 안에 들어 있는가?'를 검사하세요.
+- 답이 이미 있으면 그 질문 후보를 폐기하고 다른 targetHook을 고르세요.
+- 새 질문은 기존 확정 정보를 다시 측정하는 것이 아니라, 아직 비어 있는 정보를 추가해야 합니다.
+- 이미 확정된 사실의 세부 표현을 바꾸는 것만으로는 새 정보가 아닙니다.
 
 중요한 증거 사용 규칙:
-- 오너의 직접 답변, 답변 이유, AI 추론 검수의 정정/보충은 가장 높은 우선순위의 캐릭터 근거입니다.
+- 오너의 직접 정정/보충, 인터뷰 답변과 이유는 가장 높은 우선순위의 캐릭터 근거입니다.
 - confirmedFacts의 어떤 항목도 종류만으로 중요하거나 중요하지 않다고 판단하지 마세요.
 - 프로필/비밀 프로필이 의미를 직접 설명하거나, 서로 독립적인 여러 행동·관계·사건·답변이 같은 의미를 지지하면 강한 Hook으로 사용할 수 있습니다.
 - 반복되지만 의미가 불명확한 항목은 중간 강도의 단서입니다. 중요성을 단정하지 않는 질문만 허용됩니다.
 - 한 번 등장했고 의미가 설명되지 않은 항목은 약한 단서입니다. 심리적 의미를 전제로 질문하지 마세요.
-- 약한 단서의 중요성을 확인할 정보가치가 높다면, 중요하다는 전제 없이 짧은 확인 질문을 1회 사용할 수 있습니다. 오너 답변이 의미를 부여하면 이후 강한 Hook으로 승격할 수 있습니다.
 
 지금까지의 실제 문답과 내부 질문 메타데이터:
 ${JSON.stringify(history)}
 
 답변 이유 활용:
-- reason이 있으면 answer와 함께 다음 분기의 중요한 근거로 사용하세요.
+- reason이 있으면 answer와 함께 중요한 근거로 사용하세요.
 - 선택한 보기보다 reason이 더 구체적이면 reason을 우선해 캐릭터의 행동 규칙을 이해하세요.
-- reason을 다시 그대로 물어보지 말고, 새로 드러난 조건이나 예외만 한 단계 더 확인하세요.
+- answer/reason에 이미 적힌 내용을 다시 확인하지 마세요. 아직 답하지 않은 예외나 인접 축만 가치가 있을 때 branch하세요.
 
 현재 커버리지:
 - category counts: ${JSON.stringify(categoryCounts)}
@@ -182,21 +203,16 @@ ${formatRules}
 ${coverageRule}
 
 질문 선택 절차:
-1. 현재 캐릭터에서 아직 덜 확인됐거나 오너의 검수 피드백/최근 답변 때문에 새로 생긴 의문을 2~4개 내부적으로 비교하세요.
-2. 그중 한 문항으로 해석이 가장 많이 달라질 지점을 targetHook으로 고르세요.
-3. 최근 답변을 한 단계 더 볼 가치가 있으면 branch, 다른 확실한 고유 Hook이 더 중요하면 pivot, 강해진 해석의 예외를 볼 필요가 있으면 counter를 고르세요.
-4. 최근 형식을 반복하지 않고 가장 간단하게 물을 수 있는 format을 고르세요.
+1. 현재 캐릭터에서 아직 답이 없는 의문 후보를 2~4개 내부적으로 만드세요.
+2. 각 후보가 오너 정정/보충, 프로필, 이전 answer/reason에 이미 답이 있는지 검사하고, 있으면 제거하세요.
+3. 남은 후보 중 한 문항으로 해석이 가장 많이 달라질 지점을 targetHook으로 고르세요.
+4. 최근 답변에서 실제 미확인 정보가 이어지면 branch, 다른 확실한 고유 Hook이 더 중요하면 pivot, 강해진 해석의 현실적 예외가 미확인 상태면 counter를 고르세요.
 5. 질문은 한 가지 판단만 묻고 짧게 작성하세요.
 
 길이 강제:
 - question은 최대 90자이며 70자 안팎을 목표로 합니다.
 - 각 option은 최대 65자이며 50자 안팎을 목표로 합니다.
 - 질문과 보기에 긴 배경설명이나 여러 조건을 겹치지 마세요.
-
-분기 규칙:
-- branch는 같은 사건을 이어 쓰는 것이 아니라 최근 답변의 핵심 이유나 조건을 다른 각도에서 한 번 더 확인합니다.
-- pivot도 무관한 랜덤 질문이면 실패입니다. 확실한 프로필 Hook 또는 현재 해석과 연결되는 미확인 지점으로 이동하세요.
-- counter는 현재까지 가장 그럴듯한 해석이 깨지는 현실적인 예외를 확인합니다.
 
 선택지 설계:
 - 예상 후보 1~2개와 다른 캐해를 열 수 있는 경쟁 후보 1~2개를 함께 넣으세요.
