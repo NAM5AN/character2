@@ -294,7 +294,7 @@ export function AnalyzeFlow(){
       answer=customAnswer;
       answerSource='custom';
     }else if(type==='bipolar_scale'){
-      if(selected)answer=`${config.leftLabel||'A'} ← ${selected}/5 → ${config.rightLabel||'B'}`;
+      if(selected)answer=`${config.leftLabel||'첫 문장'} ← ${selected}/5 → ${config.rightLabel||'두 번째 문장'}`;
     }else if(type==='ranking'){
       if(ranking.length===question.options.length)answer=ranking.map((item,index)=>`${index+1}위 ${item}`).join(' > ');
     }else if(type==='forced_choice'){
@@ -377,7 +377,7 @@ export function AnalyzeFlow(){
     if(type==='bipolar_scale')return <div style={{marginTop:20}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:16,fontWeight:800,fontSize:14}}><span>{config.leftLabel}</span><span style={{textAlign:'right'}}>{config.rightLabel}</span></div>
       <div className="options" style={{gridTemplateColumns:'repeat(5,minmax(0,1fr))',marginTop:10}}>{[
-        ['1','A에 매우 가까움'],['2','A에 조금 가까움'],['3','반반'],['4','B에 조금 가까움'],['5','B에 매우 가까움'],
+        ['1','첫 문장에 매우 가까움'],['2','첫 문장에 조금 가까움'],['3','반반'],['4','두 번째 문장에 조금 가까움'],['5','두 번째 문장에 매우 가까움'],
       ].map(([value,label])=><button disabled={busy} key={value} className={`option ${selected===value?'selected':''}`} style={{padding:'14px 8px'}} onClick={()=>setSelected(value)}>{label}</button>)}</div>
     </div>;
 
