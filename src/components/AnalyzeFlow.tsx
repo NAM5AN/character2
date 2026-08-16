@@ -3,7 +3,6 @@ import { useState } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion } from '@/lib/schemas/question';
 import type { CharacterReportPreview } from '@/lib/character-report';
-import { AccessCodeModal } from '@/components/AccessCodeModal';
 import { CharacterReportView } from '@/components/CharacterReportView';
 
 type Stage = 'input'|'review'|'interview'|'finalizing'|'done';
@@ -29,29 +28,18 @@ export function AnalyzeFlow(){
   const [reason,setReason]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
-  const [accessModal,setAccessModal]=useState(false);
-  const [pendingAction,setPendingAction]=useState<null|(()=>Promise<void>)>(null);
   const [result,setResult]=useState<FinalizeResult|null>(null);
 
-  function storedCode(){ return typeof window!=='undefined' ? localStorage.getItem('chara_ai_access_code')||'' : ''; }
-  async function gate(action:(code:string)=>Promise<void>){
-    const code=storedCode();
-    if(!code){ setPendingAction(()=>()=>action(storedCode())); setAccessModal(true); return; }
-    await action(code);
-  }
-  function handleApiError(status:number, body:any, retry:()=>Promise<void>){
-    if(status===401 && body?.error==='CODE_INVALID'){
-      localStorage.removeItem('chara_ai_access_code'); setPendingAction(()=>retry); setAccessModal(true); return true;
-    }
-    setError(body?.error==='RATE_LIMITED'?'요청이 너무 많아요. 잠시 뒤 다시 시도해주세요.':`처리 중 오류가 발생했어요. (${body?.error||status})`); return false;
+  function handleApiError(status:number, body:any){
+    setError(body?.error==='RATE_LIMITED'?'요청이 너무 많아요. 잠시 뒤 다시 시도해주세요.':`처리 중 오류가 발생했어요. (${body?.error||status})`);
   }
 
-  async function parse(code:string){
+  async function parse(){
     setBusy(true); setError('');
     try{
-      const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText,accessCode:code})});
+      const r=await fetch('/api/characters/parse',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,profileText,secretProfileText})});
       const body=await r.json();
-      if(!r.ok){handleApiError(r.status,body,()=>gate(parse));return;}
+      if(!r.ok){handleApiError(r.status,body);return;}
       setDraft(body.draft); setStage('review');
     }finally{setBusy(false)}
   }
@@ -87,14 +75,14 @@ export function AnalyzeFlow(){
     setReason(saved.reason||'');
   }
 
-  async function nextQuestion(code:string, currentAnswers=answers, historyBase=questionHistory){
+  async function nextQuestion(currentAnswers=answers, historyBase=questionHistory){
     if(!draft)return;
     setBusy(true); setError('');
     try{
-      const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers,accessCode:code})});
+      const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:currentAnswers})});
       const body=await r.json();
-      if(!r.ok){handleApiError(r.status,body,()=>gate(c=>nextQuestion(c,currentAnswers,historyBase)));return;}
-      if(body.done){ await finalize(code,currentAnswers); return; }
+      if(!r.ok){handleApiError(r.status,body);return;}
+      if(body.done){ await finalize(currentAnswers); return; }
       const nextHistory=[...historyBase,body.question];
       setQuestionHistory(nextHistory);
       setQuestion(body.question);
@@ -135,15 +123,15 @@ export function AnalyzeFlow(){
       const nextHistory=questionHistory.slice(0,activeQuestionIndex+1);
       setAnswers(next);
       setQuestionHistory(nextHistory);
-      if(next.length===20){ await gate(code=>finalize(code,next)); }
-      else { await gate(code=>nextQuestion(code,next,nextHistory)); }
+      if(next.length===20){ await finalize(next); }
+      else { await nextQuestion(next,nextHistory); }
       return;
     }
 
     const next=[...answers,current];
     setAnswers(next);
-    if(next.length===20){ await gate(code=>finalize(code,next)); }
-    else { await gate(code=>nextQuestion(code,next,questionHistory)); }
+    if(next.length===20){ await finalize(next); }
+    else { await nextQuestion(next,questionHistory); }
   }
 
   function previousQuestion(){
@@ -160,12 +148,12 @@ export function AnalyzeFlow(){
     if(next)restoreAnswerFor(nextIndex,next);
   }
 
-  async function finalize(code:string, finalAnswers=answers){
+  async function finalize(finalAnswers=answers){
     if(!draft)return; setStage('finalizing'); setBusy(true); setError('');
     try{
-      const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers,accessCode:code})});
+      const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:finalAnswers})});
       const body=await r.json();
-      if(!r.ok){handleApiError(r.status,body,()=>gate(c=>finalize(c,finalAnswers))); setStage('interview'); return;}
+      if(!r.ok){handleApiError(r.status,body); setStage('interview'); return;}
       localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);
       setResult(body); setStage('done');
     }finally{setBusy(false)}
@@ -181,8 +169,6 @@ export function AnalyzeFlow(){
   );
 
   return <>
-    <AccessCodeModal open={accessModal} onClose={()=>setAccessModal(false)} onValidated={async()=>{const fn=pendingAction;setPendingAction(null);if(fn)await fn();}} />
-
     {stage==='input' && <div className="card" aria-busy={busy}>
       <div className="field"><label className="label">캐릭터 이름</label><input disabled={busy} className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="예: 한서진" /></div>
       <div className="field"><label className="label">공개 프로필</label><textarea disabled={busy} className="textarea" value={profileText} onChange={e=>setProfileText(e.target.value)} placeholder="커뮤에서 공개했던 프로필 내용을 붙여넣으세요. 성격, 외관, 관계, 설정 등을 그대로 넣어도 됩니다." /></div>
@@ -193,7 +179,7 @@ export function AnalyzeFlow(){
         <div><strong style={{display:'block',marginBottom:5}}>프로필을 읽고 있어요.</strong><p className="muted" style={{margin:0,lineHeight:1.6}}>공개·비밀 프로필을 비교하고 캐릭터 설정, 사실 근거, AI 추론을 정리하는 중입니다. 분석이 끝나면 자동으로 다음 화면으로 이동해요.</p></div>
       </div>}
       {error&&<p className="error">{error}</p>}
-      <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={()=>gate(parse)}>{busy?<span className="loading">AI 분석 진행 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
+      <div className="actions"><button className="btn primary" disabled={busy||name.trim().length<1||profileText.trim().length<20} onClick={parse}>{busy?<span className="loading">AI 분석 진행 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'AI 분석 시작'}</button></div>
     </div>}
 
     {stage==='review' && draft && <div className="stack" aria-busy={busy}>
@@ -203,15 +189,15 @@ export function AnalyzeFlow(){
         <div className="loading" style={{fontSize:18,fontWeight:900,whiteSpace:'nowrap'}}>인터뷰 질문 준비 중 <i className="dot"/><i className="dot"/><i className="dot"/></div>
         <div><strong style={{display:'block',marginBottom:5}}>첫 질문을 만들고 있어요.</strong><p className="muted" style={{margin:0,lineHeight:1.6}}>프로필과 방금 검수한 AI 추론을 바탕으로 이 캐릭터에게 맞는 첫 인터뷰 질문을 생성하는 중입니다.</p></div>
       </div>}
-      <div className="actions"><button disabled={busy} className="btn primary" onClick={()=>{setQuestionHistory([]);setAnswers([]);setActiveQuestionIndex(0);gate(c=>nextQuestion(c,[],[]))}}>{busy?<span className="loading">인터뷰 질문 준비 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'20문항 인터뷰 시작'}</button><button disabled={busy} className="btn" onClick={()=>setStage('input')}>프로필 다시 입력</button></div>
+      <div className="actions"><button disabled={busy} className="btn primary" onClick={()=>{setQuestionHistory([]);setAnswers([]);setActiveQuestionIndex(0);nextQuestion([],[])}}>{busy?<span className="loading">인터뷰 질문 준비 중 <i className="dot"/><i className="dot"/><i className="dot"/></span>:'20문항 인터뷰 시작'}</button><button disabled={busy} className="btn" onClick={()=>setStage('input')}>프로필 다시 입력</button></div>
     </div>}
 
     {stage==='interview' && question && <div className="card question-card">
       <div><div className="q-meta"><span>{question.order} / 20</span>{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{!freeResponse&&<div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}</div>}<div className="field"><label className="label">{freeResponse?'직접 답변':'직접 입력'}</label><textarea disabled={busy} className="input" style={{minHeight:freeResponse?130:80,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} placeholder={freeResponse?'이 캐릭터라면 어떤지 자유롭게 적어주세요.':'선택지에 맞는 답이 없다면 직접 적어주세요.'} /></div><div className="field"><label className="label">{freeResponse?'덧붙일 이유·맥락':'왜 그렇게 행동할까요?'} <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} placeholder={freeResponse?'답변에 덧붙이고 싶은 이유나 예외가 있다면 적어주세요.':'그 행동을 하는 이유나, 사람·상황에 따라 달라지는 조건이 있다면 적어주세요.'} /><span className="muted">이유를 적으면 다음 질문의 분기와 최종 캐해에 함께 반영돼요.</span></div></div>
-      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 최종 캐해':'답변하고 다음 질문'}</button></div></div>
+      <div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">방금 답한 내용을 유지한 채 다음 질문을 만들고 있어요.</p>}<div className="actions" style={{marginTop:16}}>{activeQuestionIndex>0&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!(selected||custom.trim())} onClick={answerCurrent}>{busy?'다음 질문 만드는 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div>
     </div>}
 
-    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>최종 캐해를 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 답변 이유, 공개·비밀 프로필을 합쳐 요약과 상세 Character Report를 만들고 있습니다.</p>{error&&<p className="error">{error}</p>}</div>}
+    {stage==='finalizing' && <div className="card" style={{textAlign:'center',padding:'90px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900}}>캐릭터 요약을 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted">20개의 답변과 프로필을 합쳐 무료 요약을 만들고 있습니다. 상세 리포트는 결제 코드 확인 후에만 생성돼요.</p>{error&&<p className="error">{error}</p>}</div>}
 
     {stage==='done' && result && <CharacterReportView preview={result.preview}/>} 
   </>;
