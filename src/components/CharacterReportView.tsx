@@ -46,7 +46,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       if(!r.ok){
         if(r.status===401){localStorage.removeItem('chara_ai_access_code');setUnlockOpen(true)}
         if(body?.error==='DETAIL_OWNER_SOURCE_REQUIRED'){
-          setError('상세 리포트가 아직 생성되지 않았어요. 비밀 프로필과 20문항 원문을 안전하게 다시 읽기 위해 최초 1회는 이 캐릭터를 만든 브라우저에서 상세보기를 열어야 해요.');
+          setError('상세 리포트가 아직 생성되지 않았어요. 최초 1회는 이 캐릭터를 만든 브라우저에서 상세보기를 열어야 해요.');
         }else if(body?.error==='EDIT_TOKEN_INVALID'){
           setError('이 브라우저의 캐릭터 생성 권한을 확인하지 못했어요. 최초 상세 생성은 캐릭터를 만든 브라우저에서 진행해주세요.');
         }else{
@@ -64,11 +64,14 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const previewSections=[
     ['관계에서 반복되는 패턴',`상대를 얼마나 가까운 사람으로 받아들이는지에 따라 허용하는 거리와 개입의 방식이 어떻게 달라지는지 살펴봅니다. 친밀감이 높아질수록 표현이 직접적으로 바뀌는지, 오히려 관찰과 배려가 늘어나는지, 갈등 뒤에 다시 관계를 회복하려는 방식은 무엇인지까지 여러 장면을 연결해 읽습니다.\n\n단순히 사람을 좋아한다거나 낯을 가린다는 식으로 끝내지 않고, 어느 순간부터 상대를 자기 책임 범위 안에 넣는지, 거절이나 침묵을 어떤 신호로 받아들이는지, 가까워진 뒤에도 끝까지 남는 경계선은 무엇인지를 함께 풀어냅니다.`],
     ['핵심 가치 · 욕구 · 두려움',`무엇을 선택할 때 가장 먼저 지키려는 기준이 무엇인지, 원하는 것이 단순한 결과인지 아니면 특정한 감각과 상태인지 구분해서 봅니다. 겉으로는 대수롭지 않게 넘겨도 반복해서 지키는 원칙이 있다면 그 원칙이 어디에서 힘을 얻는지, 반대로 포기할 수 있는 기준은 무엇인지까지 연결합니다.\n\n욕구와 두려움도 따로 떼지 않고 하나의 구조로 봅니다. 무엇을 얻고 싶은 마음이 어떤 행동을 밀어붙이는지, 무엇을 잃을까 두려워할 때 평소와 다른 판단을 하는지, 만족과 불안이 같은 대상에서 동시에 생기는 경우에는 그 모순이 어떤 선택 패턴으로 이어지는지를 해석합니다.`],
-    ['갈등과 친밀감에서 달라지는 방식',`갈등이 생겼을 때 바로 맞서는지, 먼저 상황을 관찰하는지, 증거나 이유가 충분히 쌓일 때까지 유보하는지처럼 초기 반응의 기준부터 봅니다. 이후 어느 지점에서 직접 개입하고, 무엇이 확인되면 자기 판단을 수정하며, 반대로 어떤 문제는 끝까지 양보하지 않는지도 관계의 거리와 함께 해석합니다.\n\n애정 표현 역시 말의 다정함만 보지 않습니다. 가까운 사람에게 시간을 쓰는 방식, 대신 해결해 주려는지 스스로 해낼 여지를 남기는지, 상대의 작은 변화를 얼마나 빨리 알아차리는지 등을 묶어 친밀감이 실제 행동 범위를 어떻게 바꾸는지 읽어냅니다.`],
+    ['통합 상세 해석',`각 항목에서 따로 드러난 특징을 다시 하나의 흐름으로 엮어, 이 캐릭터가 어떤 기준으로 상황을 판단하고 사람과 거리를 조절하는지 깊게 풀어냅니다. 관계에서 반복되는 선택, 감정이 행동으로 바뀌는 방식, 예외가 생기는 조건을 함께 보면서 단순한 성격표가 아니라 실제 장면 속에서 움직일 수 있는 인물의 원리를 정리합니다.\n\n서로 모순처럼 보이는 모습도 어느 한쪽을 지우지 않고 더 큰 행동 원리 안에서 연결합니다. 같은 특성이 상황에 따라 강점과 취약점으로 어떻게 바뀌는지, 다른 인물과 부딪혔을 때 어떤 관계 서사가 자연스럽게 생기는지, 아직 확정할 수 없는 열린 부분은 무엇인지까지 이어서 해석합니다.`],
   ] as const;
+  const previewBlur=[5,7.5,10] as const;
+  const previewOpacity=[.68,.52,.34] as const;
+  const previewWhite=[.04,.15,.3] as const;
 
   return <>
-    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 공개·비밀 프로필과 20문항 원문을 다시 읽어 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
+    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 캐릭터 전체 정보를 바탕으로 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
 
     <div className="result-hero"><div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div><div><div className="label">공유 코드</div><div className="share-code">{preview.shareCode}</div><button className="btn soft" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(preview.shareCode)}>코드 복사</button></div></div>
 
@@ -79,14 +82,26 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       <div className="eyebrow">Full report preview</div><h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>여기서 한 단계 더 들어가면</h2>
       <p style={{lineHeight:1.75,maxWidth:760,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
       <div className="tags" style={{marginBottom:18}}>{['유형별 해석','핵심 가치·욕구','두려움','관계·갈등 패턴','오해받는 지점','캐릭터의 모순','상세 통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
-      <div aria-hidden="true" style={{display:'grid',gap:12,position:'relative'}}>{previewSections.map(([title,t])=><div key={title} style={{border:'1px solid var(--line)',borderRadius:16,padding:'22px 24px',background:'white',minHeight:230}}><strong>{title}</strong><div style={{marginTop:12,filter:'blur(6px)',opacity:.58,userSelect:'none'}}><ParagraphText text={t}/></div></div>)}<div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 12%,rgba(255,253,248,.18) 58%,rgba(255,253,248,.72) 100%)',pointerEvents:'none'}}/></div>
-      {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>결제 확인 완료 · 원자료 재분석 중 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{margin:'8px 0 0',lineHeight:1.6}}>공개·비밀 프로필과 20문항 질문·답변·이유를 다시 읽어 상세 리포트를 만들고 있어요. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p></div>}
+
+      <div style={{position:'relative'}}>
+        <div aria-hidden="true" style={{display:'grid',gap:12,position:'relative'}}>
+          {previewSections.map(([title,t],index)=><div key={title} style={{border:'1px solid var(--line)',borderRadius:16,padding:'22px 24px',background:'white',minHeight:230,position:'relative',overflow:'hidden'}}>
+            <strong>{title}</strong>
+            <div style={{marginTop:12,filter:`blur(${previewBlur[index]}px)`,opacity:previewOpacity[index],userSelect:'none'}}><ParagraphText text={t}/></div>
+            <div style={{position:'absolute',inset:0,background:`rgba(255,253,248,${previewWhite[index]})`,pointerEvents:'none'}}/>
+          </div>)}
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
+        </div>
+        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'상세 리포트 생성 중…':'더 자세히 보기'}</button>
+      </div>
+
+      {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>상세 리포트 생성 중 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{margin:'8px 0 0',lineHeight:1.6}}>캐릭터의 행동 원리와 관계 패턴을 깊게 해석하고 있어요. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p></div>}
       {error&&<p className="error">{error}</p>}
-      <div className="actions" style={{justifyContent:'center',marginTop:24}}><button className="btn primary" disabled={busy} onClick={requestDetail}>{busy?'상세 리포트 생성 중…':'더 자세히 보기'}</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
+      <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>프로필과 20문항 원자료를 다시 읽어 만든 유형별 긴 해석과 통합 캐해입니다.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>캐릭터의 행동 원리와 관계 패턴을 깊게 풀어낸 유형별 해석과 통합 캐해입니다.</p>
       <div className="result-grid" style={{marginTop:20}}>
         <section className="result-block"><h3>겉으로 보이는 모습</h3><ParagraphText text={detail.analysis.outerSelf}/></section><section className="result-block"><h3>실제 내면</h3><ParagraphText text={detail.analysis.innerSelf}/></section><section className="result-block"><h3>갈등 방식</h3><ParagraphText text={detail.analysis.conflictStyle}/></section><section className="result-block"><h3>애정 표현</h3><ParagraphText text={detail.analysis.affectionStyle}/></section>
         <section className="result-block"><h3>핵심 가치</h3><BulletList items={detail.analysis.coreValues}/></section><section className="result-block"><h3>핵심 욕망</h3><BulletList items={detail.analysis.desires}/></section><section className="result-block"><h3>두려워하는 것</h3><BulletList items={detail.analysis.fears}/></section>
