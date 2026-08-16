@@ -33,8 +33,8 @@ export function AccessCodeModal({
       if(!r.ok){ localStorage.removeItem('chara_ai_access_code'); setError('현재 이용 코드와 일치하지 않아요. 포스타입에서 최신 코드를 확인해주세요.'); return; }
       const normalized=code.trim();
       localStorage.setItem('chara_ai_access_code',normalized);
-      await onValidated(normalized);
       onClose();
+      await onValidated(normalized);
     }finally{setBusy(false)}
   }
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
