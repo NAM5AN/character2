@@ -2,6 +2,8 @@ import 'server-only';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+export const CHARACTER_DEEP_ANALYSIS_SKILL_VERSION = 'character-deep-analysis/1.0.0' as const;
+
 type CharacterDeepAnalysisSkill = {
   core: string;
   analysisGuide: string;
