@@ -10,6 +10,9 @@ export const inferenceSchema = z.object({
   // previously saved Character Passports readable.
   evidence: z.array(z.string().min(1).max(220)).max(4).default([]),
   ownerVerdict: verdictSchema.default('unreviewed'),
+  // Optional owner clarification/correction for ambiguous or rejected AI reads.
+  // Kept optional for backward compatibility with previously saved passports.
+  ownerFeedback: z.string().max(1200).optional(),
 });
 
 export const interviewAnswerSchema = z.object({
