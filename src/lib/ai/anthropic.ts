@@ -16,6 +16,7 @@ export async function askClaudeJson<T>(args: {
   input: string;
   schema: z.ZodType<T>;
   maxTokens?: number;
+  maxAttempts?: number;
   allowFallback?: boolean;
   model?: string;
 }): Promise<T> {
@@ -27,6 +28,7 @@ export async function askClaudeJson<T>(args: {
       prompt: args.input,
       schema: args.schema,
       maxOutputTokens: args.maxTokens,
+      maxAttempts: args.maxAttempts,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -40,6 +42,7 @@ export async function askClaudeJson<T>(args: {
       prompt: args.input,
       schema: args.schema,
       maxOutputTokens: args.maxTokens,
+      maxAttempts: args.maxAttempts,
     });
   }
 }
