@@ -418,8 +418,8 @@ export function AnalyzeFlow(){
     </div>;
 
     if(type==='condition_followup')return <>
-      <div className="field"><label className="label">기본 상황</label><select disabled={busy} className="input" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
-      <div className="field"><label className="label">{config.prompt2}</label><select disabled={busy} className="input" value={secondary} onChange={e=>setSecondary(e.target.value)}><option value="">선택</option>{question.options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+      <div className="field"><label className="label">기본 상황</label><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div></div>
+      <div className="field"><label className="label">{config.prompt2}</label><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${secondary===o?'selected':''}`} onClick={()=>setSecondary(o)}>{o}</button>)}</div></div>
     </>;
 
     if(type==='in_character_response')return <div className="field"><label className="label">캐릭터라면 뭐라고 말할까요?</label><textarea disabled={busy} className="input" style={{minHeight:130,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>;
