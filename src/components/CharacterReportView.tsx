@@ -45,11 +45,11 @@ function estimatedProgress(elapsed:number){
   return Math.min(97,92+(elapsed-70)*.15);
 }
 
-function progressStage(progress:number){
-  if(progress<22)return '프로필이랑 답변을 하나씩 확인하는 중';
-  if(progress<60)return '이 캐릭터의 평소 성향을 조금 더 알아보는 중';
-  if(progress<82)return '상황이나 상대에 따라 달라지는 반응을 확인하는 중';
-  return '확인한 내용을 바탕으로 상세 리포트 작성 중';
+function progressStage(progress:number,name:string){
+  if(progress<22)return `${name}, 검사실 입장 완료`;
+  if(progress<60)return `${name}, 기본 성향 검사 진행 중`;
+  if(progress<82)return `${name}, 심층 성향 검사 진행 중`;
+  return `${name}, 결과지 작성 중`;
 }
 
 function remainingLabel(elapsed:number){
@@ -152,7 +152,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-          <div className="loading" style={{fontWeight:900}}>{progressStage(progress)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
+          <div className="loading" style={{fontWeight:900}}>{progressStage(progress,preview.name)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
           <strong style={{fontSize:20}}>{progress}%</strong>
         </div>
         <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:12}}>
