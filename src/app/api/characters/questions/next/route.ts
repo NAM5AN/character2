@@ -38,8 +38,8 @@ const FORMAT_LABELS = {
 const RESPONSE_TYPE_LABELS = {
   fill_blank: '빈칸 채우기',
   sentence_continue: '문장 이어쓰기',
-  dialogue_choice: '대사 고르기',
-  bipolar_scale: 'A/B 사이 연속 다이얼',
+  dialogue_choice: '캐릭터가 할 대사 고르기',
+  bipolar_scale: 'A/B 사이 5단계 성향 선택',
   ranking: '순위 매기기',
   multi_select: '복수 선택',
   least_likely: '가장 하지 않을 것 고르기',
@@ -57,8 +57,8 @@ const RESPONSE_TYPES = Object.keys(RESPONSE_TYPE_LABELS) as ResponseType[];
 const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   fill_blank: '질문 안에 ________ 빈칸을 하나 넣으세요. options는 서로 다른 3~5개 후보를 만들고 allowCustom=true로 하세요.',
   sentence_continue: '캐릭터의 생각이나 판단을 이어 쓰게 하는 미완성 문장으로 만드세요. options=[]이고 allowCustom=true입니다.',
-  dialogue_choice: '캐릭터가 실제로 할 법한 첫마디를 고르게 하세요. options는 짧은 실제 대사 3~5개이며 allowCustom=true입니다.',
-  bipolar_scale: '서로 반대되는 두 판단 A/B 사이에서 연속적인 위치를 드래그해 고르는 형식입니다. 5단계 점수형으로 쓰지 마세요. options=[]이고 responseConfig.leftLabel/rightLabel에 짧고 대등한 두 문장을 넣으세요.',
+  dialogue_choice: '반드시 "이 상황에서 캐릭터 본인이 실제로 뭐라고 말하는가"를 묻습니다. question의 화자와 options의 화자는 모두 캐릭터여야 합니다. 캐릭터가 상대에게서 들을 말, 상대가 캐릭터에게 할 말, 상대의 첫마디를 묻는 질문은 절대 만들지 마세요. options는 캐릭터 본인이 할 짧은 실제 대사 3~5개이며 allowCustom=true입니다.',
+  bipolar_scale: '서로 반대되는 두 판단 A/B를 responseConfig.leftLabel/rightLabel에 짧고 대등한 문장으로 넣으세요. 사용자는 A에 가까움 / 약간 A / 중간 / 약간 B / B에 가까움의 5단계 중 하나를 클릭합니다. options=[]입니다. 일반 5지선다처럼 서로 다른 다섯 행동을 만들지 마세요.',
   ranking: '서로 다른 가치·판단·행동 기준 4~5개를 options에 넣어 전부 순위 매기게 하세요.',
   multi_select: '동시에 일어날 수 있는 행동이나 반응 4~6개를 options에 넣으세요. 필요하면 responseConfig.maxSelections에 2~4를 넣으세요.',
   least_likely: 'options 3~5개 중 이 캐릭터가 가장 하지 않을 것 하나를 고르게 하세요.',
@@ -125,6 +125,13 @@ function buildHistory(answers: z.infer<typeof interviewAnswerSchema>[]) {
   });
 }
 
+function dialogueQuestionHasListenerPerspective(question: string) {
+  const normalized = question.replace(/\s+/g, ' ').trim();
+  return /(?:들을|듣게\s*될|듣는)\s*(?:말|대사|첫마디)/u.test(normalized)
+    || /상대(?:가|는|에게서)[^?]{0,35}(?:할|하는|건넬|던질)\s*(?:말|대사|첫마디)/u.test(normalized)
+    || /상대의\s*(?:말|대사|첫마디)/u.test(normalized);
+}
+
 function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>) {
   const specMap = new Map(specs.map(spec => [spec.order, spec.responseType]));
   return z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
@@ -136,6 +143,13 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
       const expectedType = specMap.get(question.order);
       if(!expectedType) ctx.addIssue({code:'custom',path:['questions',index,'order'],message:'요청하지 않은 문항 번호입니다.'});
       else if(question.responseType!==expectedType) ctx.addIssue({code:'custom',path:['questions',index,'responseType'],message:`responseType은 ${expectedType}여야 합니다.`});
+      if(question.responseType==='dialogue_choice' && dialogueQuestionHasListenerPerspective(question.question)) {
+        ctx.addIssue({
+          code:'custom',
+          path:['questions',index,'question'],
+          message:'dialogue_choice는 상대가 할 말이나 캐릭터가 들을 말을 묻지 말고, 캐릭터 본인이 할 대사를 물어야 합니다.',
+        });
+      }
       const hook=question.targetHook.trim().toLowerCase();
       if(seenHooks.has(hook)) ctx.addIssue({code:'custom',path:['questions',index,'targetHook'],message:'같은 targetHook을 한 배치에서 반복하지 마세요.'});
       seenHooks.add(hook);
@@ -262,7 +276,8 @@ ${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근
 서버가 고정한 문항별 UI 형식:
 ${JSON.stringify(specText)}
 - 각 문항은 자신의 order와 responseType을 정확히 지키세요.
-- bipolar_scale은 5단계 버튼이나 점수형이 아니라 A/B 사이를 연속으로 드래그하는 다이얼입니다.
+- dialogue_choice에서는 question과 options의 화자를 반드시 일치시키세요. question은 캐릭터 본인이 할 말을 묻고, options도 캐릭터 본인의 대사여야 합니다. "캐릭터가 들을 말/상대가 할 말"을 물어놓고 캐릭터의 대사를 options에 넣으면 실패입니다.
+- bipolar_scale은 서로 반대되는 A/B 두 문장 사이에서 5단계 중 하나를 클릭하는 유형입니다. 다섯 개의 서로 다른 행동 보기로 만들지 마세요.
 - slider는 한 가지 가능성을 0~100 점수로 매기는 별도 유형입니다. 둘을 섞지 마세요.
 
 질문 품질:
