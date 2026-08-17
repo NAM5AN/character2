@@ -52,7 +52,7 @@ function progressStage(progress:number,name:string){
   return `${name}, 결과 작성 중`;
 }
 
-function compactPersonalityNote(text:string,name:string,max=36){
+function compactPersonalityNote(text:string,name:string,max=22){
   const escapedName=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const normalized=text
     .replace(new RegExp(escapedName,'g'),'')
@@ -65,13 +65,6 @@ function compactPersonalityNote(text:string,name:string,max=36){
   const cut=first.slice(0,max-1).trimEnd();
   const stop=Math.max(cut.lastIndexOf(','),cut.lastIndexOf('·'),cut.lastIndexOf(' '));
   return `${stop>Math.floor(max*.58)?cut.slice(0,stop):cut}…`;
-}
-
-function progressPersonalityNote(progress:number,preview:CharacterReportPreview){
-  if(progress<22)return compactPersonalityNote(preview.oneLineSummary,preview.name);
-  if(progress<60)return compactPersonalityNote(preview.summary.outerSelf,preview.name);
-  if(progress<82)return compactPersonalityNote(preview.summary.innerSelf,preview.name);
-  return compactPersonalityNote(preview.oneLineSummary,preview.name);
 }
 
 function remainingLabel(elapsed:number){
@@ -146,7 +139,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const previewBlur=[5,7.5,10] as const;
   const previewOpacity=[.68,.52,.34] as const;
   const previewWhite=[.04,.15,.3] as const;
-  const personalityNote=progressPersonalityNote(progress,preview);
+  const personalityNote=compactPersonalityNote(preview.oneLineSummary,preview.name);
 
   return <>
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 캐릭터 전체 정보를 바탕으로 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
@@ -186,7 +179,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 40초~1분 30초 · 진행률은 예상치예요. 한 번 만든 리포트는 저장돼요.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 40초~1분 30초 · 생성 후 저장돼요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
