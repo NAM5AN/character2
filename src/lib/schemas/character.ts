@@ -27,7 +27,16 @@ const publicBasicProfileSchema = z.object({name:z.string().min(1),age:z.union([z
 export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),analysisConfidence:z.unknown().optional()}).passthrough();
 export const characterDraftSchema=z.object({basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),analysisConfidence:z.number().min(0).max(100)});
 
-export const analysisTypeSummarySchema=z.object({outerSelf:z.string().min(20).max(160),innerSelf:z.string().min(20).max(160),conflictStyle:z.string().min(20).max(160),affectionStyle:z.string().min(20).max(160)});
+// Public summary: legacy four fields stay required for old passports and compatibility.
+// New teaser-only fields are optional so previously saved characters remain readable.
+export const analysisTypeSummarySchema=z.object({
+  outerSelf:z.string().min(20).max(260),
+  innerSelf:z.string().min(20).max(260),
+  conflictStyle:z.string().min(20).max(260),
+  affectionStyle:z.string().min(20).max(260),
+  misunderstoodPoint:z.string().min(20).max(260).optional(),
+  hiddenPattern:z.string().min(20).max(260).optional(),
+});
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
 
