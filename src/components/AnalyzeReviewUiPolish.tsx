@@ -17,6 +17,9 @@ export function AnalyzeReviewUiPolish(){
         if(label==='첫 5문항 준비 중…'||label.startsWith('첫 5문항을 준비하고 있어요')){
           element.textContent='인터뷰 준비 중…';
         }
+        if(label.startsWith('캐릭터 요약을 정리하고 있어요')){
+          element.textContent='캐릭터의 답변을 살펴보고 있어요';
+        }
       });
     };
 
