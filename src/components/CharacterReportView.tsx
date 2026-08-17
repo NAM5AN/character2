@@ -1,13 +1,20 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
 
-type DetailPayload={analysis:FinalAnalysis;confirmedFactCount:number;inferenceCount:number;cached?:boolean};
+type DetailPayload={
+  analysis:FinalAnalysis;
+  confirmedFactCount:number;
+  inferenceCount:number;
+  cached?:boolean;
+  stageReady?:number;
+  complete?:boolean;
+};
 
-const DETAIL_ESTIMATE_SECONDS=100;
+const DETAIL_ESTIMATE_SECONDS=70;
 
 function paragraphChunks(text:string){
   const normalized=text.replace(/\r\n?/g,'\n').trim();
@@ -39,17 +46,17 @@ function formatError(message:string,code:string,details=''){
 }
 
 function estimatedProgress(elapsed:number){
-  if(elapsed<15)return Math.min(28,8+elapsed*1.3);
-  if(elapsed<55)return Math.min(68,28+(elapsed-15));
-  if(elapsed<92)return Math.min(92,68+(elapsed-55)*.65);
-  return Math.min(97,92+(elapsed-92)*.12);
+  if(elapsed<12)return Math.min(30,8+elapsed*1.8);
+  if(elapsed<38)return Math.min(70,30+(elapsed-12)*1.55);
+  if(elapsed<65)return Math.min(94,70+(elapsed-38)*.9);
+  return Math.min(97,94+(elapsed-65)*.12);
 }
 
 function progressStage(progress:number,name:string){
   if(progress<22)return `${name}, 검사 시작`;
   if(progress<60)return `${name}, 검사 중`;
   if(progress<82)return `${name}, 정밀 검사 중`;
-  return `${name}, 결과 작성 중`;
+  return `${name}, 첫 결과 작성 중`;
 }
 
 function remainingLabel(elapsed:number){
@@ -84,6 +91,14 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [error,setError]=useState('');
   const [progress,setProgress]=useState(0);
   const [elapsedSeconds,setElapsedSeconds]=useState(0);
+  const [reportPage,setReportPage]=useState<1|2|3>(1);
+  const [stageReady,setStageReady]=useState(0);
+  const [prefetchBusy,setPrefetchBusy]=useState(false);
+  const [prefetchError,setPrefetchError]=useState('');
+  const codeRef=useRef('');
+  const tokenRef=useRef('');
+  const stageReadyRef=useRef(0);
+  const inFlightStagesRef=useRef(new Set<number>());
 
   useEffect(()=>{
     if(!busy)return;
@@ -104,11 +119,56 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     return localStorage.getItem(`chara_edit_${preview.shareCode}`)||'';
   }
 
+  function mergeDetail(incoming:DetailPayload){
+    const ready=Math.max(stageReadyRef.current,incoming.stageReady||0);
+    stageReadyRef.current=ready;
+    setStageReady(ready);
+    setDetail(prev=>prev?{
+      ...prev,
+      ...incoming,
+      analysis:{...prev.analysis,...incoming.analysis},
+    }:incoming);
+  }
+
+  async function requestStage(stage:2|3){
+    if(stageReadyRef.current>=stage||inFlightStagesRef.current.has(stage))return;
+    const code=codeRef.current;
+    const token=tokenRef.current;
+    if(!code||!token)return;
+    inFlightStagesRef.current.add(stage);
+    setPrefetchBusy(true);
+    setPrefetchError('');
+    try{
+      const r=await fetch(`/api/characters/${preview.shareCode}`,{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({accessCode:code,editToken:token,stage}),
+      });
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok){
+        const apiError=apiErrorInfo(body,r.status);
+        setPrefetchError(formatError('다음 페이지를 미리 준비하지 못했어요.',apiError.code,apiError.details));
+        return;
+      }
+      mergeDetail(body.detail);
+    }catch(cause){
+      const details=cause instanceof Error?cause.message:String(cause);
+      setPrefetchError(formatError('다음 페이지 준비 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
+    }finally{
+      inFlightStagesRef.current.delete(stage);
+      setPrefetchBusy(inFlightStagesRef.current.size>0);
+    }
+  }
+
   async function loadDetail(code:string){
-    setProgress(8);setElapsedSeconds(0);setBusy(true);setError('');
+    setProgress(8);setElapsedSeconds(0);setBusy(true);setError('');setPrefetchError('');
     try{
       const token=editToken();
-      const r=await fetch(`/api/characters/${preview.shareCode}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessCode:code,...(token?{editToken:token}:{})})});
+      const r=await fetch(`/api/characters/${preview.shareCode}`,{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({accessCode:code,stage:1,...(token?{editToken:token}:{})}),
+      });
       const body=await r.json().catch(()=>({}));
       if(!r.ok){
         const apiError=apiErrorInfo(body,r.status);
@@ -124,9 +184,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         }
         return;
       }
+      codeRef.current=code;
+      tokenRef.current=token;
       setProgress(100);
-      setDetail(body.detail);
+      setReportPage(1);
+      mergeDetail(body.detail);
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
+      if(token&&(body.detail.stageReady||0)<2)void requestStage(2);
     }catch(cause){
       const details=cause instanceof Error?cause.message:String(cause);
       setError(formatError('상세 리포트 요청 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
@@ -134,6 +198,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   }
 
   function requestDetail(){if(detail){document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'});return}setUnlockOpen(true)}
+
+  function changeReportPage(next:1|2|3){
+    setReportPage(next);
+    requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'}));
+    if(next===2&&stageReadyRef.current<3)void requestStage(3);
+  }
+
   const summaryCards=[['겉으로 보이는 모습',preview.summary.outerSelf],['실제 내면',preview.summary.innerSelf],['갈등 방식',preview.summary.conflictStyle],['애정 표현',preview.summary.affectionStyle]] as const;
   const previewSections=[
     ['관계에서 반복되는 패턴',`상대를 얼마나 가까운 사람으로 받아들이는지에 따라 허용하는 거리와 개입의 방식이 어떻게 달라지는지 살펴봅니다. 친밀감이 높아질수록 표현이 직접적으로 바뀌는지, 오히려 관찰과 배려가 늘어나는지, 갈등 뒤에 다시 관계를 회복하려는 방식은 무엇인지까지 여러 장면을 연결해 읽습니다.\n\n단순히 사람을 좋아한다거나 낯을 가린다는 식으로 끝내지 않고, 어느 순간부터 상대를 자기 책임 범위 안에 넣는지, 거절이나 침묵을 어떤 신호로 받아들이는지, 가까워진 뒤에도 끝까지 남는 경계선은 무엇인지를 함께 풀어냅니다.`],
@@ -144,8 +215,11 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const previewOpacity=[.68,.52,.34] as const;
   const previewWhite=[.04,.15,.3] as const;
 
+  const nextStage=reportPage===1?2:reportPage===2?3:3;
+  const nextPageReady=reportPage===3||stageReady>=nextStage;
+
   return <>
-    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 캐릭터 전체 정보를 바탕으로 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
+    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 만들고, 읽는 동안 다음 페이지를 미리 준비합니다." submitLabel="코드 확인하고 상세 생성" />
 
     <div className="result-hero"><div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div><div><div className="label">공유 코드</div><div className="share-code">{preview.shareCode}</div><button className="btn soft" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(preview.shareCode)}>코드 복사</button></div></div>
 
@@ -166,7 +240,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>)}
           <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
         </div>
-        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'상세 리포트 생성 중…':'더 자세히 보기'}</button>
+        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'첫 페이지 생성 중…':'더 자세히 보기'}</button>
       </div>
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
@@ -181,23 +255,44 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 1~2분 · 생성 후 저장돼요.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 다음 페이지는 뒤에서 미리 준비해요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>잘게 나눈 항목을 반복하는 대신, 서로 이어지는 내용끼리 묶어 한 사람을 읽듯 자연스럽게 풀어냈어요.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 지금 페이지를 읽는 동안 다음 페이지를 뒤에서 미리 만들어둡니다.</p>
 
       {detail.analysis.characterOverview ? <>
-        <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={detail.analysis.characterOverview}/>
-        <NarrativeSection index={1} title={`${preview.name}는 이렇게 작동해요`} text={detail.analysis.innerMechanics}/>
-        <NarrativeSection index={2} title={`${preview.name}는 이렇게 관계를 맺어요`} text={detail.analysis.relationshipStyle}/>
-        <NarrativeSection index={3} title={`${preview.name}는 이런 애착이 있어요`} text={detail.analysis.attachmentStyle}/>
-        <NarrativeSection index={4} title={`${preview.name}는 이렇게 갈등해요`} text={detail.analysis.conflictStyleDetailed}/>
-        <NarrativeSection index={5} title={`${preview.name}에겐 이런 매력이 있어요`} text={detail.analysis.charmAndContradictions}/>
-        <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport}/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:14,marginTop:20,flexWrap:'wrap'}}>
+          <strong>페이지 {reportPage} / 3</strong>
+          {reportPage<3&&<span className="muted" style={{fontSize:13}}>{stageReady>=nextStage?'다음 페이지 준비 완료':prefetchBusy?'다음 페이지 준비 중…':'다음 페이지 대기 중'}</span>}
+        </div>
+
+        {reportPage===1&&<>
+          <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={detail.analysis.characterOverview}/>
+          <NarrativeSection index={1} title={`${preview.name}는 이렇게 작동해요`} text={detail.analysis.innerMechanics}/>
+        </>}
+        {reportPage===2&&<>
+          <NarrativeSection index={2} title={`${preview.name}는 이렇게 관계를 맺어요`} text={detail.analysis.relationshipStyle}/>
+          <NarrativeSection index={3} title={`${preview.name}는 이런 애착이 있어요`} text={detail.analysis.attachmentStyle}/>
+          <NarrativeSection index={4} title={`${preview.name}는 이렇게 갈등해요`} text={detail.analysis.conflictStyleDetailed}/>
+        </>}
+        {reportPage===3&&<>
+          <NarrativeSection index={5} title={`${preview.name}에겐 이런 매력이 있어요`} text={detail.analysis.charmAndContradictions}/>
+          <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport}/>
+        </>}
+
+        {prefetchError&&reportPage<3&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>
+          {prefetchError}
+          <div style={{marginTop:12}}><button className="btn" onClick={()=>void requestStage(nextStage as 2|3)}>다시 준비하기</button></div>
+        </div>}
+
+        <div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'wrap'}}>
+          <div>{reportPage>1&&<button className="btn" onClick={()=>changeReportPage((reportPage-1) as 1|2)}>← 이전 페이지</button>}</div>
+          <div>{reportPage<3&&<button className="btn primary" disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>{nextPageReady?'다음 페이지 →':'다음 페이지 준비 중…'}</button>}</div>
+        </div>
       </> : <>
         <div className="result-grid" style={{marginTop:20}}>
           <TextSection title="겉으로 보이는 모습" text={detail.analysis.outerSelf}/>
