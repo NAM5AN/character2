@@ -11,6 +11,7 @@ import {
   type InterviewAnswer,
 } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
+import { attachAiUsageSession, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
 import { createEditToken, sha256 } from '@/lib/crypto';
@@ -186,7 +187,7 @@ export async function POST(request:Request){
     };
     const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,analysisConfidence:body.draft.analysisConfidence};
     const summaryInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\nAI 추론에 대한 오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n출력 규칙:\n- oneLineSummary: 25~80자의 한 문장. 단순 성격 라벨보다 이 캐릭터의 가장 흥미로운 긴장이나 행동 원리를 잡으세요.\n- basicProfile.appearanceNotes가 있으면 외관 자료의 직접 관찰 메모입니다. 첫인상·자기표현·시각 모티프를 참고하되, 외형만으로 내면을 단정하지 마세요.\n- summary.outerSelf: 겉으로 보이는 인상과 그 인상을 단순 라벨로만 설명할 수 없는 지점. 외관 관찰이 있으면 행동과 교차해 활용하세요.\n- summary.innerSelf: 실제 선택을 움직이는 자기상·욕구·내적 기준.\n- summary.conflictStyle: 감정이 흔들리는 자극과 평소 반응이 달라지는 순간.\n- summary.affectionStyle: 신뢰가 생기는 조건과 관계에서 반복되는 거리·개입 패턴.\n- summary.misunderstoodPoint: 겉에서 오해하기 쉬운 의미와 실제 내부 기능의 차이.\n- summary.hiddenPattern: 서로 다른 두 개 이상의 단서를 연결했을 때 보이는 의외의 공통 원리.\n- summary 6개 필드는 각각 160~240자를 목표로 하고 최대 260자를 넘기지 마세요.\n- 각 summary 필드는 정확히 2개의 자연스러운 문단으로 나누고 문단 사이는 빈 줄 하나(\\n\\n)로 구분하세요.\n- 모든 문단은 **문단에서 다룰 주제만 알려주는 짧은 안내문**으로 시작하세요. 안내형 또는 질문형 중 하나만 쓰고, 결론을 굵은 문장에 미리 요약하지 마세요.\n- 본문은 실제 상담사가 오너에게 캐릭터를 풀이하듯 자연스러운 해요체 존댓말로 작성하세요. 보고서체 '~다/~이다/~한다'는 피하세요.\n- 여섯 카드는 같은 행동이나 같은 결론을 반복하지 마세요. 각 카드마다 원문에서 바로 찾기 어려운 연결을 최소 하나 포함하세요.\n- 상세 리포트에서 다룰 모든 인과와 반례를 미리 풀지 말고, 결제 전 요약만으로도 흥미로운 핵심 연결까지 보여주세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성합니다. 외관 관찰이 있으면 distinctiveDetails에 중요한 시각 특징을 포함할 수 있습니다. 각 축은 정말 중요한 발견만 0~3개로 제한하세요.\n- 근거가 부족한 Evidence Pack 축은 빈 배열로 두세요.\n- 사용자에게 보이는 oneLineSummary와 summary 6개 필드의 완결성·추론 깊이·충분한 분량이 evidencePack의 개수보다 항상 우선합니다.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
-    const summaryResult=await generateSummary(summaryInput,body,inferenceReview);
+    const summaryResult=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'summary_teaser'},()=>generateSummary(summaryInput,body,inferenceReview));
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
 
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
@@ -199,6 +200,7 @@ export async function POST(request:Request){
     const privateSource={version:'detail-source/1.0',secretProfileText,ownerReview:inferenceReview,answers:body.answers,confirmedFacts:body.draft.confirmedFacts,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits};
     const {data:saved,error}=await sb.rpc('character2_create_character_preview_v2',{p_character_id:characterId,p_share_code:shareCode,p_name:name,p_schema_version:passport.schemaVersion,p_passport_json:passport,p_analysis_confidence:body.draft.analysisConfidence,p_engine_versions:passport.engineVersions,p_answers:body.answers,p_edit_token_hash:sha256(editToken),p_detail_seed_json:detailSeed,p_source_json:privateSource});
     if(error)throw error;if(saved!==true)throw new Error('CHARACTER_SAVE_FAILED');
+    await attachAiUsageSession(body.draft.usageSessionId,shareCode);
     return NextResponse.json({preview:buildCharacterReportPreview(passport),shareCode,editToken});
   }catch(error){return apiError(error)}
 }
