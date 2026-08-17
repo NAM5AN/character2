@@ -16,28 +16,31 @@ async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   return parsed.success?parsed.data:null;
 }
 
-async function loadCompletedDetail(rawCode:string):Promise<CompletedDetailPayload|null>{
+async function loadSavedDetail(rawCode:string):Promise<CompletedDetailPayload|null>{
   const code=normalizeShareCode(rawCode);
   if(!isShareCode(code))return null;
   const supabase=getSupabaseServer();
-  const {data,error}=await supabase.rpc('character2_get_completed_detail',{p_share_code:code});
+  const {data,error}=await supabase.rpc('character2_get_saved_detail',{p_share_code:code});
   if(error||!data||typeof data!=='object'||Array.isArray(data))return null;
   const record=data as Record<string,unknown>;
   const analysis=finalAnalysisSchema.safeParse(record.analysis);
   if(!analysis.success)return null;
+  const rawStage=Number(record.stageReady)||1;
+  const stageReady=Math.max(1,Math.min(3,rawStage));
+  const complete=record.complete===true||record.complete==='true'||stageReady>=3;
   return {
     analysis:analysis.data,
     confirmedFactCount:Number(record.confirmedFactCount)||0,
     inferenceCount:Number(record.inferenceCount)||0,
     cached:true,
-    stageReady:3,
-    complete:true,
+    stageReady,
+    complete,
   };
 }
 
 export default async function CharacterPage({params}:{params:Promise<{shareCode:string}>}){
   const {shareCode}=await params;
-  const [preview,completedDetail]=await Promise.all([loadPreview(shareCode),loadCompletedDetail(shareCode)]);
+  const [preview,savedDetail]=await Promise.all([loadPreview(shareCode),loadSavedDetail(shareCode)]);
   if(!preview)notFound();
-  return <main className="container page"><CharacterReportClient preview={preview} completedDetail={completedDetail}/></main>;
+  return <main className="container page"><CharacterReportClient preview={preview} completedDetail={savedDetail}/></main>;
 }
