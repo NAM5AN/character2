@@ -4,10 +4,11 @@ import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas
 import { askOpenAIJson } from '@/lib/ai/openai';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
+import { resolveProfileInput } from '@/lib/profile-source';
 
 const requestSchema = z.object({
   name: z.string().min(1).max(80),
-  profileText: z.string().min(20).max(50_000),
+  profileText: z.string().min(1).max(50_000),
   secretProfileText: z.string().max(50_000).optional().default(''),
 });
 
@@ -198,8 +199,14 @@ export async function POST(request: Request) {
   try {
     await assertRateLimit('character_parse', 10, 30);
     const body = requestSchema.parse(await request.json());
+    const [publicSource, secretSource] = await Promise.all([
+      resolveProfileInput(body.profileText, true),
+      resolveProfileInput(body.secretProfileText, false),
+    ]);
+    const profileText = publicSource.text;
+    const secretProfileText = secretSource.text;
 
-    const sourceAnchors = buildSourceAnchors(body.profileText, body.secretProfileText);
+    const sourceAnchors = buildSourceAnchors(profileText, secretProfileText);
 
     const raw = await askOpenAIJson({
       instructions: PARSER_INSTRUCTIONS_V2,
@@ -214,8 +221,8 @@ export async function POST(request: Request) {
         name: body.name,
         age: basic.age ?? null,
         gender: typeof basic.gender === 'string' ? basic.gender : null,
-        profileText: body.profileText,
-        ...(body.secretProfileText.trim() ? { secretProfileText: body.secretProfileText } : {}),
+        profileText,
+        ...(secretProfileText.trim() ? { secretProfileText } : {}),
       },
       traits: normalizeTraitRecord(raw.traits),
       relationshipTraits: normalizeTraitRecord(raw.relationshipTraits),
