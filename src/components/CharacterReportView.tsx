@@ -267,16 +267,18 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
   return <>
     <style>{`
-      .report-summary-head{align-items:start;gap:28px}
-      .report-summary-copy{min-width:0}
-      .save-character-panel{width:min(520px,100%);border:1px solid var(--line);border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.46)}
+      .report-summary-head{display:flex;flex-wrap:wrap;align-items:flex-start;gap:28px}
+      .report-summary-copy{flex:1 1 340px;min-width:0}
+      .save-character-panel{flex:0 1 480px;max-width:520px;border:1px solid var(--line);border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.46)}
       .save-character-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:10px}
       .save-character-row .field{margin:0}
       .save-character-note{margin:11px 0 0;font-size:13px;line-height:1.6;color:var(--muted)}
       .full-preview-sections{display:grid;gap:12px;position:relative}
+      @media(max-width:760px){
+        .save-character-panel{flex-basis:100%;max-width:none}
+      }
       @media(max-width:640px){
-        .report-summary-head{display:block}
-        .save-character-panel{margin-top:20px;padding:16px}
+        .save-character-panel{padding:16px}
         .save-character-row{grid-template-columns:1fr}
         .save-character-row .btn{width:100%}
         .full-preview-section.preview-index-0,.full-preview-section.preview-index-1{display:none}
