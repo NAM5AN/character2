@@ -213,10 +213,10 @@ async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
     const model=await askClaudeJson({
       system:SUMMARY_PSYCHE_SYSTEM,
       schema:summaryDossierSchema,
-      maxTokens:4200,
-      maxAttempts:1,
+      maxTokens:8000,
+      maxAttempts:3,
       model:'anthropic/claude-sonnet-5',
-      allowFallback:false,
+      allowFallback:true,
       input:`${input}${retry}`,
     });
     const passed=model.validatedInsights.filter(summaryQualityPass);
@@ -233,7 +233,7 @@ async function generateSummary(input:string,body:z.infer<typeof requestSchema>,r
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식 또는 공개 요약 품질 점검에 걸렸습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 6개 필드를 최우선으로 새로 작성하세요. 각 summary 필드는 160~260자를 목표로 하고 130자보다 짧아지지 않게 충분한 맥락을 담으세요. 각 필드는 반드시 2문단이며 문단 사이에 \\n\\n을 넣으세요. 각 문단 첫 문장은 반드시 **굵은 안내문**이고, 결론이 아니라 그 문단에서 다룰 주제만 알려줘야 합니다. 원자료를 다시 읽는 것이 아니라 제공된 심층 해석 묶음의 mechanism을 풀어쓰세요. misunderstoodPoint와 hiddenPattern도 빠뜨리지 마세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 심층 해석 묶음에서 새로 작성하세요. 점검 내용: ${last}`;
     try{
-      const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:4000,maxAttempts:1,input:`${input}${retry}`,allowFallback:false});
+      const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:7000,maxAttempts:2,input:`${input}${retry}`,allowFallback:true});
       const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
       if(parsed.success){
         const shortFields=shortSummaryFields(parsed.data.summary);
