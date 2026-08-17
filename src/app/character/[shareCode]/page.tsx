@@ -7,6 +7,7 @@ import { finalAnalysisSchema } from '@/lib/schemas/character';
 import { CharacterReportClient } from '@/components/CharacterReportClient';
 import type { CompletedDetailPayload } from '@/components/CompletedCharacterReportView';
 import { detailViewCookieName } from '@/lib/detail-access';
+import { normalizeStoredDetailParagraphGuides } from '@/lib/stored-detail-paragraph-guides';
 
 async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   const code=normalizeShareCode(rawCode);
@@ -25,7 +26,8 @@ async function loadSavedDetail(rawCode:string):Promise<CompletedDetailPayload|nu
   const {data,error}=await supabase.rpc('character2_get_saved_detail_public',{p_share_code:code});
   if(error||!data||typeof data!=='object'||Array.isArray(data))return null;
   const record=data as Record<string,unknown>;
-  const analysis=finalAnalysisSchema.safeParse(record.analysis);
+  const normalizedAnalysis=normalizeStoredDetailParagraphGuides(record.analysis);
+  const analysis=finalAnalysisSchema.safeParse(normalizedAnalysis);
   if(!analysis.success)return null;
   const rawStage=Number(record.stageReady)||1;
   const stageReady=Math.max(1,Math.min(3,rawStage));
