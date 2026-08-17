@@ -58,10 +58,10 @@ function estimatedProgress(elapsed:number){
 }
 
 function progressStage(progress:number,name:string){
-  if(progress<22)return `${name}, 검사 시작`;
-  if(progress<60)return `${name}, 검사 중`;
-  if(progress<82)return `${name}, 정밀 검사 중`;
-  return `${name}, 첫 결과 작성 중`;
+  if(progress<22)return `${name}의 기본 흐름을 살펴보고 있어요`;
+  if(progress<60)return `${name}의 관계 패턴을 읽고 있어요`;
+  if(progress<82)return `${name}의 감정과 갈등을 함께 정리하고 있어요`;
+  return `${name}의 첫 리포트를 쓰고 있어요`;
 }
 
 function remainingLabel(elapsed:number){
@@ -269,7 +269,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const canEditIdentity=Boolean(creatorEditToken);
 
   return <>
-    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 만들고, 읽는 동안 남은 페이지도 순서대로 미리 준비합니다." submitLabel="코드 확인하고 상세 생성" />
+    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 정리하고, 읽는 동안 남은 페이지도 순서대로 준비합니다." submitLabel="코드 확인하고 상세 리포트 보기" />
 
     <div className="result-hero">
       <div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div>
@@ -290,7 +290,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       </div>
     </div>
 
-    <div style={{marginTop:34}}><div className="eyebrow">Quick interpretation</div><h2 style={{marginTop:10}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 생성됩니다.'}</p></div>
+    <div style={{marginTop:34}}><div className="eyebrow">Quick interpretation</div><h2 style={{marginTop:10}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 정리됩니다.'}</p></div>
     <div className="result-grid" style={{marginTop:20}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
 
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
@@ -307,7 +307,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>)}
           <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
         </div>
-        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'첫 페이지 생성 중…':'더 자세히 보기'}</button>
+        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'첫 페이지 정리 중…':'더 자세히 보기'}</button>
       </div>
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
@@ -322,14 +322,14 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 나머지 페이지는 뒤에서 순서대로 계속 준비해요.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 나머지 페이지는 이어서 순서대로 정리해요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 첫 페이지를 읽는 동안 2페이지와 3페이지까지 순서대로 미리 만들어둡니다.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 첫 페이지를 읽는 동안 2페이지와 3페이지도 순서대로 정리해둡니다.</p>
 
       {isPagedReport ? <>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:14,marginTop:20,flexWrap:'wrap'}}>
