@@ -52,21 +52,6 @@ function progressStage(progress:number,name:string){
   return `${name}, 결과 작성 중`;
 }
 
-function compactPersonalityNote(text:string,name:string,max=22){
-  const escapedName=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const normalized=text
-    .replace(new RegExp(escapedName,'g'),'')
-    .replace(/\s+/g,' ')
-    .replace(/^[,·:：\s-]+/,'')
-    .trim();
-  if(!normalized)return'';
-  const first=normalized.split(/(?<=[.!?。！？])\s+/u)[0]?.trim()||normalized;
-  if(first.length<=max)return first;
-  const cut=first.slice(0,max-1).trimEnd();
-  const stop=Math.max(cut.lastIndexOf(','),cut.lastIndexOf('·'),cut.lastIndexOf(' '));
-  return `${stop>Math.floor(max*.58)?cut.slice(0,stop):cut}…`;
-}
-
 function remainingLabel(elapsed:number){
   if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '조금 더 걸리고 있어요';
   const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
@@ -139,7 +124,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const previewBlur=[5,7.5,10] as const;
   const previewOpacity=[.68,.52,.34] as const;
   const previewWhite=[.04,.15,.3] as const;
-  const personalityNote=compactPersonalityNote(preview.oneLineSummary,preview.name);
 
   return <>
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 최초 생성 시 캐릭터 전체 정보를 바탕으로 상세 캐해를 만듭니다." submitLabel="코드 확인하고 상세 생성" />
@@ -171,7 +155,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <div className="loading" style={{fontWeight:900}}>{progressStage(progress,preview.name)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
           <strong style={{fontSize:20}}>{progress}%</strong>
         </div>
-        {personalityNote&&<div style={{marginTop:6,fontSize:13,lineHeight:1.45,color:'#6f6b64'}}>성향 · {personalityNote}</div>}
         <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
           <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
         </div>
