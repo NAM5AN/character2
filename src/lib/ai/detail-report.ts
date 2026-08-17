@@ -13,7 +13,7 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
-export const DETAIL_REPORT_VERSION = 'detail-analysis/6.0' as const;
+export const DETAIL_REPORT_VERSION = 'detail-analysis/6.1' as const;
 
 const legacyDetailSeedSchema = z.object({
   version: z.literal('detail-seed/1.0'),
@@ -139,7 +139,14 @@ const REPORT_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리�
 리포트의 가치는 오너가 이미 아는 설정을 다시 말하는 데 있지 않습니다.
 오너도 명시적으로 적지 않았을 수 있는 숨은 욕구, 자기보호, 맹점, 관계의 기대, 행동이 뒤집히는 임계점을 설득력 있게 보여주는 데 있습니다.
 
+문체는 실제 상담사가 캐릭터 오너에게 옆에서 차분히 풀이해주는 느낌의 자연스러운 해요체 존댓말을 사용하세요.
+- 보고서체인 "~다.", "~이다.", "~한다."를 쓰지 마세요.
+- 지나치게 격식적인 "~입니다.", "~합니다.", "~됩니다."도 피하고, "~해요", "~보여요", "~느껴져요", "~수 있어요", "~쪽에 가까워요"처럼 부드럽게 설명하세요.
+- 단정이 필요한 곳도 딱딱한 선언문보다 "이렇게 보는 편이 자연스러워요"처럼 독자가 이해하기 쉬운 설명으로 풀어주세요.
+- 심리 상담이나 치료를 하는 사람처럼 말하지 말고, 캐릭터를 잘 아는 전문 해석자가 이해를 도와주는 톤을 유지하세요.
+
 작성 원칙:
+- 모든 문장은 끝까지 완결하세요. 글자 수를 맞추려고 조사·서술어·문장 중간에서 잘라 끝내면 실패입니다.
 - 각 주요 해석은 evidenceAnchors를 근거로 삼되, 근거를 목록처럼 읽어주지 마세요.
 - 먼저 결론과 메커니즘을 설명하고, 필요한 구체적 행동은 그 해석을 붙잡는 짧은 예시로만 사용하세요.
 - 같은 evidenceAnchor를 여러 섹션에서 반복하지 마세요.
@@ -172,15 +179,6 @@ function asParagraphText(value: unknown): string {
     .join('\n\n');
 }
 
-function clipText(text:string,max:number){
-  const normalized=text.trim();
-  if(normalized.length<=max)return normalized;
-  const cut=normalized.slice(0,max).trimEnd();
-  const stops=[cut.lastIndexOf('.'),cut.lastIndexOf('!'),cut.lastIndexOf('?'),cut.lastIndexOf('。'),cut.lastIndexOf('！'),cut.lastIndexOf('？')];
-  const stop=Math.max(...stops);
-  return (stop>=Math.floor(max*.62)?cut.slice(0,stop+1):cut).trim();
-}
-
 function asList(value:unknown){
   const raw=Array.isArray(value)
     ? value
@@ -189,24 +187,23 @@ function asList(value:unknown){
       : [];
   return raw
     .map(asInlineText)
-    .map(x=>clipText(x,80))
     .filter(x=>x.length>=8)
     .slice(0,5);
 }
 
 function normalizeDetail(raw:z.infer<typeof detailAnalysisRawSchema>){
   return {
-    outerSelf:clipText(asParagraphText(raw.outerSelf),360),
-    innerSelf:clipText(asParagraphText(raw.innerSelf),360),
+    outerSelf:asParagraphText(raw.outerSelf),
+    innerSelf:asParagraphText(raw.innerSelf),
     coreValues:asList(raw.coreValues),
     desires:asList(raw.desires),
     fears:asList(raw.fears),
-    conflictStyle:clipText(asParagraphText(raw.conflictStyle),360),
-    affectionStyle:clipText(asParagraphText(raw.affectionStyle),360),
+    conflictStyle:asParagraphText(raw.conflictStyle),
+    affectionStyle:asParagraphText(raw.affectionStyle),
     misunderstoodPoints:asList(raw.misunderstoodPoints),
     contradictions:asList(raw.contradictions),
     interestingPoints:asList(raw.interestingPoints),
-    detailedReport:clipText(asParagraphText(raw.detailedReport),1400),
+    detailedReport:asParagraphText(raw.detailedReport),
   };
 }
 
@@ -458,7 +455,7 @@ async function generateDetailFields(
   const psyche=await buildPsychologicalModel(seed,packet);
   const dossier=buildReportDossier(psyche);
 
-  const baseInput=`캐릭터 이름: ${seed.name}\n\n[검증된 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n중요:\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- evidenceAnchors를 항목별로 나열하지 말고 conclusion과 mechanism을 먼저 설명한 뒤 필요한 곳에만 자연스럽게 녹이세요.\n- 서로 다른 섹션이 같은 insight를 반복하지 않도록 각 섹션의 초점을 분리하세요.\n\n출력 규칙:\n- outerSelf: 타인이 체감하는 표면 태도와 실제 내부 판단 사이의 간극을 해석하세요. 180~320자.\n- innerSelf: hiddenNeed, hiddenFear, selfProtection, selfNarrative를 연결해 실제 선택을 움직이는 심리를 설명하세요. 180~320자.\n- conflictStyle: 무엇이 단순 불편함에서 자기 기준의 침범으로 바뀌는지와 반응 임계점을 설명하세요. 180~320자.\n- affectionStyle: 친밀함에서 무엇을 확인받고 싶어 하는지, 보호·개입·경계가 어떤 공통 욕구에서 나오는지 설명하세요. 180~320자.\n- coreValues / desires / fears: 각각 2~5개. 표면 단어가 아니라 반복 행동을 움직이는 심리적 기능을 적으세요.\n- misunderstoodPoints: 외부 인상과 내부 기능이 엇갈리는 구조를 적으세요.\n- contradictions: 반대 행동이 같은 욕구에서 갈라지는 메커니즘을 적으세요.\n- interestingPoints: validatedInsights 중 원자료에 직접 적혀 있지 않았을 가능성이 높은 새 연결을 우선하세요.\n- detailedReport: 850~1400자. coreEngine에서 숨은 욕구·두려움·자기보호·친밀감·갈등·맹점이 어떻게 파생되는지 하나의 흐름으로 쓰세요. 최소 세 개의 검증된 새 해석을 서로 연결해야 합니다.\n- 문단은 논점이 실제로 바뀔 때만 \\n\\n으로 나누세요. 소제목, 번호, 불릿은 detailedReport 안에 넣지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 출처 표현은 절대 사용하지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
+  const baseInput=`캐릭터 이름: ${seed.name}\n\n[검증된 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n중요:\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- evidenceAnchors를 항목별로 나열하지 말고 conclusion과 mechanism을 먼저 설명한 뒤 필요한 곳에만 자연스럽게 녹이세요.\n- 서로 다른 섹션이 같은 insight를 반복하지 않도록 각 섹션의 초점을 분리하세요.\n- 사용자에게 노출되는 모든 문장은 자연스러운 해요체 존댓말로 쓰세요. 보고서체인 ~다./~이다./~한다.와 딱딱한 ~입니다./~합니다.를 피하세요.\n- 문장은 조사나 서술어 중간에서 끊지 말고 반드시 완결된 문장으로 끝내세요.\n\n출력 규칙:\n- outerSelf: 타인이 체감하는 표면 태도와 실제 내부 판단 사이의 간극을 해석하세요. 220~420자 정도. 의미가 전환되는 지점에서 \\n\\n을 한 번 넣어 자연스러운 2문단으로 쓰세요. 문장마다 줄을 바꾸지 마세요.\n- innerSelf: hiddenNeed, hiddenFear, selfProtection, selfNarrative를 연결해 실제 선택을 움직이는 심리를 설명하세요. 220~420자 정도. 핵심 심리와 그것이 흔들리는 조건을 나눠 자연스러운 2문단으로 쓰세요.\n- conflictStyle: 무엇이 단순 불편함에서 자기 기준의 침범으로 바뀌는지와 반응 임계점을 설명하세요. 220~420자 정도. 초기 대응과 임계점 이후 반응이 흐름상 갈리는 지점에서 2문단으로 나누세요.\n- affectionStyle: 친밀함에서 무엇을 확인받고 싶어 하는지, 보호·개입·경계가 어떤 공통 욕구에서 나오는지 설명하세요. 220~420자 정도. 애정의 기본 방식과 가까워졌을 때 달라지는 부분을 흐름에 맞춰 2문단으로 나누세요.\n- coreValues / desires / fears: 각각 2~5개. 한 항목은 40~160자 정도의 완결된 한 문장으로 쓰고, 표면 단어가 아니라 반복 행동을 움직이는 심리적 기능을 설명하세요.\n- misunderstoodPoints: 1~5개. 외부 인상과 내부 기능이 엇갈리는 구조를 각각 완결된 한 문장으로 설명하세요.\n- contradictions: 1~5개. 반대 행동이 같은 욕구에서 갈라지는 메커니즘을 각각 완결된 한 문장으로 설명하세요.\n- interestingPoints: 2~5개. validatedInsights 중 원자료에 직접 적혀 있지 않았을 가능성이 높은 새 연결을 우선하고, 각각 완결된 한 문장으로 쓰세요.\n- detailedReport: 900~1600자 정도. coreEngine에서 숨은 욕구·두려움·자기보호·친밀감·갈등·맹점이 어떻게 파생되는지 하나의 흐름으로 쓰세요. 최소 세 개의 검증된 새 해석을 서로 연결하세요. 논점이 실제로 바뀔 때만 \\n\\n으로 문단을 나누고, 보통 3~5문단 정도가 자연스럽습니다.\n- 소제목, 번호, 불릿은 detailedReport 안에 넣지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 출처 표현은 절대 사용하지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
 
   const raw=await askClaudeJson({
     system:REPORT_SYSTEM,
