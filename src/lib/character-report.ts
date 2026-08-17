@@ -3,6 +3,7 @@ import type { CharacterPassport } from '@/lib/schemas/character';
 
 export const characterReportPreviewSchema = z.object({
   name: z.string().min(1),
+  ownerName: z.string().min(1).max(80).nullable().optional(),
   shareCode: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
   oneLineSummary: z.string(),
   summary: z.object({
