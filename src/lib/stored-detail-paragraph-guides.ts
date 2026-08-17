@@ -97,7 +97,7 @@ function splitParagraphs(text: string) {
 
 function isShortGuideSentence(value: string) {
   const lead = value.replace(/\s+/gu, ' ').trim();
-  if (lead.length < 6 || lead.length > 52) return false;
+  if (lead.length < 6 || lead.length > 32) return false;
   if (/[,，;；:：]/u.test(lead) || BANNED_META.test(lead)) return false;
   const ending = lead.at(-1);
   if (ending !== '.' && ending !== '?') return false;
