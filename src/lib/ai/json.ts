@@ -1,6 +1,16 @@
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
 
+function imageFilePart(dataUrl:string){
+  const match=dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/iu);
+  if(!match)throw new Error('AI_IMAGE_INPUT_INVALID');
+  return {
+    type:'file' as const,
+    data:Buffer.from(match[2],'base64'),
+    mediaType:match[1],
+  };
+}
+
 export async function generateValidatedJson<T>(args: {
   model: string;
   system: string;
@@ -31,7 +41,7 @@ export async function generateValidatedJson<T>(args: {
             role: 'user' as const,
             content: [
               { type: 'text' as const, text: prompt },
-              ...images.map(image => ({ type: 'image' as const, image })),
+              ...images.map(imageFilePart),
             ],
           }],
         } : { prompt }),
