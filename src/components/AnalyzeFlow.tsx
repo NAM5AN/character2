@@ -13,7 +13,6 @@ type SavedAnalysisSession={version:1;stage:SavedStage;name:string;profileText:st
 type ResponseData={selected?:string;custom?:string;multiSelected?:string[];ranking?:string[];sliderValue?:number;matrixAnswers?:Record<string,string>;secondary?:string};
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
-const PREFETCH_BATCH_AFTER:Record<number,number>={2:6,7:11,12:16};
 const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={fill_blank:'빈칸 채우기',sentence_continue:'문장 이어쓰기',dialogue_choice:'대사 고르기',bipolar_scale:'A/B 가까움',ranking:'순위 매기기',forced_choice:'둘 중 하나',multi_select:'복수 선택',least_likely:'가장 하지 않을 것',slider:'가능성 슬라이더',relationship_matrix:'관계별 반응',inner_outer:'속마음 · 실제 행동',temporal_compare:'시간별 반응',condition_followup:'조건 변화 비교',in_character_response:'캐릭터 대사 직접 쓰기',owner_meta:'오너 메타 질문'};
 
 function responseTypeOf(question:InterviewQuestion):QuestionResponseType{const candidate=(question as InterviewQuestion&{responseType?:QuestionResponseType}).responseType;return candidate||(question.format==='free_response'?'in_character_response':'fill_blank')}
@@ -69,6 +68,11 @@ export function AnalyzeFlow(){
       setReason(saved.reason||'');
     }
     setStage('interview');
+    // Prefetch exactly one question ahead, generated with every answer known at
+    // this moment, so the next question reflects prior answers with no wait.
+    if(q.order<20&&!history.some(item=>item.order===q.order+1)){
+      void requestBatch(q.order+1,answerList,history).catch(()=>{});
+    }
   }
 
   function restoreSavedSession(saved:SavedAnalysisSession){
@@ -102,12 +106,10 @@ export function AnalyzeFlow(){
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
 
   async function requestBatch(startOrder:number,currentAnswers:InterviewAnswer[],plannedBase=questionHistoryRef.current){
-    if(!draft||startOrder>20)return[];const count=Math.min(5,21-startOrder);const existing=plannedBase.filter(q=>q.order>=startOrder&&q.order<startOrder+count);if(existing.length===count)return existing.sort((a,b)=>a.order-b.order);const pending=batchRequests.current.get(startOrder);if(pending)return pending;
+    if(!draft||startOrder>20)return[];const count=Math.min(1,21-startOrder);const existing=plannedBase.filter(q=>q.order>=startOrder&&q.order<startOrder+count);if(existing.length===count)return existing.sort((a,b)=>a.order-b.order);const pending=batchRequests.current.get(startOrder);if(pending)return pending;
     const promise=(async()=>{const normalizedAnswers=uniqueAnswersByOrder(currentAnswers);const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers,plannedQuestions:plannedBase,startOrder,batchSize:count})});const body=await r.json();if(!r.ok){const err=new Error(typeof body?.error==='string'?body.error:`HTTP_${r.status}`) as Error&{status?:number;body?:any};err.status=r.status;err.body=body;throw err}const incoming=(Array.isArray(body.questions)?body.questions:body.question?[body.question]:[]) as InterviewQuestion[];const merged=mergeQuestionHistory(questionHistoryRef.current,incoming);setHistory(merged);return incoming.sort((a,b)=>a.order-b.order)})();
     batchRequests.current.set(startOrder,promise);try{return await promise}finally{batchRequests.current.delete(startOrder)}
   }
-
-  function prefetchAfter(order:number,currentAnswers:InterviewAnswer[]){const start=PREFETCH_BATCH_AFTER[order];if(!start)return;void requestBatch(start,currentAnswers,questionHistoryRef.current).catch(()=>{})}
 
   async function goToOrder(order:number,currentAnswers:InterviewAnswer[],historyBase=questionHistoryRef.current){
     if(order>20){await finalize(currentAnswers);return}const existing=historyBase.find(item=>item.order===order)||questionHistoryRef.current.find(item=>item.order===order);if(existing){const history=mergeQuestionHistory(historyBase,questionHistoryRef.current);applyQuestion(existing,history,currentAnswers);return}setBusy(true);setError('');try{const questions=await requestBatch(order,currentAnswers,historyBase);const history=questionHistoryRef.current;const q=questions.find(item=>item.order===order)||history.find(item=>item.order===order);if(!q){setError('다음 질문 묶음을 불러오지 못했어요. 다시 시도해주세요.');return}applyQuestion(q,history,currentAnswers)}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}
@@ -123,7 +125,7 @@ export function AnalyzeFlow(){
 
   async function answerCurrent(){
     if(!question)return;const current=buildCurrentAnswer();if(!current)return;const editingPast=answers.some(answer=>answer.order>current.order);const next=editingPast?uniqueAnswersByOrder([...answers.filter(answer=>answer.order<current.order),current]):upsertAnswer(answers,current);const nextHistory=editingPast?questionHistory.filter(item=>item.order<=current.order):questionHistory;setAnswers(next);if(editingPast){batchRequests.current.clear();setHistory(nextHistory)}
-    if(question.order===20){const missing=firstMissingOrder(next);if(missing!==null){const repairedAnswers=next.filter(answer=>answer.order<missing);const repairedHistory=nextHistory.filter(item=>item.order<missing);setAnswers(repairedAnswers);setHistory(repairedHistory);await goToOrder(missing,repairedAnswers,repairedHistory);return}await finalize(next);return}if(!editingPast)prefetchAfter(question.order,next);await goToOrder(question.order+1,next,nextHistory);
+    if(question.order===20){const missing=firstMissingOrder(next);if(missing!==null){const repairedAnswers=next.filter(answer=>answer.order<missing);const repairedHistory=nextHistory.filter(item=>item.order<missing);setAnswers(repairedAnswers);setHistory(repairedHistory);await goToOrder(missing,repairedAnswers,repairedHistory);return}await finalize(next);return}await goToOrder(question.order+1,next,nextHistory);
   }
 
   function previousQuestion(){if(busy||!question)return;const previous=questionHistory.filter(item=>item.order<question.order).at(-1);if(previous)applyQuestion(previous,questionHistory,answers)}
