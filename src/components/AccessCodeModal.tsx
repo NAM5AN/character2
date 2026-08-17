@@ -57,8 +57,16 @@ export function AccessCodeModal({
       <div className="eyebrow">{eyebrow}</div><h3>{title}</h3>
       <p>{description}</p>
       <div className="notice" style={{margin:'14px 0',lineHeight:1.7}}>
-        <strong>상세 이용권 3,000원 · 캐릭터 수 제한 없음</strong><br/>
-        구매자 본인 이용을 전제로 합니다. 코드 공유·타인 이용이 의심되는 경우 이용 코드는 예고 없이 교체될 수 있으며, 교체 후에는 포스타입 유료 영역에서 최신 코드를 다시 확인해주세요.
+        <strong>
+          상세 이용권 <del style={{opacity:.62,fontWeight:700}}>3,000원</del>{' '}
+          <span style={{fontSize:'1.14em'}}>1,500원</span> · 캐릭터 수 제한 없음
+        </strong><br/>
+        <span style={{display:'inline-block',marginTop:6}}>
+          현재는 샘플을 모으는 기간이라 할인 가격으로 운영하고 있어요. 충분한 샘플이 모인 뒤에는 별도 예고 없이 가격을 올릴 예정입니다.
+        </span><br/>
+        <span style={{display:'inline-block',marginTop:6}}>
+          구매자 본인 이용을 전제로 합니다. 코드 공유·타인 이용이 의심되는 경우 이용 코드는 예고 없이 교체될 수 있으며, 교체 후에는 포스타입 유료 영역에서 최신 코드를 다시 확인해주세요.
+        </span>
         <div style={{marginTop:14}}>
           <a
             className="btn soft"
@@ -70,7 +78,7 @@ export function AccessCodeModal({
           >포스타입에서 코드 확인하기 ↗</a>
         </div>
       </div>
-      <div className="field"><label className="label">이용 코드</label><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} placeholder="예: CHARA82" /></div>
+      <div className="field"><label className="label">이용 코드</label><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} /></div>
       {error && <div className="error" style={{whiteSpace:'pre-wrap'}}>{error}</div>}
       <div className="actions"><button className="btn primary" disabled={busy||!code.trim()} onClick={validate}>{busy?'확인 중…':submitLabel}</button><button className="btn" disabled={busy} onClick={onClose}>닫기</button></div>
     </div>
