@@ -31,7 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </div>
             <nav className="nav-links">
               <Link className="nav-link" href="/analyze">자캐 분석</Link>
-              <Link className="nav-link optional" href="/#lookup">코드 불러오기</Link>
+              <Link className="nav-link optional" href="/#lookup">저장 캐릭터</Link>
             </nav>
           </div>
         </header>
