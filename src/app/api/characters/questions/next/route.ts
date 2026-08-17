@@ -66,7 +66,7 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   relationship_matrix: '같은 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]이고 responseConfig.rows에는 2~4개의 관계 상대, columns에는 2~4개의 짧은 반응을 넣으세요.',
   inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 responseConfig.prompt2에 두 번째 항목을 넣으세요.',
   temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
-  condition_followup: '기본 상황에서 한 번 고른 뒤, 같은 상황에 조건 하나만 더해졌을 때 다시 고르게 합니다. 핵심 제약: 바뀐 조건은 전제를 뒤집지 말고 같은 판단 축을 유지하는 변주여야 합니다(예: 상대가 더 급해짐·대가를 제시함·부탁이 더 커짐·지켜보는 사람이 생김·관계가 더 가깝거나 먼 상대임 등 강도나 조건의 변화). 기본 상황에서 성립하던 선택이 바뀐 조건에서 무의미해지거나 자기모순이 되면 실패입니다. 특히 "도와주려는" 전제를 "거절당함"처럼 뒤집어서 보기 대부분이 헛돌게 만들지 마세요. options는 3~5개의 공통 반응이며 기본 상황과 바뀐 조건 둘 다에서 각각 자연스럽고 서로 구별되게 성립해야 합니다. 기본 질문은 특정 행동을 미리 전제하지 말고("~하려 할 때"처럼 이미 그 행동을 하는 것으로 못박지 말고) 열린 상황으로 두세요. responseConfig.prompt2에는 바뀐 조건을 포함한 두 번째 질문 문장을 넣으세요.',
+  condition_followup: '기본 상황을 제시하고 options(3~5개)로 한 번 고르게 한 뒤, 조건 하나가 바뀐 상황을 responseConfig.prompt2에 두 번째 질문으로 넣고, 그 바뀐 상황에 실제로 어울리는 별도의 선택지를 responseConfig.options2(3~5개)에 넣으세요. options와 options2는 각각 자기 상황에서 자연스럽고 서로 구별되는 반응이어야 하며, 두 목록이 같을 필요는 없습니다. 바뀐 조건 때문에 기본 보기가 어색해지는 상황이라면(예: 상대가 이미 거절했거나 전제가 달라짐) options2는 그 조건에 맞는 새 반응들로 다시 구성하고 기본 보기를 그대로 재사용하지 마세요. 두 목록 모두 어느 답이 더 도덕적으로 좋아 보이지 않게 만드세요. 기본 질문은 특정 행동을 미리 전제하지 말고("~하려 할 때"처럼 이미 그 행동을 하는 것으로 못박지 말고) 열린 상황으로 두세요.',
   owner_meta: '캐릭터를 오래 본 오너만 답하기 좋은 메타 질문을 만드세요. options는 3~5개 후보이며 allowCustom=true입니다.',
 };
 
@@ -157,7 +157,20 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
 export async function POST(request: Request) {
   try {
     await assertRateLimit('question_batch', 30, 60);
-    const body = requestSchema.parse(await request.json());
+    const raw = await request.json();
+    // Backward compatibility: condition_followup questions generated before the
+    // options2 field existed reused the base options for the branch. Backfill so
+    // in-flight sessions replaying such planned questions still validate.
+    if (raw && Array.isArray(raw.plannedQuestions)) {
+      for (const planned of raw.plannedQuestions) {
+        if (planned?.responseType !== 'condition_followup') continue;
+        const rc = planned.responseConfig;
+        if (rc && (!Array.isArray(rc.options2) || rc.options2.length < 3) && Array.isArray(planned.options)) {
+          rc.options2 = planned.options;
+        }
+      }
+    }
+    const body = requestSchema.parse(raw);
     const answeredOrders = new Set(body.answers.map(answer=>answer.order));
     const history = buildHistory(body.answers);
     const startOrder = body.startOrder ?? Math.min(20, body.answers.length + 1);

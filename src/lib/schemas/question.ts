@@ -39,8 +39,10 @@ export const questionResponseConfigSchema = z.object({
   maxLabel: z.string().min(1).max(65).optional(),
   rows: z.array(z.string().min(1).max(65)).max(6).default([]),
   columns: z.array(z.string().min(1).max(65)).max(5).default([]),
+  // Separate option set for the changed-condition follow-up (condition_followup only).
+  options2: z.array(z.string().min(1).max(65)).max(6).default([]),
   maxSelections: z.number().int().min(1).max(6).optional(),
-}).default({ rows: [], columns: [] });
+}).default({ rows: [], columns: [], options2: [] });
 
 const OPTION_RESPONSE_TYPES = new Set([
   'fill_blank',
@@ -98,6 +100,9 @@ export const interviewQuestionSchema = z.object({
   }
   if ((type === 'inner_outer' || type === 'condition_followup') && !config.prompt2) {
     ctx.addIssue({ code: 'custom', path: ['responseConfig', 'prompt2'], message: '두 번째 질문 문구가 필요합니다.' });
+  }
+  if (type === 'condition_followup' && (config.options2 || []).length < 3) {
+    ctx.addIssue({ code: 'custom', path: ['responseConfig', 'options2'], message: '조건 변경형에는 바뀐 상황용 선택지(options2)가 3개 이상 필요합니다.' });
   }
   if (type === 'temporal_compare' && (!config.leftLabel || !config.rightLabel)) {
     ctx.addIssue({ code: 'custom', path: ['responseConfig'], message: '시간 비교형에는 두 시점 라벨이 필요합니다.' });
