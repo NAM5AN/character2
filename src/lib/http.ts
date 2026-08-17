@@ -9,27 +9,39 @@ function structuredError(message:string){
   return {code,details};
 }
 
-export function apiError(error: unknown) {
+export type ApiErrorPayload = { status: number; body: { error: string; details?: string } };
+
+// Maps a thrown error to the same {status, body} that apiError would return, so both
+// JSON responses and streaming responses report errors identically.
+export function apiErrorPayload(error: unknown): ApiErrorPayload {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
   if (message === 'CODE_INVALID' || message.includes('CODE_INVALID')) {
-    return NextResponse.json({ error: 'CODE_INVALID' }, { status: 401 });
+    return { status: 401, body: { error: 'CODE_INVALID' } };
   }
-  if (message === 'RATE_LIMITED') return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  if (message === 'RATE_LIMITED') return { status: 429, body: { error: 'RATE_LIMITED' } };
   if (message.includes('DETAIL_ACCESS_DENIED')) {
-    return NextResponse.json({ error: 'DETAIL_ACCESS_DENIED' }, { status: 403 });
+    return { status: 403, body: { error: 'DETAIL_ACCESS_DENIED' } };
   }
   if (message.includes('DETAIL_ENTITLEMENT_ALREADY_CLAIMED')) {
-    return NextResponse.json({
-      error: 'DETAIL_OWNER_SOURCE_REQUIRED',
-      details: '이미 다른 브라우저에 상세 리포트 열람 권한이 저장되어 있어요. 캐릭터를 만든 브라우저에서 다시 열어주세요.',
-    }, { status: 409 });
+    return {
+      status: 409,
+      body: {
+        error: 'DETAIL_OWNER_SOURCE_REQUIRED',
+        details: '이미 다른 브라우저에 상세 리포트 열람 권한이 저장되어 있어요. 캐릭터를 만든 브라우저에서 다시 열어주세요.',
+      },
+    };
   }
 
-  const {code,details}=structuredError(message);
+  const { code, details } = structuredError(message);
   if (message.includes('NOT_CONFIGURED')) {
-    return NextResponse.json({ error: code, ...(details?{details}:{}) }, { status: 503 });
+    return { status: 503, body: { error: code, ...(details ? { details } : {}) } };
   }
 
   console.error(error);
-  return NextResponse.json({ error: code, ...(details?{details}:{}) }, { status: 500 });
+  return { status: 500, body: { error: code, ...(details ? { details } : {}) } };
+}
+
+export function apiError(error: unknown) {
+  const { status, body } = apiErrorPayload(error);
+  return NextResponse.json(body, { status });
 }

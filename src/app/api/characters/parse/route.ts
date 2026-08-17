@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas/character';
-import { askOpenAIJson } from '@/lib/ai/openai';
+import { streamOpenAIJson } from '@/lib/ai/openai';
 import { analyzeAppearanceImages } from '@/lib/ai/appearance';
 import { withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
+import { ndjsonStream } from '@/lib/ai/stream';
 import { resolveProfileInput } from '@/lib/profile-source';
 
 const appearanceImageSchema = z.object({
@@ -213,24 +213,33 @@ function normalizeInferences(items: unknown[], anchors: SourceAnchor[]) {
 }
 
 export async function POST(request: Request) {
+  let body: z.infer<typeof requestSchema>;
   try {
+    body = requestSchema.parse(await request.json());
+  } catch (error) {
+    return apiError(error);
+  }
+
+  return ndjsonStream(async (emit) => {
     await assertRateLimit('character_parse', 10, 30);
-    const body = requestSchema.parse(await request.json());
+    emit(0.04);
     const usageSessionId=crypto.randomUUID();
     const [publicSource, secretSource, appearanceNotes] = await Promise.all([
       resolveProfileInput(body.profileText, true),
       resolveProfileInput(body.secretProfileText, false),
       withAiUsageContext({sessionId:usageSessionId,stage:'profile_image'},()=>analyzeAppearanceImages(body.appearanceImages)),
     ]);
+    emit(0.15);
     const profileText = publicSource.text;
     const secretProfileText = secretSource.text;
 
     const sourceAnchors = buildSourceAnchors(profileText, secretProfileText, appearanceNotes);
 
-    const raw = await withAiUsageContext({sessionId:usageSessionId,stage:'profile_parse'},()=>askOpenAIJson({
+    const raw = await withAiUsageContext({sessionId:usageSessionId,stage:'profile_parse'},()=>streamOpenAIJson({
       instructions: PARSER_INSTRUCTIONS_V2,
       schema: initialCharacterDraftSchema,
       maxOutputTokens: 3600,
+      onProgress: (r) => emit(0.15 + r * 0.82),
       input: `캐릭터 이름: ${body.name}\n\nSOURCE_FACTS — 서버가 공개/비밀 프로필과 외관 관찰 메모를 순서대로 만든 근거 ID 목록입니다:\n${JSON.stringify(sourceAnchors)}\n\nlayer=public은 공개 프로필, layer=secret은 비밀 프로필, layer=appearance는 첨부 이미지에서 직접 관찰한 외관 보조 정보입니다.\nappearance는 외형·의상·소품·시각적 인상을 보완하는 자료이며, 심리나 과거를 단독으로 확정하는 근거로 쓰면 안 됩니다.\n공개와 비밀 정보층의 차이는 캐릭터 해석에 활용할 수 있지만, 문서 표기 차이나 누락 자체를 aiInference로 만들지는 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText/appearanceNotes는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidenceIds} 배열로 출력하세요. evidenceIds는 SOURCE_FACTS에 실제 존재하는 서로 다른 fact ID 2~4개입니다. id와 ownerVerdict는 서버가 생성합니다.`,
     }));
 
@@ -252,8 +261,6 @@ export async function POST(request: Request) {
       analysisConfidence: normalizeScore(raw.analysisConfidence, 65),
     });
 
-    return NextResponse.json({ draft });
-  } catch (error) {
-    return apiError(error);
-  }
+    return { draft };
+  }, { estimateSeconds: 22 });
 }
