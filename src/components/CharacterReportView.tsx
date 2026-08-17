@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
+import { useRotatingFlavor } from '@/lib/loading-flavor';
 
 type DetailPayload={
   analysis:FinalAnalysis;
@@ -57,13 +58,6 @@ function estimatedProgress(elapsed:number){
   return Math.min(97,94+(elapsed-65)*.12);
 }
 
-function progressStage(progress:number,name:string){
-  if(progress<22)return `${name}의 기본 흐름을 살펴보고 있어요`;
-  if(progress<60)return `${name}의 관계 패턴을 읽고 있어요`;
-  if(progress<82)return `${name}의 감정과 갈등을 함께 정리하고 있어요`;
-  return '리포트를 작성하는 중이에요';
-}
-
 function remainingLabel(elapsed:number){
   if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '조금 더 걸리고 있어요';
   const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
@@ -95,6 +89,9 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [error,setError]=useState('');
   const [progress,setProgress]=useState(0);
   const [elapsedSeconds,setElapsedSeconds]=useState(0);
+  // 캐릭터 성격에 맞는 로딩 문구를 상세 리포트 생성 중에도 순환 표시 (AI 미사용).
+  const flavorSignal=[preview.oneLineSummary,preview.summary?.outerSelf,preview.summary?.innerSelf,preview.summary?.conflictStyle,preview.summary?.affectionStyle,preview.summary?.misunderstoodPoint,preview.summary?.hiddenPattern].filter(Boolean).join(' ');
+  const flavorMessage=useRotatingFlavor(flavorSignal,preview.name,busy);
   const [reportPage,setReportPage]=useState<1|2|3>(1);
   const [stageReady,setStageReady]=useState(0);
   const [prefetchBusy,setPrefetchBusy]=useState(false);
@@ -325,7 +322,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-          <div className="loading" style={{fontWeight:900}}>{progressStage(progress,preview.name)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
+          <div className="loading" style={{fontWeight:900}}>{flavorMessage} <i className="dot"/><i className="dot"/><i className="dot"/></div>
           <strong style={{fontSize:20}}>{progress}%</strong>
         </div>
         <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
