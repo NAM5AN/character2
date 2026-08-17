@@ -28,7 +28,9 @@ export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.strin
 export const characterDraftSchema=z.object({basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),analysisConfidence:z.number().min(0).max(100)});
 
 export const analysisTypeSummarySchema=z.object({outerSelf:z.string().min(20).max(160),innerSelf:z.string().min(20).max(160),conflictStyle:z.string().min(20).max(160),affectionStyle:z.string().min(20).max(160)});
-const reportListSchema=z.array(z.string().min(8).max(80)).min(2).max(5);
+const reportItemSchema=z.string().min(8).max(80);
+const reportListSchema=z.array(reportItemSchema).min(2).max(5);
+const evidenceBackedListSchema=z.array(reportItemSchema).min(1).max(5);
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
 
@@ -52,7 +54,7 @@ export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summa
 export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,evidencePack:characterEvidencePackSchema});
 
 export const detailAnalysisRawSchema=z.object({outerSelf:z.unknown(),innerSelf:z.unknown(),coreValues:z.unknown(),desires:z.unknown(),fears:z.unknown(),conflictStyle:z.unknown(),affectionStyle:z.unknown(),misunderstoodPoints:z.unknown(),contradictions:z.unknown(),interestingPoints:z.unknown(),detailedReport:z.unknown()}).passthrough();
-export const detailAnalysisGenerationSchema=z.object({outerSelf:z.string().min(140).max(360),innerSelf:z.string().min(140).max(360),coreValues:reportListSchema,desires:reportListSchema,fears:reportListSchema,conflictStyle:z.string().min(140).max(360),affectionStyle:z.string().min(140).max(360),misunderstoodPoints:reportListSchema,contradictions:reportListSchema,interestingPoints:reportListSchema,detailedReport:z.string().min(700).max(1400)});
+export const detailAnalysisGenerationSchema=z.object({outerSelf:z.string().min(140).max(360),innerSelf:z.string().min(140).max(360),coreValues:reportListSchema,desires:reportListSchema,fears:reportListSchema,conflictStyle:z.string().min(140).max(360),affectionStyle:z.string().min(140).max(360),misunderstoodPoints:evidenceBackedListSchema,contradictions:evidenceBackedListSchema,interestingPoints:reportListSchema,detailedReport:z.string().min(700).max(1400)});
 
 export const finalAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:z.record(z.string(),z.unknown()).optional().default({}),outerSelf:z.unknown(),innerSelf:z.unknown(),coreValues:z.unknown(),desires:z.unknown(),fears:z.unknown(),conflictStyle:z.unknown(),affectionStyle:z.unknown(),misunderstoodPoints:z.unknown(),contradictions:z.unknown(),interestingPoints:z.unknown(),detailedReport:z.unknown()}).passthrough();
 export const finalAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,...detailAnalysisGenerationSchema.shape});
