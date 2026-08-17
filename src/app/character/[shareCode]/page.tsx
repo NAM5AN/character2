@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSupabaseServer } from '@/lib/supabase/server';
 import { normalizeShareCode, isShareCode } from '@/lib/share-code';
 import { characterReportPreviewSchema, type CharacterReportPreview } from '@/lib/character-report';
-import { CharacterReportView } from '@/components/CharacterReportView';
+import { CharacterReportClient } from '@/components/CharacterReportClient';
 
 async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   const code=normalizeShareCode(rawCode);
@@ -18,5 +18,5 @@ export default async function CharacterPage({params}:{params:Promise<{shareCode:
   const {shareCode}=await params;
   const preview=await loadPreview(shareCode);
   if(!preview)notFound();
-  return <main className="container page"><CharacterReportView preview={preview}/></main>;
+  return <main className="container page"><CharacterReportClient preview={preview}/></main>;
 }
