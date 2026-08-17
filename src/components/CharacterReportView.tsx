@@ -7,7 +7,7 @@ import { AccessCodeModal } from '@/components/AccessCodeModal';
 
 type DetailPayload={analysis:FinalAnalysis;confirmedFactCount:number;inferenceCount:number;cached?:boolean};
 
-const DETAIL_ESTIMATE_SECONDS=75;
+const DETAIL_ESTIMATE_SECONDS=100;
 
 function paragraphChunks(text:string){
   const normalized=text.replace(/\r\n?/g,'\n').trim();
@@ -24,7 +24,7 @@ function ParagraphText({text}:{text:string}){
 }
 
 function BulletList({items}:{items:string[]}){
-  return <ul style={{margin:'0',paddingLeft:22,lineHeight:1.8,color:'#444'}}>{items.map((item,index)=><li key={`${index}-${item.slice(0,18)}`} style={{margin:index===0?0:'7px 0 0'}}>{item}</li>)}</ul>;
+  return <ul style={{margin:'0',paddingLeft:22,lineHeight:1.8,color:'#444'}}>{items.map((item,index)=><li key={`${index}-${item.slice(0,18)}`} style={{margin:index===0?0:'9px 0 0'}}>{item}</li>)}</ul>;
 }
 
 function apiErrorInfo(body:unknown,status:number){
@@ -39,10 +39,10 @@ function formatError(message:string,code:string,details=''){
 }
 
 function estimatedProgress(elapsed:number){
-  if(elapsed<12)return Math.min(30,8+elapsed*1.8);
-  if(elapsed<42)return Math.min(69,30+(elapsed-12)*1.3);
-  if(elapsed<70)return Math.min(92,69+(elapsed-42)*.82);
-  return Math.min(97,92+(elapsed-70)*.15);
+  if(elapsed<15)return Math.min(28,8+elapsed*1.3);
+  if(elapsed<55)return Math.min(68,28+(elapsed-15));
+  if(elapsed<92)return Math.min(92,68+(elapsed-55)*.65);
+  return Math.min(97,92+(elapsed-92)*.12);
 }
 
 function progressStage(progress:number,name:string){
@@ -56,6 +56,16 @@ function remainingLabel(elapsed:number){
   if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '조금 더 걸리고 있어요';
   const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
   return `약 ${remaining}초 남음`;
+}
+
+function TextSection({title,text}:{title:string;text?:string}){
+  if(!text?.trim())return null;
+  return <section className="result-block"><h3>{title}</h3><ParagraphText text={text}/></section>;
+}
+
+function ListSection({title,items}:{title:string;items?:string[]}){
+  if(!items?.length)return null;
+  return <section className="result-block"><h3>{title}</h3><BulletList items={items}/></section>;
 }
 
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
@@ -136,7 +146,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
       <div className="eyebrow">Full report preview</div><h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>여기서 한 단계 더 들어가면</h2>
       <p style={{lineHeight:1.75,maxWidth:760,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
-      <div className="tags" style={{marginBottom:18}}>{['유형별 해석','핵심 가치·욕구','두려움','관계·갈등 패턴','오해받는 지점','캐릭터의 모순','상세 통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
+      <div className="tags" style={{marginBottom:18}}>{['핵심 성격','감정·방어기제','관계·애착','자기기만','극한상황','매력 포인트','숨은 해석','사용 설명서'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
 
       <div style={{position:'relative'}}>
         <div aria-hidden="true" style={{display:'grid',gap:12,position:'relative'}}>
@@ -162,19 +172,58 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 40초~1분 30초 · 생성 후 저장돼요.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 1~2분 · 생성 후 저장돼요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>캐릭터의 행동 원리와 관계 패턴을 깊게 풀어낸 유형별 해석과 통합 캐해입니다.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>설정을 다시 읽어주는 대신, 행동과 관계에서 반복되는 원리를 연결해 이 캐릭터가 실제로 어떻게 움직이는지 풀어봤어요.</p>
+
       <div className="result-grid" style={{marginTop:20}}>
-        <section className="result-block"><h3>겉으로 보이는 모습</h3><ParagraphText text={detail.analysis.outerSelf}/></section><section className="result-block"><h3>실제 내면</h3><ParagraphText text={detail.analysis.innerSelf}/></section><section className="result-block"><h3>갈등 방식</h3><ParagraphText text={detail.analysis.conflictStyle}/></section><section className="result-block"><h3>애정 표현</h3><ParagraphText text={detail.analysis.affectionStyle}/></section>
-        <section className="result-block"><h3>핵심 가치</h3><BulletList items={detail.analysis.coreValues}/></section><section className="result-block"><h3>핵심 욕망</h3><BulletList items={detail.analysis.desires}/></section><section className="result-block"><h3>두려워하는 것</h3><BulletList items={detail.analysis.fears}/></section>
-        <section className="result-block"><h3>쉽게 오해받는 부분</h3><BulletList items={detail.analysis.misunderstoodPoints}/></section><section className="result-block"><h3>캐릭터의 모순</h3><BulletList items={detail.analysis.contradictions}/></section><section className="result-block"><h3>AI가 발견한 흥미로운 지점</h3><BulletList items={detail.analysis.interestingPoints}/></section>
+        <TextSection title="겉으로 보이는 모습" text={detail.analysis.outerSelf}/>
+        <TextSection title="실제 내면" text={detail.analysis.innerSelf}/>
+        <TextSection title="갈등 방식" text={detail.analysis.conflictStyle}/>
+        <TextSection title="애정 표현" text={detail.analysis.affectionStyle}/>
+        <ListSection title="핵심 가치" items={detail.analysis.coreValues}/>
+        <ListSection title="핵심 욕망" items={detail.analysis.desires}/>
+        <ListSection title="두려워하는 것" items={detail.analysis.fears}/>
+        <ListSection title="쉽게 오해받는 부분" items={detail.analysis.misunderstoodPoints}/>
+        <ListSection title="캐릭터의 모순" items={detail.analysis.contradictions}/>
+        <ListSection title="새롭게 읽히는 지점" items={detail.analysis.interestingPoints}/>
       </div>
+
+      {detail.analysis.corePersonality&&<>
+        <div style={{marginTop:42}}><div className="eyebrow">Deep character reading</div><h2 style={{marginTop:10}}>더 깊게 읽은 캐릭터</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>오너가 이미 알고 있는 설정보다, 그 설정들이 함께 있을 때 자연스럽게 따라오는 속내와 관계의 원리를 중심으로 정리했어요.</p></div>
+        <div className="result-grid" style={{marginTop:20}}>
+          <TextSection title="본질적인 성격" text={detail.analysis.corePersonality}/>
+          <TextSection title="왜 이런 성격이 되었는지" text={detail.analysis.developmentalRoots}/>
+          <TextSection title="감정 구조" text={detail.analysis.emotionalStructure}/>
+          <TextSection title="방어기제와 스트레스 반응" text={detail.analysis.defenseAndStress}/>
+          <TextSection title="대인관계 방식" text={detail.analysis.relationshipPattern}/>
+          <TextSection title="애착·친밀감" text={detail.analysis.attachmentPattern}/>
+          <TextSection title="연애하면 어떤 타입인지" text={detail.analysis.romanceStyle}/>
+          <TextSection title="사람을 좋아하고 싫어하는 기준" text={detail.analysis.attractionCriteria}/>
+          <TextSection title="가치관과 극한상황" text={detail.analysis.moralAndExtremeChoices}/>
+          <TextSection title="자기기만" text={detail.analysis.selfDeception}/>
+          <TextSection title="원하는 것 vs 정말 필요한 것" text={detail.analysis.wantsVsNeeds}/>
+          <TextSection title="표면 설정과 실제로 읽히는 모습" text={detail.analysis.statedVsEnacted}/>
+          <ListSection title="강점이 약점으로 뒤집히는 지점" items={detail.analysis.strengthsAndRisks}/>
+          <ListSection title="캐릭터의 매력 포인트" items={detail.analysis.charmPoints}/>
+          <ListSection title="직접 쓰이지 않은 숨은 특성" items={detail.analysis.hiddenTraits}/>
+        </div>
+
+        {detail.analysis.relationshipManual&&<section className="card" style={{marginTop:22,padding:'30px'}}>
+          <div className="eyebrow">Character manual</div><h2 style={{fontSize:'clamp(26px,4vw,38px)',marginTop:10}}>캐릭터 사용 설명서</h2>
+          <div className="result-grid" style={{marginTop:18}}>
+            <section className="result-block"><h3>친해지는 방법</h3><BulletList items={detail.analysis.relationshipManual.gettingClose}/></section>
+            <section className="result-block"><h3>특히 하면 안 되는 것</h3><BulletList items={detail.analysis.relationshipManual.avoid}/></section>
+            <section className="result-block"><h3>좋아하고 신뢰한다는 신호</h3><BulletList items={detail.analysis.relationshipManual.affectionSignals}/></section>
+          </div>
+        </section>}
+      </>}
+
       <section className="card" style={{marginTop:22,padding:'32px'}}><div className="eyebrow">Deep report</div><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:10}}>통합 상세 해석</h2>{detail.analysis.detailedReport?<div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div>:<p className="muted">이 캐릭터는 상세 리포트 기능 추가 이전 버전으로 생성되어 기존 유형별 해석만 제공됩니다.</p>}</section>
       <div className="actions"><button className="btn" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </div>}
