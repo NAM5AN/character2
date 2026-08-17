@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
 import { getCharacterDeepAnalysisSkill } from '@/lib/ai/character-deep-analysis-skill';
+import { rewriteDetailedReportParagraphLeads } from '@/lib/ai/report-paragraph-leads';
 
 const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5';
 const DEFAULT_DETAIL_MODEL = 'anthropic/claude-opus-4.8';
@@ -44,6 +45,11 @@ function applyCharacterDeepAnalysisSkill(system: string) {
   ].join('\n\n---\n\n');
 }
 
+async function finalizeClaudeResult<T>(value: T, system: string, model: string) {
+  if (!isReportWriterSystem(system)) return value;
+  return rewriteDetailedReportParagraphLeads(value, model);
+}
+
 export async function askClaudeJson<T>(args: {
   system: string;
   input: string;
@@ -62,7 +68,7 @@ export async function askClaudeJson<T>(args: {
   const maxOutputTokens = isPaidDetail ? undefined : args.maxTokens;
 
   try {
-    return await generateValidatedJson({
+    const result = await generateValidatedJson({
       model: primaryModel,
       system: resolvedSystem,
       prompt: args.input,
@@ -70,13 +76,14 @@ export async function askClaudeJson<T>(args: {
       maxOutputTokens,
       maxAttempts,
     });
+    return await finalizeClaudeResult(result, args.system, primaryModel);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
     if (args.allowFallback === false) throw error;
 
     const fallbackModel = process.env.CLAUDE_JSON_FALLBACK_MODEL || 'openai/gpt-5.6-luna';
-    return generateValidatedJson({
+    const result = await generateValidatedJson({
       model: fallbackModel,
       system: `${resolvedSystem}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
       prompt: args.input,
@@ -84,5 +91,6 @@ export async function askClaudeJson<T>(args: {
       maxOutputTokens,
       maxAttempts,
     });
+    return finalizeClaudeResult(result, args.system, fallbackModel);
   }
 }
