@@ -68,6 +68,15 @@ function ListSection({title,items}:{title:string;items?:string[]}){
   return <section className="result-block"><h3>{title}</h3><BulletList items={items}/></section>;
 }
 
+function NarrativeSection({title,text,index}:{title:string;text?:string;index:number}){
+  if(!text?.trim())return null;
+  return <section className="card" style={{marginTop:index===0?20:18,padding:'32px'}}>
+    <div className="eyebrow">Detailed reading {String(index+1).padStart(2,'0')}</div>
+    <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>{title}</h2>
+    <div style={{fontSize:16.5}}><ParagraphText text={text}/></div>
+  </section>;
+}
+
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
   const [unlockOpen,setUnlockOpen]=useState(false);
   const [detail,setDetail]=useState<DetailPayload|null>(null);
@@ -146,7 +155,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
       <div className="eyebrow">Full report preview</div><h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>여기서 한 단계 더 들어가면</h2>
       <p style={{lineHeight:1.75,maxWidth:760,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
-      <div className="tags" style={{marginBottom:18}}>{['핵심 성격','감정·방어기제','관계·애착','자기기만','극한상황','매력 포인트','숨은 해석','사용 설명서'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
+      <div className="tags" style={{marginBottom:18}}>{['이런 캐릭터예요','이렇게 작동해요','이렇게 관계를 맺어요','이런 애착이 있어요','이렇게 갈등해요','이런 매력이 있어요','통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
 
       <div style={{position:'relative'}}>
         <div aria-hidden="true" style={{display:'grid',gap:12,position:'relative'}}>
@@ -179,24 +188,28 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>설정을 다시 읽어주는 대신, 행동과 관계에서 반복되는 원리를 연결해 이 캐릭터가 실제로 어떻게 움직이는지 풀어봤어요.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>잘게 나눈 항목을 반복하는 대신, 서로 이어지는 내용끼리 묶어 한 사람을 읽듯 자연스럽게 풀어냈어요.</p>
 
-      <div className="result-grid" style={{marginTop:20}}>
-        <TextSection title="겉으로 보이는 모습" text={detail.analysis.outerSelf}/>
-        <TextSection title="실제 내면" text={detail.analysis.innerSelf}/>
-        <TextSection title="갈등 방식" text={detail.analysis.conflictStyle}/>
-        <TextSection title="애정 표현" text={detail.analysis.affectionStyle}/>
-        <ListSection title="핵심 가치" items={detail.analysis.coreValues}/>
-        <ListSection title="핵심 욕망" items={detail.analysis.desires}/>
-        <ListSection title="두려워하는 것" items={detail.analysis.fears}/>
-        <ListSection title="쉽게 오해받는 부분" items={detail.analysis.misunderstoodPoints}/>
-        <ListSection title="캐릭터의 모순" items={detail.analysis.contradictions}/>
-        <ListSection title="새롭게 읽히는 지점" items={detail.analysis.interestingPoints}/>
-      </div>
-
-      {detail.analysis.corePersonality&&<>
-        <div style={{marginTop:42}}><div className="eyebrow">Deep character reading</div><h2 style={{marginTop:10}}>더 깊게 읽은 캐릭터</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>오너가 이미 알고 있는 설정보다, 그 설정들이 함께 있을 때 자연스럽게 따라오는 속내와 관계의 원리를 중심으로 정리했어요.</p></div>
+      {detail.analysis.characterOverview ? <>
+        <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={detail.analysis.characterOverview}/>
+        <NarrativeSection index={1} title={`${preview.name}는 이렇게 작동해요`} text={detail.analysis.innerMechanics}/>
+        <NarrativeSection index={2} title={`${preview.name}는 이렇게 관계를 맺어요`} text={detail.analysis.relationshipStyle}/>
+        <NarrativeSection index={3} title={`${preview.name}는 이런 애착이 있어요`} text={detail.analysis.attachmentStyle}/>
+        <NarrativeSection index={4} title={`${preview.name}는 이렇게 갈등해요`} text={detail.analysis.conflictStyleDetailed}/>
+        <NarrativeSection index={5} title={`${preview.name}에겐 이런 매력이 있어요`} text={detail.analysis.charmAndContradictions}/>
+        <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport}/>
+      </> : <>
         <div className="result-grid" style={{marginTop:20}}>
+          <TextSection title="겉으로 보이는 모습" text={detail.analysis.outerSelf}/>
+          <TextSection title="실제 내면" text={detail.analysis.innerSelf}/>
+          <TextSection title="갈등 방식" text={detail.analysis.conflictStyle}/>
+          <TextSection title="애정 표현" text={detail.analysis.affectionStyle}/>
+          <ListSection title="핵심 가치" items={detail.analysis.coreValues}/>
+          <ListSection title="핵심 욕망" items={detail.analysis.desires}/>
+          <ListSection title="두려워하는 것" items={detail.analysis.fears}/>
+          <ListSection title="쉽게 오해받는 부분" items={detail.analysis.misunderstoodPoints}/>
+          <ListSection title="캐릭터의 모순" items={detail.analysis.contradictions}/>
+          <ListSection title="새롭게 읽히는 지점" items={detail.analysis.interestingPoints}/>
           <TextSection title="본질적인 성격" text={detail.analysis.corePersonality}/>
           <TextSection title="왜 이런 성격이 되었는지" text={detail.analysis.developmentalRoots}/>
           <TextSection title="감정 구조" text={detail.analysis.emotionalStructure}/>
@@ -213,7 +226,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <ListSection title="캐릭터의 매력 포인트" items={detail.analysis.charmPoints}/>
           <ListSection title="직접 쓰이지 않은 숨은 특성" items={detail.analysis.hiddenTraits}/>
         </div>
-
         {detail.analysis.relationshipManual&&<section className="card" style={{marginTop:22,padding:'30px'}}>
           <div className="eyebrow">Character manual</div><h2 style={{fontSize:'clamp(26px,4vw,38px)',marginTop:10}}>캐릭터 사용 설명서</h2>
           <div className="result-grid" style={{marginTop:18}}>
@@ -222,9 +234,9 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
             <section className="result-block"><h3>좋아하고 신뢰한다는 신호</h3><BulletList items={detail.analysis.relationshipManual.affectionSignals}/></section>
           </div>
         </section>}
+        {detail.analysis.detailedReport&&<section className="card" style={{marginTop:22,padding:'32px'}}><div className="eyebrow">Deep report</div><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:10}}>통합 상세 해석</h2><div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div></section>}
       </>}
 
-      <section className="card" style={{marginTop:22,padding:'32px'}}><div className="eyebrow">Deep report</div><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:10}}>통합 상세 해석</h2>{detail.analysis.detailedReport?<div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div>:<p className="muted">이 캐릭터는 상세 리포트 기능 추가 이전 버전으로 생성되어 기존 유형별 해석만 제공됩니다.</p>}</section>
       <div className="actions"><button className="btn" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </div>}
   </>;
