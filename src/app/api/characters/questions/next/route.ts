@@ -38,7 +38,7 @@ const FORMAT_LABELS = {
 const RESPONSE_TYPE_LABELS = {
   fill_blank: '빈칸 채우기',
   sentence_continue: '문장 이어쓰기',
-  dialogue_choice: '캐릭터가 할 대사 고르기',
+  dialogue_choice: '대사·상대 반응 고르기',
   bipolar_scale: 'A/B 사이 5단계 성향 선택',
   ranking: '순위 매기기',
   multi_select: '복수 선택',
@@ -57,7 +57,7 @@ const RESPONSE_TYPES = Object.keys(RESPONSE_TYPE_LABELS) as ResponseType[];
 const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   fill_blank: '질문 안에 ________ 빈칸을 하나 넣으세요. options는 서로 다른 3~5개 후보를 만들고 allowCustom=true로 하세요.',
   sentence_continue: '캐릭터의 생각이나 판단을 이어 쓰게 하는 미완성 문장으로 만드세요. options=[]이고 allowCustom=true입니다.',
-  dialogue_choice: '반드시 "이 상황에서 캐릭터 본인이 실제로 뭐라고 말하는가"를 묻습니다. question의 화자와 options의 화자는 모두 캐릭터여야 합니다. 캐릭터가 상대에게서 들을 말, 상대가 캐릭터에게 할 말, 상대의 첫마디를 묻는 질문은 절대 만들지 마세요. options는 캐릭터 본인이 할 짧은 실제 대사 3~5개이며 allowCustom=true입니다.',
+  dialogue_choice: '두 하위형 중 정보가치가 높은 쪽을 하나 고르세요. ① responseConfig.prompt2="speaker:character": 캐릭터가 실제로 할 첫마디를 묻고 options에는 캐릭터의 대사 3~5개만 넣습니다. ② responseConfig.prompt2="speaker:counterparty": 캐릭터의 말·행동을 받은 상대나 제3자가 가장 먼저 할 말을 묻고 options에는 상대의 대사 3~5개만 넣습니다. 상대 반응형은 캐릭터가 타인에게 주는 인상, 매력, 부담, 긴장, 오해 같은 제3자 시점 정보를 얻을 가치가 있을 때 적극 사용하세요. 두 화자의 대사를 한 문항에 섞으면 실패입니다. allowCustom=true입니다.',
   bipolar_scale: '서로 반대되는 두 판단 A/B를 responseConfig.leftLabel/rightLabel에 짧고 대등한 문장으로 넣으세요. 사용자는 A에 가까움 / 약간 A / 중간 / 약간 B / B에 가까움의 5단계 중 하나를 클릭합니다. options=[]입니다. 일반 5지선다처럼 서로 다른 다섯 행동을 만들지 마세요.',
   ranking: '서로 다른 가치·판단·행동 기준 4~5개를 options에 넣어 전부 순위 매기게 하세요.',
   multi_select: '동시에 일어날 수 있는 행동이나 반응 4~6개를 options에 넣으세요. 필요하면 responseConfig.maxSelections에 2~4를 넣으세요.',
@@ -125,13 +125,6 @@ function buildHistory(answers: z.infer<typeof interviewAnswerSchema>[]) {
   });
 }
 
-function dialogueQuestionHasListenerPerspective(question: string) {
-  const normalized = question.replace(/\s+/g, ' ').trim();
-  return /(?:들을|듣게\s*될|듣는)\s*(?:말|대사|첫마디)/u.test(normalized)
-    || /상대(?:가|는|에게서)[^?]{0,35}(?:할|하는|건넬|던질)\s*(?:말|대사|첫마디)/u.test(normalized)
-    || /상대의\s*(?:말|대사|첫마디)/u.test(normalized);
-}
-
 function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>) {
   const specMap = new Map(specs.map(spec => [spec.order, spec.responseType]));
   return z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
@@ -143,12 +136,15 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
       const expectedType = specMap.get(question.order);
       if(!expectedType) ctx.addIssue({code:'custom',path:['questions',index,'order'],message:'요청하지 않은 문항 번호입니다.'});
       else if(question.responseType!==expectedType) ctx.addIssue({code:'custom',path:['questions',index,'responseType'],message:`responseType은 ${expectedType}여야 합니다.`});
-      if(question.responseType==='dialogue_choice' && dialogueQuestionHasListenerPerspective(question.question)) {
-        ctx.addIssue({
-          code:'custom',
-          path:['questions',index,'question'],
-          message:'dialogue_choice는 상대가 할 말이나 캐릭터가 들을 말을 묻지 말고, 캐릭터 본인이 할 대사를 물어야 합니다.',
-        });
+      if(question.responseType==='dialogue_choice'){
+        const speaker=question.responseConfig.prompt2;
+        if(speaker!=='speaker:character'&&speaker!=='speaker:counterparty'){
+          ctx.addIssue({
+            code:'custom',
+            path:['questions',index,'responseConfig','prompt2'],
+            message:'dialogue_choice는 speaker:character 또는 speaker:counterparty로 화자를 명시해야 합니다.',
+          });
+        }
       }
       const hook=question.targetHook.trim().toLowerCase();
       if(seenHooks.has(hook)) ctx.addIssue({code:'custom',path:['questions',index,'targetHook'],message:'같은 targetHook을 한 배치에서 반복하지 마세요.'});
@@ -276,7 +272,8 @@ ${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근
 서버가 고정한 문항별 UI 형식:
 ${JSON.stringify(specText)}
 - 각 문항은 자신의 order와 responseType을 정확히 지키세요.
-- dialogue_choice에서는 question과 options의 화자를 반드시 일치시키세요. question은 캐릭터 본인이 할 말을 묻고, options도 캐릭터 본인의 대사여야 합니다. "캐릭터가 들을 말/상대가 할 말"을 물어놓고 캐릭터의 대사를 options에 넣으면 실패입니다.
+- dialogue_choice는 캐릭터 본인의 대사를 묻는 형식과 상대/제3자의 대사를 묻는 형식을 모두 사용할 수 있습니다. responseConfig.prompt2로 화자를 명시하고 question과 options의 화자를 반드시 일치시키세요.
+- 상대 반응형을 만들 때는 캐릭터의 실제 말·행동이 타인에게 어떤 인상이나 긴장을 만드는지 확인할 수 있도록 서로 다른 반응 후보를 두세요. 전부 호의적이거나 전부 적대적인 보기만 두지 마세요.
 - bipolar_scale은 서로 반대되는 A/B 두 문장 사이에서 5단계 중 하나를 클릭하는 유형입니다. 다섯 개의 서로 다른 행동 보기로 만들지 마세요.
 - slider는 한 가지 가능성을 0~100 점수로 매기는 별도 유형입니다. 둘을 섞지 마세요.
 
