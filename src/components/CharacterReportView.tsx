@@ -46,17 +46,18 @@ function estimatedProgress(elapsed:number){
 }
 
 function progressStage(progress:number,name:string){
-  if(progress<22)return `${name}, 검사실에 데려왔어요`;
-  if(progress<60)return `${name}, 얌전히 검사 받는 중`;
-  if(progress<82)return `${name}, 정밀 검사 들어갑니다`;
-  return `${name}, 이제 결과만 남았어요`;
+  if(progress<22)return `${name}, 검사 시작`;
+  if(progress<60)return `${name}, 검사 중`;
+  if(progress<82)return `${name}, 정밀 검사 중`;
+  return `${name}, 결과 작성 중`;
 }
 
-function compactPersonalityNote(text:string,name:string,max=72){
+function compactPersonalityNote(text:string,name:string,max=36){
   const escapedName=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const normalized=text
-    .replace(new RegExp(escapedName,'g'),'이 캐릭터')
+    .replace(new RegExp(escapedName,'g'),'')
     .replace(/\s+/g,' ')
+    .replace(/^[,·:：\s-]+/,'')
     .trim();
   if(!normalized)return'';
   const first=normalized.split(/(?<=[.!?。！？])\s+/u)[0]?.trim()||normalized;
@@ -74,9 +75,9 @@ function progressPersonalityNote(progress:number,preview:CharacterReportPreview)
 }
 
 function remainingLabel(elapsed:number){
-  if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '예상 시간보다 조금 더 걸리고 있어요';
+  if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '조금 더 걸리고 있어요';
   const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
-  return `예상 남은 시간 약 ${remaining}초`;
+  return `약 ${remaining}초 남음`;
 }
 
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
@@ -177,15 +178,15 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <div className="loading" style={{fontWeight:900}}>{progressStage(progress,preview.name)} <i className="dot"/><i className="dot"/><i className="dot"/></div>
           <strong style={{fontSize:20}}>{progress}%</strong>
         </div>
-        {personalityNote&&<div style={{marginTop:7,fontSize:13,lineHeight:1.55,color:'#6f6b64'}}>검사실 메모 · {personalityNote}</div>}
-        <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:12}}>
+        {personalityNote&&<div style={{marginTop:6,fontSize:13,lineHeight:1.45,color:'#6f6b64'}}>성향 · {personalityNote}</div>}
+        <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
           <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:14,flexWrap:'wrap',marginTop:10,fontSize:13}}>
-          <span className="muted">경과 {elapsedSeconds}초</span>
+        <div style={{display:'flex',justifyContent:'space-between',gap:14,flexWrap:'wrap',marginTop:8,fontSize:13}}>
+          <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'10px 0 0',lineHeight:1.6}}>보통 약 40초~1분 30초 정도 걸려요. 진행률은 평균 소요시간을 기준으로 한 예상치이며, 실제 AI 처리 단계와 정확히 일치하지 않을 수 있습니다. 한 번 생성된 결과는 저장되어 다시 AI를 호출하지 않습니다.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>보통 40초~1분 30초 · 진행률은 예상치예요. 한 번 만든 리포트는 저장돼요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
