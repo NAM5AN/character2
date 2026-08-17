@@ -17,6 +17,10 @@ export function LookupForm() {
     try{
       const response=await fetch('/api/characters/lookup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:character,ownerName:owner})});
       const body=await response.json().catch(()=>({}));
+      if(response.ok&&body?.admin){
+        router.push('/admin/console');
+        return;
+      }
       if(!response.ok){
         setError(body?.error==='CHARACTER_NOT_FOUND'?'저장된 캐릭터를 찾지 못했어요. 캐릭터 이름과 오너명을 확인해주세요.':'캐릭터를 불러오지 못했어요.');
         return;
