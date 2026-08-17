@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   characterDraftSchema,
@@ -9,9 +10,8 @@ import {
   type SummaryAnalysisGeneration,
   type InterviewAnswer,
 } from '@/lib/schemas/character';
-import { streamClaudeJson } from '@/lib/ai/anthropic';
+import { askClaudeJson } from '@/lib/ai/anthropic';
 import { attachAiUsageSession, withAiUsageContext } from '@/lib/ai/usage';
-import { ndjsonStream } from '@/lib/ai/stream';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
 import { createEditToken, sha256 } from '@/lib/crypto';
@@ -206,18 +206,17 @@ function summaryQualityPass(insight:z.infer<typeof summaryInsightSchema>){
   return q.evidenceStrength>=2&&q.specificity>=2&&q.latentDepth>=2&&q.inferenceDistance>=2&&total>=12;
 }
 
-async function buildSummaryDossier(input:string,onProgress?:(ratio:number)=>void):Promise<SummaryDossier>{
+async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
   let last='';
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 분석에서 엄격한 품질 기준을 통과한 insight가 부족했습니다. 프로필·오너 검수·문답에서 서로 독립적인 단서를 다시 연결하고, 단순 재서술이 아닌 메커니즘 수준의 해석을 만들어주세요. 점검: ${last}`;
-    const model=await streamClaudeJson({
+    const model=await askClaudeJson({
       system:SUMMARY_PSYCHE_SYSTEM,
       schema:summaryDossierSchema,
       maxTokens:4200,
       maxAttempts:1,
       model:'anthropic/claude-sonnet-5',
       allowFallback:false,
-      onProgress,
       input:`${input}${retry}`,
     });
     const passed=model.validatedInsights.filter(summaryQualityPass);
@@ -229,12 +228,12 @@ async function buildSummaryDossier(input:string,onProgress?:(ratio:number)=>void
   throw new Error(`SUMMARY_PSYCHOLOGY_FAILED: ${last||'충분한 해석을 만들지 못함'}`);
 }
 
-async function generateSummary(input:string,body:z.infer<typeof requestSchema>,review:any,onProgress?:(ratio:number)=>void):Promise<SummaryAnalysisGeneration>{
+async function generateSummary(input:string,body:z.infer<typeof requestSchema>,review:any):Promise<SummaryAnalysisGeneration>{
   let last='';
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식 또는 공개 요약 품질 점검에 걸렸습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 6개 필드를 최우선으로 새로 작성하세요. 각 summary 필드는 160~260자를 목표로 하고 130자보다 짧아지지 않게 충분한 맥락을 담으세요. 각 필드는 반드시 2문단이며 문단 사이에 \\n\\n을 넣으세요. 각 문단 첫 문장은 반드시 **굵은 안내문**이고, 결론이 아니라 그 문단에서 다룰 주제만 알려줘야 합니다. 원자료를 다시 읽는 것이 아니라 제공된 심층 해석 묶음의 mechanism을 풀어쓰세요. misunderstoodPoint와 hiddenPattern도 빠뜨리지 마세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 심층 해석 묶음에서 새로 작성하세요. 점검 내용: ${last}`;
     try{
-      const raw=await streamClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:4000,maxAttempts:1,input:`${input}${retry}`,allowFallback:false,onProgress});
+      const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:4000,maxAttempts:1,input:`${input}${retry}`,allowFallback:false});
       const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,body,review));
       if(parsed.success){
         const shortFields=shortSummaryFields(parsed.data.summary);
@@ -255,13 +254,9 @@ async function generateSummary(input:string,body:z.infer<typeof requestSchema>,r
 async function uniqueShareCode(){const sb=getSupabaseServer();for(let i=0;i<8;i++){const code=generateShareCode();const {data,error}=await sb.rpc('character2_share_code_exists',{p_share_code:code});if(error)throw error;if(data!==true)return code}throw new Error('SHARE_CODE_EXHAUSTED')}
 
 export async function POST(request:Request){
-  let body:z.infer<typeof requestSchema>;
   try{
-    body=requestSchema.parse(await request.json());
-  }catch(error){return apiError(error)}
-
-  return ndjsonStream(async(emit)=>{
     await assertRateLimit('character_finalize',8,60);
+    const body=requestSchema.parse(await request.json());
     const inferenceReview={
       confirmed:body.draft.aiInferences.filter(x=>x.ownerVerdict==='confirmed').map(x=>({text:x.text,evidence:x.evidence})),
       ambiguous:body.draft.aiInferences.filter(x=>x.ownerVerdict==='ambiguous').map(x=>({text:x.text,evidence:x.evidence,ownerFeedback:x.ownerFeedback?.trim()||''})),
@@ -269,11 +264,10 @@ export async function POST(request:Request){
     };
     const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,analysisConfidence:body.draft.analysisConfidence};
     const dossierInput=`캐릭터 데이터:\n${JSON.stringify(analysisDraft)}\n\n오너 검수:\n${JSON.stringify(inferenceReview)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(body.answers)}\n\n작업 규칙:\n- 답변의 문장을 순서대로 요약하지 말고 행동·조건·이유를 의미 단위로 압축하세요.\n- 서로 멀리 떨어진 단서를 최소 두 개 이상 연결해서만 강한 insight를 만드세요.\n- 오너가 정정한 내용은 기존 추론보다 우선하세요.\n- 한 행동이 어떤 욕구를 충족하거나 어떤 위험을 피하는지, 어떤 조건에서 반대로 뒤집히는지까지 보세요.\n- evidenceAnchors는 원 질문 전체를 복사하지 말고 행동·관계·조건만 짧게 남기세요.`;
-    const summaryDossier=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'summary_psychology'},()=>buildSummaryDossier(dossierInput,(r)=>emit(0.02+r*0.48)));
+    const summaryDossier=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'summary_psychology'},()=>buildSummaryDossier(dossierInput));
     const summaryInput=`캐릭터 이름: ${body.draft.basicProfile.name}\n\n[검증된 요약용 심층 해석 묶음]\n${JSON.stringify(summaryDossier)}\n\n출력 규칙:\n- 원 프로필과 원 문답은 다시 볼 수 없다고 생각하고 이 심층 해석 묶음만으로 작성하세요.\n- oneLineSummary: 25~80자의 한 문장. 가장 흥미로운 긴장이나 행동 원리를 잡으세요.\n- summary.outerSelf: 겉으로 보이는 인상과 그 인상을 단순 라벨로 설명할 수 없는 이유.\n- summary.innerSelf: 실제 선택을 움직이는 자기상·욕구·내적 기준.\n- summary.conflictStyle: 감정이 흔들리는 자극과 평소 반응이 달라지는 임계점.\n- summary.affectionStyle: 신뢰가 생기는 조건과 관계에서 반복되는 거리·개입 패턴.\n- summary.misunderstoodPoint: 겉에서 오해하기 쉬운 의미와 실제 내부 기능의 차이.\n- summary.hiddenPattern: 서로 다른 insight를 다시 연결했을 때 보이는 의외의 공통 원리.\n- summary 6개 필드는 각각 160~260자를 목표로 하세요.\n- 각 필드는 정확히 2개의 자연스러운 문단으로 나누고 문단 사이는 빈 줄 하나(\\n\\n)로 구분하세요.\n- 모든 문단은 **문단에서 다룰 주제만 알려주는 짧은 안내문**으로 시작하세요.\n- 본문은 실제 상담사가 오너에게 캐릭터를 풀이하듯 자연스러운 해요체 존댓말로 작성하세요.\n- evidenceAnchors를 근거 목록처럼 나열하지 말고 필요한 경우 짧은 예시로만 사용하세요.\n- 여섯 카드는 같은 행동이나 같은 결론을 반복하지 마세요.\n- 상세 리포트에서 다룰 전체 인과와 반례를 미리 다 풀지는 마세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성하고 각 축은 중요한 발견만 0~3개로 제한하세요.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
-    const summaryResult=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'summary_teaser'},()=>generateSummary(summaryInput,body,inferenceReview,(r)=>emit(0.5+r*0.45)));
+    const summaryResult=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'summary_teaser'},()=>generateSummary(summaryInput,body,inferenceReview));
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
-    emit(0.96);
 
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
@@ -286,6 +280,6 @@ export async function POST(request:Request){
     const {data:saved,error}=await sb.rpc('character2_create_character_preview_v2',{p_character_id:characterId,p_share_code:shareCode,p_name:name,p_schema_version:passport.schemaVersion,p_passport_json:passport,p_analysis_confidence:body.draft.analysisConfidence,p_engine_versions:passport.engineVersions,p_answers:body.answers,p_edit_token_hash:sha256(editToken),p_detail_seed_json:detailSeed,p_source_json:privateSource});
     if(error)throw error;if(saved!==true)throw new Error('CHARACTER_SAVE_FAILED');
     await attachAiUsageSession(body.draft.usageSessionId,shareCode);
-    return {preview:buildCharacterReportPreview(passport),shareCode,editToken};
-  },{estimateSeconds:55});
+    return NextResponse.json({preview:buildCharacterReportPreview(passport),shareCode,editToken});
+  }catch(error){return apiError(error)}
 }
