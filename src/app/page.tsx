@@ -3,6 +3,39 @@ import { LookupForm } from '@/components/LookupForm';
 
 export default function Home() {
   return <main>
+    <style>{`
+      @media (min-width: 901px) {
+        .home-screen {
+          height: calc(100svh - 114px);
+          min-height: 0;
+          padding: 18px 0 20px;
+          gap: 42px;
+        }
+        .home-intro h1 {
+          font-size: clamp(50px, 4.8vw, 72px);
+          margin-bottom: 18px;
+        }
+        .home-intro .hero-copy {
+          font-size: 16px;
+          line-height: 1.6;
+        }
+        .home-intro .actions { margin-top: 20px; }
+        .home-lookup { padding: 26px 28px; }
+        .home-lookup h2 {
+          font-size: clamp(30px, 2.5vw, 36px);
+          margin-bottom: 10px;
+        }
+        .home-lookup > div > p { margin-bottom: 14px; }
+        .home-lookup .field { margin: 10px 0; }
+        .home-lookup .input { padding: 12px 14px; }
+        body:has(.home-screen) .footer {
+          height: 42px;
+          padding: 0;
+          display: flex;
+          align-items: center;
+        }
+      }
+    `}</style>
     <section className="container home-screen">
       <div className="home-intro">
         <h1>캐릭터를<br/>조금 더 깊게<br/>읽어보기.</h1>
