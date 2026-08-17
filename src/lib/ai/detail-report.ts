@@ -12,7 +12,7 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
-export const DETAIL_REPORT_VERSION = 'detail-analysis/6.3' as const;
+export const DETAIL_REPORT_VERSION = 'detail-analysis/6.4' as const;
 
 const legacyDetailSeedSchema = z.object({
   version: z.literal('detail-seed/1.0'),
@@ -42,6 +42,7 @@ export const privateDetailSourceSchema = z.object({
   relationshipTraits: z.record(z.string(),z.unknown()).default({}),
 });
 
+// Internal analysis keeps structural quality checks, but no character-count limits.
 const qualityScoreSchema = z.object({
   evidenceStrength: z.number().int().min(0).max(3),
   specificity: z.number().int().min(0).max(3),
@@ -49,31 +50,31 @@ const qualityScoreSchema = z.object({
   counterEvidenceRobustness: z.number().int().min(0).max(3),
   inferenceDistance: z.number().int().min(0).max(3),
   predictiveValue: z.number().int().min(0).max(3),
-  verdict: z.string().min(1).max(60),
+  verdict: z.string(),
 });
 
 const validatedInsightSchema = z.object({
-  conclusion: z.string().min(20).max(520),
-  mechanism: z.string().min(20).max(520),
-  evidenceAnchors: z.array(z.string().min(4).max(320)).min(2).max(5),
-  counterEvidence: z.array(z.string().min(4).max(300)).max(3).default([]),
-  confidence: z.string().min(1).max(60),
-  prediction: z.string().min(8).max(360),
+  conclusion: z.string(),
+  mechanism: z.string(),
+  evidenceAnchors: z.array(z.string()).min(2),
+  counterEvidence: z.array(z.string()).default([]),
+  confidence: z.string(),
+  prediction: z.string(),
   quality: qualityScoreSchema,
 });
 
 const psychologicalModelSchema = z.object({
-  coreEngine: z.string().min(24).max(700),
-  hiddenNeed: z.string().min(20).max(620),
-  hiddenFear: z.string().min(20).max(620),
-  selfProtection: z.string().min(20).max(620),
-  blindSpot: z.string().min(20).max(620),
-  intimacyLogic: z.string().min(20).max(620),
-  conflictLogic: z.string().min(20).max(620),
-  selfNarrative: z.string().min(20).max(620),
-  validatedInsights: z.array(validatedInsightSchema).min(5).max(10),
-  tensions: z.array(validatedInsightSchema).max(4).default([]),
-  uncertainties: z.array(z.string().min(8).max(300)).max(5).default([]),
+  coreEngine: z.string(),
+  hiddenNeed: z.string(),
+  hiddenFear: z.string(),
+  selfProtection: z.string(),
+  blindSpot: z.string(),
+  intimacyLogic: z.string(),
+  conflictLogic: z.string(),
+  selfNarrative: z.string(),
+  validatedInsights: z.array(validatedInsightSchema).min(6),
+  tensions: z.array(validatedInsightSchema).default([]),
+  uncertainties: z.array(z.string()).default([]),
 });
 
 type PsychologicalModel = z.infer<typeof psychologicalModelSchema>;
@@ -98,7 +99,7 @@ type SourcePacket = {
 const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위한 심층 분석가입니다.
 최종 글을 쓰지 마세요. 입력을 항목별로 다시 정리하는 것도 목적이 아닙니다.
 
-내부적으로는 반드시 다음 순서로 분석하세요.
+내부적으로 반드시 다음 순서로 분석하세요.
 1) 관찰 가능한 행동과 선택을 의미 단위로 압축
 2) 서로 떨어진 단서를 묶어 반복되는 주제를 찾기
 3) 각 주제에 대해 더 단순한 대안 설명과 반례를 검토
@@ -115,19 +116,20 @@ const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리�
 - 실제로 주어진 과거 사건이나 설정은 현재 성격과 연결해도 되지만, 자료에 없는 과거·트라우마·진단·숨겨진 사실은 만들지 마세요.
 - 질문 번호, 점수, 퍼센트, 슬라이더 같은 UI 흔적은 출력하지 마세요.
 
-validatedInsights 전체는 특정 영역에 몰리지 않게 아래 다섯 축을 골고루 덮으세요.
-- 본질적 성격·욕구·두려움·자기인식·자기기만
-- 감정 구조·방어기제·스트레스 반응
-- 대인관계·애착·연애·사람을 좋아하고 싫어하는 기준
-- 가치관·도덕관·극한상황의 선택
-- 강점과 약점의 양면성·매력 포인트·직접 쓰이지 않은 숨은 특성`;
+validatedInsights 전체는 특정 영역에 몰리지 않게 아래 여섯 축을 모두 덮으세요.
+- 본질적 성격·겉과 속·자기인식·과거가 남긴 영향·숨은 특성
+- 욕구·결핍·두려움·감정 구조·방어기제·자기기만·원하는 것과 필요한 것
+- 일반 대인관계·신뢰·주도권·사람을 좋아하고 싫어하는 기준·관계 사용 설명서
+- 애착·친밀감·애정표현·의존·연애·질투·이별·잘 맞고 힘든 상대
+- 갈등·스트레스·가치관·도덕관·극한상황 선택
+- 모순·오해받는 지점·강점과 약점의 양면성·매력 포인트·새롭게 읽히는 부분`;
 
 const REPORT_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 쓰는 전문 해석자입니다.
 당신에게는 원자료를 직접 읽고 검증까지 마친 "검증된 해석 묶음"만 주어집니다.
-원 질문과 원 답변은 제공되지 않습니다. 따라서 답변을 항목별로 재분류하지 말고, 검증된 심리 메커니즘을 하나의 인물 해석으로 통합하세요.
+원 질문과 원 답변은 제공되지 않습니다. 답변을 항목별로 재분류하지 말고, 검증된 심리 메커니즘을 자연스러운 인물 해석으로 통합하세요.
 
 리포트의 가치는 오너가 이미 아는 설정을 다시 말하는 데 있지 않습니다.
-오너가 적어놓기는 했지만 아직 명확히 언어화하지 못했을 법한 숨은 욕구, 자기보호, 맹점, 관계의 기대, 행동이 뒤집히는 임계점, 자기기만과 양면성을 설득력 있게 보여주는 데 있습니다.
+오너가 적어놓기는 했지만 아직 명확히 언어화하지 못했을 법한 숨은 욕구, 자기보호, 맹점, 관계의 기대, 행동이 뒤집히는 임계점, 자기기만과 양면성을 설득력 있게 보여주세요.
 
 문체는 실제 상담사가 캐릭터 오너에게 옆에서 차분히 풀이해주는 것처럼 자연스러운 해요체 존댓말을 사용하세요.
 - "~다.", "~이다.", "~한다." 같은 보고서체를 쓰지 마세요.
@@ -136,14 +138,13 @@ const REPORT_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리�
 - 심리 상담이나 치료를 하는 사람처럼 진단하지 말고, 캐릭터를 잘 아는 전문 해석자가 이해를 돕는 톤을 유지하세요.
 
 작성 원칙:
-- 모든 문장은 끝까지 완결하세요. 조사·서술어·문장 중간에서 잘라 끝내지 마세요.
+- 모든 문장은 끝까지 완결하세요.
+- 각 카테고리 안에서는 관련 내용이 앞 문단에서 다음 문단으로 자연스럽게 이어지게 쓰고, 문장 수를 맞추기 위한 기계적인 줄바꿈은 하지 마세요.
 - evidenceAnchors를 목록처럼 다시 읽어주지 말고, 결론과 메커니즘을 먼저 설명한 뒤 구체적 행동은 짧은 예시로만 사용하세요.
-- 같은 행동이나 같은 insight를 여러 섹션에서 반복하지 마세요.
-- 모순은 상반된 행동을 나열하는 대신 같은 욕구가 왜 다른 행동으로 갈라지는지 설명하세요.
-- 과거 원인은 실제 자료에 명시된 사건이나 환경이 있을 때만 연결하세요. 없으면 특정 과거를 상상하지 마세요.
-- 극한 상황은 단순 A/B 예측이 아니라 어떤 가치를 지키기 때문에 그 선택으로 기우는지 설명하세요.
-- 강점과 약점은 서로 다른 특성을 나열하지 말고 같은 특성이 어떤 조건에서 뒤집히는지 보여주세요.
-- 숨은 특성은 직접 쓰인 설정의 동의어가 아니라 여러 단서를 연결해서 새로 보이는 것을 우선하세요.
+- 같은 행동이나 같은 insight를 여러 카테고리에서 반복하지 마세요.
+- 과거 원인은 실제 자료에 명시된 사건이나 환경이 있을 때만 연결하세요. 근거가 없으면 원인을 만들어내지 말고 현재 구조까지만 설명하세요.
+- 근거가 약한 소주제도 조용히 생략하지 마세요. 단정할 수 없다면 "뚜렷하게 단정하기는 어렵지만"처럼 불확실성을 표시한 뒤 현재 자료에서 읽을 수 있는 범위까지 설명하세요.
+- 글자 수를 맞추기 위해 내용을 줄이거나 생략하지 마세요.
 - 질문 번호, 점수, 퍼센트, 슬라이더, 분석 출처 표현은 절대 쓰지 마세요.`;
 
 function asRecord(value: unknown): UnknownRecord {
@@ -272,9 +273,13 @@ function allPsychText(model:PsychologicalModel){
 
 function allReportText(detail:DetailAnalysisGeneration){
   return [
-    detail.outerSelf,detail.innerSelf,detail.conflictStyle,detail.affectionStyle,detail.detailedReport,
-    detail.corePersonality,detail.developmentalRoots,detail.emotionalStructure,detail.defenseAndStress,detail.relationshipPattern,detail.attachmentPattern,detail.romanceStyle,detail.attractionCriteria,detail.moralAndExtremeChoices,detail.selfDeception,detail.wantsVsNeeds,detail.statedVsEnacted,
-    ...detail.coreValues,...detail.desires,...detail.fears,...detail.misunderstoodPoints,...detail.contradictions,...detail.interestingPoints,...detail.strengthsAndRisks,...detail.charmPoints,...detail.hiddenTraits,...detail.relationshipManual.gettingClose,...detail.relationshipManual.avoid,...detail.relationshipManual.affectionSignals,
+    detail.characterOverview,
+    detail.innerMechanics,
+    detail.relationshipStyle,
+    detail.attachmentStyle,
+    detail.conflictStyleDetailed,
+    detail.charmAndContradictions,
+    detail.integratedReport,
   ].join(' ');
 }
 
@@ -318,7 +323,7 @@ function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
 
 function validatedInsightReason(model:PsychologicalModel){
   const passed=model.validatedInsights.filter(qualityPass);
-  if(passed.length<4)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
+  if(passed.length<6)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
   return '';
 }
 
@@ -327,7 +332,7 @@ async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|Unkno
     system:PSYCHE_SYSTEM,
     schema:psychologicalModelSchema,
     maxAttempts:1,
-    input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
+    input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 여섯 분석 축을 모두 다룰 수 있도록 validatedInsights의 범위를 고르게 분산하세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
     allowFallback:false,
     model:'anthropic/claude-sonnet-5',
   });
@@ -361,7 +366,7 @@ async function generateDetailFields(seed:DetailSeed,publicProfileText:string,pri
   const psyche=await buildPsychologicalModel(seed,packet);
   const dossier=buildReportDossier(psyche);
 
-  const input=`캐릭터 이름: ${seed.name}\n\n[검증된 심층 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n공통 규칙:\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- 사용자에게 노출되는 모든 문장은 자연스러운 해요체 존댓말로 쓰세요.\n- 문장은 조사나 서술어 중간에서 끊지 말고 반드시 완결하세요.\n- 서로 다른 섹션이 같은 insight나 행동 예시를 반복하지 않도록 각 섹션의 초점을 분리하세요.\n- 새로운 과거 사건이나 숨겨진 설정을 창작하지 마세요. developmentalRoots는 실제 과거 근거가 없으면 특정 원인을 단정하지 마세요.\n\n기존 핵심 섹션:\n- outerSelf: 타인이 체감하는 표면 태도와 실제 내부 판단의 간극. 의미가 전환되는 곳에서 자연스럽게 문단을 나누세요.\n- innerSelf: 숨은 욕구·두려움·자기보호·자기서사를 연결해 실제 선택을 움직이는 심리를 설명하세요.\n- conflictStyle: 불편함 감지 → 초기 대응 → 임계점 → 한계 반응 → 물러나는 예외의 흐름을 보여주세요.\n- affectionStyle: 애정 행동 목록보다 친밀함 속에서 무엇을 확인받고 싶어 하는지 설명하세요.\n- coreValues / desires / fears: 각각 2~5개를 목표로 하되, 억지로 개수를 채우기보다 실제로 구분되는 심리적 기능만 완결된 문장으로 적으세요.\n- misunderstoodPoints / contradictions: 실제로 설명 가능한 것만 작성하세요. 없으면 빈 배열도 괜찮습니다.\n- interestingPoints: 직접 쓰인 설정의 재진술이 아니라 여러 단서를 연결해 새로 보이는 부분을 우선하세요.\n\n추가 심층 섹션:\n- corePersonality: 이 캐릭터가 본질적으로 어떤 사람인지, 무엇을 얻고 지키기 위해 움직이는지, 자기 인식과 타인의 인상이 어디서 갈리는지 2~3문단으로 풀어주세요.\n- developmentalRoots: 실제로 명시된 과거 경험·사건·환경이 현재 성격과 가치관, 관계 방식, 방어 습관에 남긴 흔적을 인과적으로 설명하세요. 근거가 없으면 원인을 지어내지 말고 현재 성격을 유지시키는 구조까지만 설명하세요.\n- emotionalStructure: 화가 날 때 실제 무엇에 상처받는지, 슬픔·질투·죄책감·수치심·불안을 어떻게 처리하는지, 본인조차 인정하기 어려운 감정이 무엇인지 설명하세요.\n- defenseAndStress: 주로 쓰는 방어와 스트레스 반응을 설명하고 평상시 → 압박받을 때 → 한계에 몰렸을 때 어떻게 달라지는지 흐름으로 보여주세요.\n- relationshipPattern: 첫 만남, 친해지는 조건, 가까운 사람과 싫어하는 사람, 강한 사람/약한 사람, 주도권, 신뢰 기준, 관계를 끊는 기준을 하나의 관계 논리로 엮으세요.\n- attachmentPattern: 누군가와 친밀해지는 과정, 사랑받는다는 확인 방식, 상대에게 원하는 것, 의존 허용도와 버림·배신·구속 중 민감한 위협을 설명하세요.\n- romanceStyle: 좋아하게 되는 속도, 플러팅·고백, 연애 초반과 장기 관계, 질투·싸움·이별, 잘 맞는 상대와 최악의 상대를 심리 원리와 연결해 설명하세요.\n- attractionCriteria: 어떤 사람에게 약하고 어떤 사람을 싫어하는지 표면 취향이 아니라 내적 기준으로 설명하세요.\n- moralAndExtremeChoices: 절대 양보하지 않는 것, 타협 가능한 것, 거짓말·수단·용서의 기준과 극한 선택에서 무엇을 우선할지 이유까지 설명하세요.\n- selfDeception: 스스로 믿는 자기상과 반복 행동이 맞지 않는 부분, 인정하고 싶지 않은 욕망, 자기 행동을 정당화하는 논리를 설명하세요.\n- wantsVsNeeds: 본인이 원한다고 느끼는 것과 실제로 안정되고 성장하기 위해 필요한 것이 어떻게 다른지 설명하세요.\n- statedVsEnacted: 표면 설정·자기서술과 반복 행동에서 실제로 읽히는 모습의 차이를 설명하세요. 오너의 의도는 명시적으로 확인된 경우만 추정하세요.\n- strengthsAndRisks: 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는지 한 항목 안에서 양면을 함께 적으세요.\n- charmPoints: 첫인상, 알고 지낼수록 생기는 매력, 위험하지만 끌리는 점, 호불호가 갈릴 지점을 캐릭터 고유의 이유와 함께 적으세요.\n- hiddenTraits: 직접 적혀 있지 않지만 여러 독립 단서를 연결했을 때 자연스럽게 도출되는 숨은 특성만 적으세요.\n- relationshipManual.gettingClose: 이 캐릭터와 친해지는 방법.\n- relationshipManual.avoid: 이 캐릭터에게 특히 하면 안 되는 것.\n- relationshipManual.affectionSignals: 이 캐릭터가 누군가를 좋아하고 신뢰한다는 신호. 각 항목은 RP에 바로 쓸 수 있을 정도로 구체적으로 적으세요.\n- detailedReport: 위 항목을 다시 순서대로 요약하지 말고 coreEngine을 중심으로 욕구·두려움·감정·방어·관계·자기기만·극한 선택이 어떻게 하나의 사람 안에서 이어지는지 3~6문단으로 통합하세요.\n\n질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 과정이나 입력 출처를 드러내는 표현은 사용하지 마세요.`;
+  const input=`캐릭터 이름: ${seed.name}\n\n[검증된 심층 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n최종 결과는 아래 7개 문자열 필드만 작성하세요. 각 필드는 화면의 큰 카테고리 하나가 됩니다. 글자 수 제한은 없으며, 해당 카테고리에 배정된 소주제를 하나도 빠뜨리지 마세요. 근거가 부족한 소주제는 삭제하지 말고 불확실성을 표시해서 현재 읽을 수 있는 범위까지 설명하세요.\n\n1) characterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\n2) innerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리\n\n3) relationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\n4) attachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\n5) conflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유\n\n6) charmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\n7) integratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.\n\n공통:\n- 모든 필드는 자연스러운 해요체 존댓말로 작성하세요.\n- 내용이 겹칠 때는 같은 문장을 반복하지 말고, 각 카테고리의 관점에 맞게 다음 논점으로 이어가세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더, 선택지 번호, 분석 과정이나 입력 출처를 드러내는 표현은 사용하지 마세요.`;
 
   const detail=await askClaudeJson({
     system:REPORT_SYSTEM,
