@@ -7,16 +7,33 @@ import { CompletedCharacterReportView, type CompletedDetailPayload } from '@/com
 
 export function CharacterReportClient({preview,completedDetail}:{preview:CharacterReportPreview;completedDetail?:CompletedDetailPayload|null}){
   const [creatorEditToken,setCreatorEditToken]=useState<string|undefined>(undefined);
+  const [resolvedDetail,setResolvedDetail]=useState<CompletedDetailPayload|null>(completedDetail||null);
 
   useEffect(()=>{
+    let cancelled=false;
     try{
       const token=localStorage.getItem(`chara_edit_${preview.shareCode}`)?.trim();
-      if(token)setCreatorEditToken(token);
-    }catch{}
-  },[preview.shareCode]);
+      if(!token)return;
+      setCreatorEditToken(token);
+      if(completedDetail)return;
 
-  if(completedDetail){
-    return <CompletedCharacterReportView preview={preview} detail={completedDetail}/>;
+      void (async()=>{
+        try{
+          const r=await fetch(`/api/characters/${preview.shareCode}`,{
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body:JSON.stringify({stage:1,editToken:token}),
+          });
+          const body=await r.json().catch(()=>({}));
+          if(!cancelled&&r.ok&&body?.detail)setResolvedDetail(body.detail as CompletedDetailPayload);
+        }catch{}
+      })();
+    }catch{}
+    return()=>{cancelled=true};
+  },[completedDetail,preview.shareCode]);
+
+  if(resolvedDetail){
+    return <CompletedCharacterReportView preview={preview} detail={resolvedDetail}/>;
   }
 
   return <CharacterReportView preview={preview} creatorEditToken={creatorEditToken}/>;
