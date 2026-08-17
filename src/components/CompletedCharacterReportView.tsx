@@ -44,8 +44,10 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   const [reportPage,setReportPage]=useState<1|2|3>(1);
   const analysis=detail.analysis;
   const isPaged=Boolean(analysis.characterOverview?.trim());
+  const totalPages=Math.max(1,Math.min(3,detail.stageReady||3));
 
   function changePage(next:1|2|3){
+    if(next>totalPages)return;
     setReportPage(next);
     requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
   }
@@ -59,7 +61,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
       <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
 
       {isPaged?<>
-        <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
+        <div style={{marginTop:20}}><strong>페이지 {reportPage} / {totalPages}</strong></div>
 
         {reportPage===1&&<>
           <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={analysis.characterOverview}/>
@@ -79,7 +81,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
           <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
           <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0,marginLeft:'auto'}}>
             {reportPage>1&&<button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>changePage((reportPage-1) as 1|2)}>← 이전 페이지</button>}
-            {reportPage<3&&<button className="btn primary" style={{whiteSpace:'nowrap'}} onClick={()=>changePage((reportPage+1) as 2|3)}>다음 페이지 →</button>}
+            {reportPage<totalPages&&<button className="btn primary" style={{whiteSpace:'nowrap'}} onClick={()=>changePage((reportPage+1) as 2|3)}>다음 페이지 →</button>}
           </div>
         </div>
       </>:<>
