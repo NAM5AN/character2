@@ -46,12 +46,10 @@ export async function askClaudeJson<T>(args: {
   const primaryModel = resolveClaudeModel(args.system, args.model);
   const resolvedSystem = applyCharacterDeepAnalysisSkill(args.system);
   const isPaidDetail = args.system.includes('유료 상세 캐해 리포트');
-  // 상세 리포트는 한 요청 안에서 분석+작성 두 모델 호출을 수행하므로,
-  // JSON 내부 재시도로 호출 수가 폭증해 Vercel 300초 제한을 넘지 않게 제한합니다.
+  // 상세 리포트는 재시도를 1회로 제한해 300초 타임아웃을 막되,
+  // 출력 토큰은 앱에서 임의로 자르지 않습니다. 스키마의 길이 제한이 출력 크기를 제어합니다.
   const maxAttempts = args.maxAttempts ?? (isPaidDetail ? 1 : undefined);
-  const maxOutputTokens = isPaidDetail && args.maxTokens
-    ? Math.min(args.maxTokens, 6000)
-    : args.maxTokens;
+  const maxOutputTokens = isPaidDetail ? undefined : args.maxTokens;
 
   try {
     return await generateValidatedJson({
