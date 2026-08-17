@@ -15,7 +15,7 @@ export function CharacterReportClient({preview,completedDetail}:{preview:Charact
       const token=localStorage.getItem(`chara_edit_${preview.shareCode}`)?.trim();
       if(!token)return;
       setCreatorEditToken(token);
-      if(completedDetail)return;
+      if(completedDetail?.complete||completedDetail?.canResume)return;
 
       void (async()=>{
         try{
@@ -25,7 +25,9 @@ export function CharacterReportClient({preview,completedDetail}:{preview:Charact
             body:JSON.stringify({stage:1,editToken:token}),
           });
           const body=await r.json().catch(()=>({}));
-          if(!cancelled&&r.ok&&body?.detail)setResolvedDetail(body.detail as CompletedDetailPayload);
+          if(!cancelled&&r.ok&&body?.detail){
+            setResolvedDetail({...body.detail,canResume:true} as CompletedDetailPayload);
+          }
         }catch{}
       })();
     }catch{}
