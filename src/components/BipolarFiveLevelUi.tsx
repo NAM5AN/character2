@@ -141,11 +141,59 @@ export function BipolarFiveLevelUi(){
     .five-level-choice.selected .five-level-label { color:var(--ink); }
     .five-level-choice:focus-visible { outline:2px solid var(--ink);outline-offset:6px;border-radius:8px; }
     @media (max-width:640px){
-      .five-level-scale { gap:5px;padding:0;margin-top:22px; }
-      .five-level-circle { width:46px;height:46px;border-width:2px; }
-      .five-level-choice.level-2 .five-level-circle,.five-level-choice.level-4 .five-level-circle { width:39px;height:39px;margin-top:3px; }
-      .five-level-choice.level-3 .five-level-circle { width:32px;height:32px;margin-top:7px; }
-      .five-level-label { font-size:10px;line-height:1.35; }
+      .bipolar-control { padding:18px 14px 16px; }
+      .bipolar-control .bipolar-labels { display:none; }
+      .five-level-scale {
+        display:flex;
+        flex-direction:column;
+        align-items:stretch;
+        gap:4px;
+        position:relative;
+        margin-top:0;
+        padding:2px 0;
+      }
+      .five-level-scale::before {
+        content:'';
+        position:absolute;
+        left:23px;
+        top:25px;
+        bottom:25px;
+        width:2px;
+        background:var(--line);
+        border-radius:999px;
+        pointer-events:none;
+      }
+      .five-level-choice {
+        width:100%;
+        min-height:58px;
+        display:grid;
+        grid-template-columns:48px minmax(0,1fr);
+        align-items:center;
+        gap:14px;
+        padding:4px 2px;
+        text-align:left;
+        border-radius:12px;
+      }
+      .five-level-choice:hover { background:rgba(255,255,255,.35); }
+      .five-level-circle,
+      .five-level-choice.level-2 .five-level-circle,
+      .five-level-choice.level-3 .five-level-circle,
+      .five-level-choice.level-4 .five-level-circle {
+        position:relative;
+        z-index:1;
+        margin:0 auto;
+      }
+      .five-level-circle { width:44px;height:44px;border-width:2px; }
+      .five-level-choice.level-2 .five-level-circle,
+      .five-level-choice.level-4 .five-level-circle { width:37px;height:37px; }
+      .five-level-choice.level-3 .five-level-circle { width:30px;height:30px; }
+      .five-level-label {
+        max-width:none;
+        font-size:13px;
+        line-height:1.45;
+        text-align:left;
+        color:var(--ink);
+      }
     }
   `}</style>;
 }
