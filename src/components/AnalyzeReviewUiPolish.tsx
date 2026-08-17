@@ -49,6 +49,7 @@ export function AnalyzeReviewUiPolish(){
       if(!summaryWasVisible){summaryWasVisible=true;summaryProgress=6}
       const card=loading.closest<HTMLElement>('.card');
       if(!card)return;
+      card.querySelectorAll<HTMLElement>('p.muted').forEach(p=>p.remove());
       let progress=card.querySelector<HTMLElement>('.summary-progress-value');
       if(!progress){
         progress=document.createElement('div');
