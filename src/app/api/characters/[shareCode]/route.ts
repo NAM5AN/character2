@@ -72,7 +72,10 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
 
     if(!bundle.seed&&bundle.legacyAnalysis){
       const legacy=finalAnalysisSchema.safeParse(bundle.legacyAnalysis);
-      if(legacy.success&&legacy.data.outerSelf.trim()&&legacy.data.innerSelf.trim()){
+      const hasReadableLegacy=legacy.success&&Boolean(
+        (legacy.data.outerSelf?.trim()&&legacy.data.innerSelf?.trim()) || legacy.data.characterOverview?.trim()
+      );
+      if(legacy.success&&hasReadableLegacy){
         return NextResponse.json({detail:{analysis:legacy.data,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true,legacy:true}});
       }
     }
