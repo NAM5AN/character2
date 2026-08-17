@@ -11,7 +11,7 @@ export default function Home() {
       </div>
 
       <div id="lookup" className="card home-lookup">
-        <div><h2>이미 분석한 캐릭터가 있나요?</h2><p className="muted">저장할 때 사용한 캐릭터 이름과 오너명을 입력하면 리포트를 다시 불러올 수 있어요.</p></div>
+        <div><h2>이미 분석한<br/>캐릭터가 있나요?</h2><p className="muted">저장할 때 사용한 캐릭터 이름과 오너명을 입력하면 리포트를 다시 불러올 수 있어요.</p></div>
         <LookupForm />
       </div>
     </section>
