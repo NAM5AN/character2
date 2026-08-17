@@ -14,24 +14,26 @@ type SavedAnalysisSession={version:1;stage:SavedStage;name:string;profileText:st
 type ResponseData={selected?:string;custom?:string;multiSelected?:string[];ranking?:string[];sliderValue?:number;matrixAnswers?:Record<string,string>;secondary?:string};
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
-// 심즈 로딩 문구 스타일: 엉뚱하지만 그 순간 캐릭터에게 뭔가 벌어지는 듯한 "~하는 중".
+// 심즈 로딩 문구 스타일: 캐릭터가 지금 벌이고 있는 엉뚱하고 사소한 현장 상황 "~하는 중".
 const LOADING_FLAVORS=[
-  '{name}의 서랍 맨 아래 칸을 몰래 여는 중',
-  '{name}가 아무한테도 안 보여준 일기장을 훔쳐보는 중',
-  '{name}의 표정 뒤에 숨은 속마음 자막을 켜는 중',
-  '{name}가 방금 한 말과 진심 사이 거리를 재는 중',
-  '{name}가 좋아하는 척했던 목록을 골라내는 중',
-  '{name}의 새벽 세 시 생각을 몰래 엿듣는 중',
-  '{name}가 흘리고 간 떡밥을 주워담는 중',
-  '{name}의 허세와 진심을 저울에 나란히 올리는 중',
-  '{name}가 화났을 때 진짜 상처받은 지점을 찾는 중',
-  '{name}가 숨겨둔 설정을 지도에 표시하는 중',
-  '{name}의 습관을 한 손에 조심히 모으는 중',
-  '{name}가 절대 안 진다고 우기는 것들을 세는 중',
-  '{name}의 겉과 속을 나란히 세워 비교하는 중',
-  '{name}가 방금 넘긴 페이지를 살짝 되감는 중',
-  '{name}의 모순을 조심스럽게 펼쳐보는 중',
-  '{name}가 안 그런 척 챙겨둔 마음을 발견하는 중',
+  '{name}가 양말 한 짝을 찾아 온 방을 뒤지는 중',
+  '{name}가 거울 보며 센 척 표정 연습하는 중',
+  '{name}가 냉장고 문 열고 5분째 고민만 하는 중',
+  '{name}가 라면 끓이다 스프부터 뜯어 먹는 중',
+  '{name}가 이불 속에서 세상 다 산 표정 짓는 중',
+  '{name}가 갑자기 춤추다 아무도 안 본 척하는 중',
+  '{name}가 물 마시러 갔다가 왜 갔는지 까먹는 중',
+  '{name}가 소파 밑에서 리모컨을 발굴하는 중',
+  '{name}가 창밖 비둘기랑 눈싸움하는 중',
+  '{name}가 안 웃긴 농담 혼자 곱씹으며 웃는 중',
+  '{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중',
+  '{name}가 이어폰 줄 푸는 데 인생 거는 중',
+  '{name}가 계획표 짜다가 계획표만 예쁘게 꾸미는 중',
+  '{name}가 옷 잔뜩 입어보고 결국 원래 옷 입는 중',
+  '{name}가 유통기한 노려보며 먹을지 말지 고민하는 중',
+  '{name}가 폰 5분만 본다 하고 한 시간째인 중',
+  '{name}가 과자 봉지 조용히 뜯으려다 실패하는 중',
+  '{name}가 벽에 붙은 스티커 떼다 반만 뜯어 놓는 중',
 ];
 const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={fill_blank:'빈칸 채우기',sentence_continue:'문장 이어쓰기',dialogue_choice:'대사 고르기',bipolar_scale:'A/B 가까움',ranking:'순위 매기기',forced_choice:'둘 중 하나',multi_select:'복수 선택',least_likely:'가장 하지 않을 것',slider:'가능성 슬라이더',relationship_matrix:'관계별 반응',inner_outer:'속마음 · 실제 행동',temporal_compare:'시간별 반응',condition_followup:'조건 변화 비교',in_character_response:'캐릭터 대사 직접 쓰기',owner_meta:'오너 메타 질문'};
 
