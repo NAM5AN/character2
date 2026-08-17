@@ -11,6 +11,7 @@ import {
   generatePaidDetailContinuation,
   generatePaidDetailStage1,
 } from '@/lib/ai/detail-report';
+import { withAiUsageContext } from '@/lib/ai/usage';
 import { CHARACTER_DEEP_ANALYSIS_SKILL_VERSION } from '@/lib/ai/character-deep-analysis-skill';
 import { apiError } from '@/lib/http';
 
@@ -129,7 +130,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
         privateSource=source;
       }
 
-      const generated=await generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource);
+      const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource));
       const storedAnalysis:Record<string,unknown>={
         ...generated.analysis,
         detailVersion:DETAIL_REPORT_VERSION,
@@ -150,7 +151,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     const dossier=rawDetail._detailDossier;
     if(!dossier)return NextResponse.json({error:'DETAIL_DOSSIER_MISSING'},{status:409});
     const continuationStage=body.stage as 2|3;
-    const patch=await generatePaidDetailContinuation(bundle.seed,dossier,continuationStage);
+    const patch=await withAiUsageContext({shareCode,stage:`detail_stage_${continuationStage}`},()=>generatePaidDetailContinuation(bundle.seed,dossier,continuationStage));
     const {_detailDossier:ignoredDossier,...existingWithoutDossier}=rawDetail;
     void ignoredDossier;
     const storedAnalysis:Record<string,unknown>={
