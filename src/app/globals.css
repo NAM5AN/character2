@@ -107,6 +107,27 @@ h3 { letter-spacing: -.03em; }
 .lookup { display:flex; gap:8px; }
 .lookup .input { text-transform:uppercase; letter-spacing:.1em; font-family:monospace; font-weight:800; }
 .footer { padding:36px 0 60px; color:var(--muted); border-top:1px solid var(--line); font-size:13px; }
+
+/* Requested cleanup: remove auxiliary captions and helper copy while keeping controls and primary content. */
+.page > .card > .notice,
+.page > .card[aria-busy="true"] > [role="status"],
+.stack > .card:first-child > .eyebrow,
+.stack > .card:first-child > .two-col,
+.stack > .card:first-child > .progress,
+.stack > .card:nth-child(2) > h3,
+.stack > .card:nth-child(2) > h3 + .muted,
+.stack > .card[role="status"],
+.inference > div:has(> .tags),
+.question-card .q-meta > span:nth-child(2),
+.question-card .field > textarea + .muted,
+.loading + p.muted,
+.result-hero > div:first-child > .eyebrow,
+.result-hero + div > .eyebrow,
+.result-hero + div > p.muted,
+.result-grid + .card > .eyebrow {
+  display: none !important;
+}
+
 @media (max-width: 760px) {
   .hero { grid-template-columns:1fr; padding:72px 0 54px; gap:28px; }
   .feature-grid,.two-col,.result-grid { grid-template-columns:1fr; }
