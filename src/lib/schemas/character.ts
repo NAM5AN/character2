@@ -29,13 +29,15 @@ export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().opt
 
 // Public summary: legacy four fields stay required for old passports and compatibility.
 // New teaser-only fields are optional so previously saved characters remain readable.
+// Generation is instructed to stay around 160~240 chars, but allow headroom so a good
+// two-paragraph answer is not discarded merely because the model runs slightly long.
 export const analysisTypeSummarySchema=z.object({
-  outerSelf:z.string().min(20).max(260),
-  innerSelf:z.string().min(20).max(260),
-  conflictStyle:z.string().min(20).max(260),
-  affectionStyle:z.string().min(20).max(260),
-  misunderstoodPoint:z.string().min(20).max(260).optional(),
-  hiddenPattern:z.string().min(20).max(260).optional(),
+  outerSelf:z.string().min(20).max(800),
+  innerSelf:z.string().min(20).max(800),
+  conflictStyle:z.string().min(20).max(800),
+  affectionStyle:z.string().min(20).max(800),
+  misunderstoodPoint:z.string().min(20).max(800).optional(),
+  hiddenPattern:z.string().min(20).max(800).optional(),
 });
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
