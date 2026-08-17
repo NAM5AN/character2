@@ -4,6 +4,11 @@ import { useEffect } from 'react';
 
 const LEVEL_VALUES = [0, 25, 50, 75, 100] as const;
 
+type ManagedScale = HTMLElement & {
+  __fiveLevelRange?: HTMLInputElement;
+  __fiveLevelSync?: EventListener;
+};
+
 function nearestLevel(value:number){
   return LEVEL_VALUES.reduce((best,item)=>Math.abs(item-value)<Math.abs(best-value)?item:best,LEVEL_VALUES[0]);
 }
@@ -16,72 +21,145 @@ function levelLabel(index:number,left:string,right:string){
   return right;
 }
 
+function currentQuestionKey(control:HTMLElement,left:string,right:string){
+  const card=control.closest('.question-card');
+  const order=card?.querySelector<HTMLElement>('.q-meta span:first-child')?.textContent?.trim()||'';
+  const title=card?.querySelector<HTMLElement>('.q-title')?.textContent?.trim()||'';
+  return `${order}|${title}|${left}|${right}`;
+}
+
+function syncControl(control:HTMLElement,range:HTMLInputElement,scale:HTMLElement){
+  const active=nearestLevel(Number(range.value||50));
+  const hasReactSelection=Boolean(control.querySelector('.bipolar-current'));
+  const touched=hasReactSelection||control.dataset.fiveLevelTouched==='1';
+  scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach(button=>{
+    const checked=Number(button.dataset.value)===active&&touched;
+    button.classList.toggle('selected',checked);
+    button.setAttribute('aria-checked',checked?'true':'false');
+  });
+}
+
+function refreshLabels(scale:HTMLElement,left:string,right:string){
+  const groupLabel=`${left}와 ${right} 사이의 5단계 선택`;
+  if(scale.getAttribute('aria-label')!==groupLabel)scale.setAttribute('aria-label',groupLabel);
+  scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach((button,index)=>{
+    const label=levelLabel(index,left,right);
+    if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);
+    const caption=button.querySelector<HTMLElement>('.five-level-label');
+    if(caption&&caption.textContent!==label)caption.textContent=label;
+  });
+}
+
+function bindRange(control:HTMLElement,range:HTMLInputElement,scale:ManagedScale){
+  if(scale.__fiveLevelRange===range)return;
+  if(scale.__fiveLevelRange&&scale.__fiveLevelSync){
+    scale.__fiveLevelRange.removeEventListener('input',scale.__fiveLevelSync);
+    scale.__fiveLevelRange.removeEventListener('change',scale.__fiveLevelSync);
+  }
+  const sync:EventListener=()=>syncControl(control,range,scale);
+  range.addEventListener('input',sync);
+  range.addEventListener('change',sync);
+  scale.__fiveLevelRange=range;
+  scale.__fiveLevelSync=sync;
+}
+
+function createScale(control:HTMLElement){
+  const scale=document.createElement('div') as ManagedScale;
+  scale.className='five-level-scale';
+  scale.setAttribute('role','radiogroup');
+
+  LEVEL_VALUES.forEach((value,index)=>{
+    const button=document.createElement('button');
+    button.type='button';
+    button.className=`five-level-choice level-${index+1}`;
+    button.dataset.value=String(value);
+    button.setAttribute('role','radio');
+    button.setAttribute('aria-checked','false');
+
+    const circle=document.createElement('span');
+    circle.className='five-level-circle';
+    circle.setAttribute('aria-hidden','true');
+    const caption=document.createElement('span');
+    caption.className='five-level-label';
+    button.append(circle,caption);
+
+    button.addEventListener('click',()=>{
+      const currentControl=button.closest('.bipolar-control') as HTMLElement|null;
+      const currentRange=currentControl?.querySelector<HTMLInputElement>('.bipolar-range');
+      if(!currentControl||!currentRange)return;
+      currentControl.dataset.fiveLevelTouched='1';
+      try{currentRange.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{currentRange.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
+      currentRange.value=String(value);
+      currentRange.dispatchEvent(new Event('input',{bubbles:true}));
+      currentRange.dispatchEvent(new Event('change',{bubbles:true}));
+      syncControl(currentControl,currentRange,scale);
+    });
+    scale.appendChild(button);
+  });
+
+  control.appendChild(scale);
+  return scale;
+}
+
+function removeStaleScales(){
+  document.querySelectorAll<ManagedScale>('.five-level-scale').forEach(scale=>{
+    const parent=scale.parentElement;
+    const valid=Boolean(
+      parent?.classList.contains('bipolar-control')&&
+      parent.querySelector<HTMLInputElement>('.bipolar-range'),
+    );
+    if(valid)return;
+    if(scale.__fiveLevelRange&&scale.__fiveLevelSync){
+      scale.__fiveLevelRange.removeEventListener('input',scale.__fiveLevelSync);
+      scale.__fiveLevelRange.removeEventListener('change',scale.__fiveLevelSync);
+    }
+    scale.remove();
+  });
+}
+
 export function BipolarFiveLevelUi(){
   useEffect(()=>{
     const enhance=()=>{
+      removeStaleScales();
       document.querySelectorAll<HTMLElement>('.bipolar-control').forEach(control=>{
-        if(control.dataset.fiveLevelReady==='1')return;
         const range=control.querySelector<HTMLInputElement>('.bipolar-range');
         if(!range)return;
-        control.dataset.fiveLevelReady='1';
 
         const labels=control.querySelectorAll<HTMLElement>('.bipolar-labels strong');
         const left=labels[0]?.textContent?.trim()||'첫 번째 선택';
         const right=labels[1]?.textContent?.trim()||'두 번째 선택';
+        const nextQuestionKey=currentQuestionKey(control,left,right);
+        const questionChanged=control.dataset.fiveLevelQuestionKey!==nextQuestionKey;
 
-        const scale=document.createElement('div');
-        scale.className='five-level-scale';
-        scale.setAttribute('role','radiogroup');
-        scale.setAttribute('aria-label',`${left}와 ${right} 사이의 5단계 선택`);
+        let scale=control.querySelector<ManagedScale>(':scope > .five-level-scale');
+        if(!scale)scale=createScale(control);
 
-        const sync=()=>{
-          const active=nearestLevel(Number(range.value||50));
-          scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach(button=>{
-            const checked=Number(button.dataset.value)===active && control.dataset.fiveLevelTouched==='1';
-            button.classList.toggle('selected',checked);
-            button.setAttribute('aria-checked',checked?'true':'false');
-          });
-        };
+        if(questionChanged){
+          control.dataset.fiveLevelQuestionKey=nextQuestionKey;
+          control.dataset.fiveLevelTouched=control.querySelector('.bipolar-current')?'1':'0';
+        }
 
-        LEVEL_VALUES.forEach((value,index)=>{
-          const label=levelLabel(index,left,right);
-          const button=document.createElement('button');
-          button.type='button';
-          button.className=`five-level-choice level-${index+1}`;
-          button.dataset.value=String(value);
-          button.setAttribute('role','radio');
-          button.setAttribute('aria-checked','false');
-          button.setAttribute('aria-label',label);
-
-          const circle=document.createElement('span');
-          circle.className='five-level-circle';
-          circle.setAttribute('aria-hidden','true');
-          const caption=document.createElement('span');
-          caption.className='five-level-label';
-          caption.textContent=label;
-          button.append(circle,caption);
-
-          button.addEventListener('click',()=>{
-            control.dataset.fiveLevelTouched='1';
-            try{range.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{range.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
-            range.value=String(value);
-            range.dispatchEvent(new Event('input',{bubbles:true}));
-            range.dispatchEvent(new Event('change',{bubbles:true}));
-            sync();
-          });
-          scale.appendChild(button);
-        });
-
-        range.addEventListener('input',sync);
-        range.addEventListener('change',sync);
-        control.appendChild(scale);
+        refreshLabels(scale,left,right);
+        bindRange(control,range,scale);
+        syncControl(control,range,scale);
       });
     };
 
     enhance();
-    const observer=new MutationObserver(enhance);
+    let queued=false;
+    const observer=new MutationObserver(()=>{
+      if(queued)return;
+      queued=true;
+      queueMicrotask(()=>{
+        queued=false;
+        enhance();
+      });
+    });
     observer.observe(document.body,{childList:true,subtree:true});
-    return()=>observer.disconnect();
+    return()=>{
+      observer.disconnect();
+      removeStaleScales();
+    };
   },[]);
 
   return <style>{`
