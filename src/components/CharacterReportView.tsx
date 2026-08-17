@@ -27,7 +27,12 @@ function paragraphChunks(text:string){
 
 function ParagraphText({text}:{text:string}){
   const chunks=paragraphChunks(text);
-  return <div>{chunks.map((chunk,index)=><p key={`${index}-${chunk.slice(0,18)}`} style={{margin:index===0?0:'18px 0 0',lineHeight:1.85,color:'#444'}}>{chunk}</p>)}</div>;
+  return <div>{chunks.map((chunk,index)=>{
+    const lead=chunk.match(/^\*\*(.+?)\*\*\s*(.*)$/su);
+    return <p key={`${index}-${chunk.slice(0,18)}`} style={{margin:index===0?0:'18px 0 0',lineHeight:1.85,color:'#444'}}>
+      {lead?<><strong style={{color:'#222'}}>{lead[1]}</strong>{lead[2]?<> {lead[2]}</>:null}</>:chunk}
+    </p>;
+  })}</div>;
 }
 
 function BulletList({items}:{items:string[]}){
