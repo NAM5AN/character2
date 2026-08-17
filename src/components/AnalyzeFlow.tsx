@@ -191,6 +191,7 @@ export function AnalyzeFlow(){
   const [secondary,setSecondary]=useState('');
   const [busy,setBusy]=useState(false);
   const [parseProgress,setParseProgress]=useState(0);
+  const [finalizeProgress,setFinalizeProgress]=useState(0);
   const [flavorTick,setFlavorTick]=useState(0);
   const [error,setError]=useState('');
   const [result,setResult]=useState<FinalizeResult|null>(null);
@@ -269,6 +270,19 @@ export function AnalyzeFlow(){
     const id=window.setInterval(()=>setFlavorTick(t=>t+1),2600);
     return()=>window.clearInterval(id);
   },[busy]);
+  // Summary is non-streaming (two Claude passes, ~1-2min). Show a time-based bar so
+  // the screen never looks frozen during the wait.
+  useEffect(()=>{
+    if(stage!=='finalizing')return;
+    setFinalizeProgress(4);
+    const started=Date.now();
+    const id=window.setInterval(()=>{
+      const elapsed=(Date.now()-started)/1000;
+      const ratio=1-Math.exp(-elapsed/70);
+      setFinalizeProgress(Math.max(4,Math.min(96,Math.round(ratio*96))));
+    },600);
+    return()=>window.clearInterval(id);
+  },[stage]);
   const flavorName=(draft?.basicProfile.name||name||'이 캐릭터').trim()||'이 캐릭터';
   const flavorMessage=applyName(matchedFlavors[flavorTick%matchedFlavors.length]||'',flavorName);
 
@@ -346,7 +360,7 @@ export function AnalyzeFlow(){
 
     {stage==='interview'&&question&&<div className="card question-card"><div><div className="q-meta"><span>{question.order} / 20</span>{responseType&&<span>{RESPONSE_TYPE_LABELS[responseType]}</span>}{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{renderResponseControls()}<div className="field"><label className="label">왜 그렇게 답했나요? <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">여기에 적은 이유·맥락은 원문 그대로 다음 질문과 최종 해석에 반영돼요.</span></div></div><div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">다음 질문 묶음 준비를 마치는 중이에요.</p>}<div className="actions" style={{marginTop:16}}>{question.order>1&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&questionHistory.some(item=>item.order===question.order+1)&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!hasCurrentResponse} onClick={answerCurrent}>{busy?'질문 준비 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div></div>}
 
-    {stage==='finalizing'&&<div className="card" style={{textAlign:'center',padding:'80px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900,justifyContent:'center'}}>캐릭터 요약을 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{marginTop:16,lineHeight:1.6}}>{flavorMessage}</p>{error&&<p className="error">{error}</p>}</div>}
+    {stage==='finalizing'&&<div className="card" style={{textAlign:'center',padding:'64px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900,justifyContent:'center'}}>캐릭터 요약을 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><div style={{maxWidth:440,margin:'22px auto 0'}}><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16}}><span className="muted" style={{textAlign:'left',lineHeight:1.5,minHeight:'2.6em'}}>{flavorMessage||' '}</span><strong style={{fontSize:20,fontVariantNumeric:'tabular-nums'}}>{finalizeProgress}%</strong></div><div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}><div style={{height:'100%',width:`${finalizeProgress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .6s ease'}}/></div><p className="muted" style={{margin:'10px 0 0',fontSize:12,lineHeight:1.5}}>20문답을 두 단계로 깊게 읽는 중이라 1~2분쯤 걸려요.</p></div>{error&&<p className="error">{error}</p>}</div>}
     {stage==='done'&&result&&<CharacterReportView preview={result.preview} creatorEditToken={result.editToken}/>} 
   </>;
 }
