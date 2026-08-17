@@ -4,6 +4,7 @@ import { characterDraftSchema, interviewAnswerSchema } from '@/lib/schemas/chara
 import { interviewQuestionSchema, type InterviewQuestion } from '@/lib/schemas/question';
 import { askOpenAIJson } from '@/lib/ai/openai';
 import { QUESTION_INSTRUCTIONS } from '@/lib/ai/prompts';
+import { withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 
@@ -222,7 +223,7 @@ export async function POST(request: Request) {
       rule:RESPONSE_TYPE_RULES[spec.responseType],
     }));
 
-    const generated = await askOpenAIJson({
+    const generated = await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:`questions_${startOrder}_${startOrder+batchCount-1}`},()=>askOpenAIJson({
       instructions: `${QUESTION_INSTRUCTIONS}\n\n이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
       schema: batchSchema,
       maxOutputTokens: Math.max(2200, batchCount * 1250),
@@ -276,7 +277,7 @@ ${JSON.stringify(specText)}
 - 최상위 키는 questions 하나만 사용하세요.
 - questions에는 정확히 ${batchCount}개를 넣으세요.
 - 각 문항 키는 order, category, mode, format, responseType, responseConfig, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.`,
-    });
+    }));
 
     const questions = generated.questions.slice().sort((a,b)=>a.order-b.order) as InterviewQuestion[];
     return NextResponse.json({done:false,questions,...(questions.length===1?{question:questions[0]}:{})});
