@@ -15,8 +15,8 @@ export const characterReportPreviewSchema = z.object({
 
 export type CharacterReportPreview = z.infer<typeof characterReportPreviewSchema>;
 
-function compactFallback(text: string, max = 160) {
-  const normalized = text.replace(/\s+/g, ' ').trim();
+function compactFallback(text: string | undefined, max = 160) {
+  const normalized = (text ?? '').replace(/\s+/g, ' ').trim();
   if (normalized.length <= max) return normalized;
   const cut = normalized.slice(0, max - 1).trimEnd();
   const sentenceEnd = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('다.'), cut.lastIndexOf('요.'));
@@ -26,10 +26,10 @@ function compactFallback(text: string, max = 160) {
 export function buildCharacterReportPreview(passport: CharacterPassport): CharacterReportPreview {
   const analysis = passport.analysis;
   const summary = analysis.summary ?? {
-    outerSelf: compactFallback(analysis.outerSelf),
-    innerSelf: compactFallback(analysis.innerSelf),
-    conflictStyle: compactFallback(analysis.conflictStyle),
-    affectionStyle: compactFallback(analysis.affectionStyle),
+    outerSelf: compactFallback(analysis.outerSelf ?? analysis.characterOverview),
+    innerSelf: compactFallback(analysis.innerSelf ?? analysis.innerMechanics),
+    conflictStyle: compactFallback(analysis.conflictStyle ?? analysis.conflictStyleDetailed),
+    affectionStyle: compactFallback(analysis.affectionStyle ?? analysis.attachmentStyle ?? analysis.relationshipStyle),
   };
 
   return characterReportPreviewSchema.parse({
