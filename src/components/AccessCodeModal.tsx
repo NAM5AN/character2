@@ -22,8 +22,8 @@ export function AccessCodeModal({
   open,
   onClose,
   onValidated,
-  eyebrow = 'AI access code',
-  title = 'AI 이용 코드가 필요해요',
+  eyebrow = 'Detailed report',
+  title = '상세 이용 코드가 필요해요',
   description = '포스타입 유료 영역에서 최신 코드를 확인한 뒤 입력해주세요. 한 번 입력한 코드는 이 브라우저에 저장됩니다.',
   submitLabel = '확인하고 계속',
 }: Props) {
