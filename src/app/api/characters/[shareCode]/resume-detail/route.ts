@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServer } from '@/lib/supabase/server';
@@ -11,6 +12,7 @@ import {
 } from '@/lib/ai/detail-report';
 import { CHARACTER_DEEP_ANALYSIS_SKILL_VERSION } from '@/lib/ai/character-deep-analysis-skill';
 import { withAiUsageContext } from '@/lib/ai/usage';
+import { detailViewCookieName } from '@/lib/detail-access';
 
 const requestSchema=z.object({stage:z.coerce.number().int().min(2).max(3)});
 const bundleSchema=z.object({
@@ -39,18 +41,32 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     const shareCode=normalizeShareCode(raw);
     if(!isShareCode(shareCode))return NextResponse.json({error:'INVALID_SHARE_CODE'},{status:400});
     const body=requestSchema.parse(await request.json());
+    const cookieStore=await cookies();
+    const detailViewToken=cookieStore.get(detailViewCookieName(shareCode))?.value?.trim()||'';
+    if(!detailViewToken)return NextResponse.json({error:'DETAIL_ACCESS_DENIED'},{status:403});
 
     const sb=getSupabaseServer();
-    const {data,error}=await sb.rpc('character2_get_saved_detail_bundle',{p_share_code:shareCode});
+    const {data,error}=await sb.rpc('character2_get_entitled_detail_bundle',{
+      p_share_code:shareCode,
+      p_detail_view_token:detailViewToken,
+      p_edit_token:'',
+    });
     if(error)throw error;
-    if(!data)return NextResponse.json({error:'SAVED_DETAIL_NOT_FOUND'},{status:404});
+    if(!data)return NextResponse.json({error:'DETAIL_ACCESS_DENIED'},{status:403});
     const bundle=bundleSchema.parse(data);
     const rawDetail=record(bundle.detail);
     const currentStage=storedDetailStage(rawDetail);
     const parsedExisting=finalAnalysisSchema.safeParse(rawDetail);
 
     if(parsedExisting.success&&currentStage>=body.stage){
-      return NextResponse.json({detail:{analysis:parsedExisting.data,stageReady:currentStage,complete:currentStage>=3,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true}});
+      return NextResponse.json({detail:{
+        analysis:parsedExisting.data,
+        stageReady:currentStage,
+        complete:currentStage>=3,
+        confirmedFactCount:bundle.confirmedFactCount,
+        inferenceCount:bundle.inferenceCount,
+        cached:true,
+      }});
     }
     if(currentStage<body.stage-1){
       return NextResponse.json({error:'DETAIL_STAGE_NOT_READY'},{status:409});
@@ -60,7 +76,10 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     if(!dossier)return NextResponse.json({error:'DETAIL_DOSSIER_MISSING'},{status:409});
 
     const continuationStage=body.stage as 2|3;
-    const patch=await withAiUsageContext({shareCode,stage:`detail_resume_${continuationStage}`},()=>generatePaidDetailContinuation(bundle.seed,dossier,continuationStage));
+    const patch=await withAiUsageContext(
+      {shareCode,stage:`detail_resume_${continuationStage}`},
+      ()=>generatePaidDetailContinuation(bundle.seed,dossier,continuationStage),
+    );
     const {_detailDossier:ignoredDossier,...existingWithoutDossier}=rawDetail;
     void ignoredDossier;
     const storedAnalysis:Record<string,unknown>={
@@ -73,11 +92,23 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       ...(continuationStage<3?{_detailDossier:dossier}:{}),
     };
 
-    const {data:saved,error:saveError}=await sb.rpc('character2_save_saved_detail',{p_share_code:shareCode,p_detail_json:storedAnalysis});
+    const {data:saved,error:saveError}=await sb.rpc('character2_save_entitled_detail',{
+      p_share_code:shareCode,
+      p_detail_view_token:detailViewToken,
+      p_edit_token:'',
+      p_detail_json:storedAnalysis,
+    });
     if(saveError)throw saveError;
     if(saved!==true)throw new Error('DETAIL_SAVE_FAILED');
 
     const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
-    return NextResponse.json({detail:{analysis:publicAnalysis,stageReady:continuationStage,complete:continuationStage===3,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
+    return NextResponse.json({detail:{
+      analysis:publicAnalysis,
+      stageReady:continuationStage,
+      complete:continuationStage===3,
+      confirmedFactCount:bundle.confirmedFactCount,
+      inferenceCount:bundle.inferenceCount,
+      cached:false,
+    }});
   }catch(error){return apiError(error)}
 }
