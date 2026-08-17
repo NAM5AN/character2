@@ -45,14 +45,22 @@ export async function askClaudeJson<T>(args: {
 }): Promise<T> {
   const primaryModel = resolveClaudeModel(args.system, args.model);
   const resolvedSystem = applyCharacterDeepAnalysisSkill(args.system);
+  const isPaidDetail = args.system.includes('유료 상세 캐해 리포트');
+  // 상세 리포트는 한 요청 안에서 분석+작성 두 모델 호출을 수행하므로,
+  // JSON 내부 재시도로 호출 수가 폭증해 Vercel 300초 제한을 넘지 않게 제한합니다.
+  const maxAttempts = args.maxAttempts ?? (isPaidDetail ? 1 : undefined);
+  const maxOutputTokens = isPaidDetail && args.maxTokens
+    ? Math.min(args.maxTokens, 6000)
+    : args.maxTokens;
+
   try {
     return await generateValidatedJson({
       model: primaryModel,
       system: resolvedSystem,
       prompt: args.input,
       schema: args.schema,
-      maxOutputTokens: args.maxTokens,
-      maxAttempts: args.maxAttempts,
+      maxOutputTokens,
+      maxAttempts,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -65,8 +73,8 @@ export async function askClaudeJson<T>(args: {
       system: `${resolvedSystem}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
       prompt: args.input,
       schema: args.schema,
-      maxOutputTokens: args.maxTokens,
-      maxAttempts: args.maxAttempts,
+      maxOutputTokens,
+      maxAttempts,
     });
   }
 }
