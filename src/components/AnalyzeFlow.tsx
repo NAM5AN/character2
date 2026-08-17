@@ -147,6 +147,18 @@ function pickFlavors(text:string):string[]{
   }
   return out.length?out:FLAVOR_POOL.filter(f=>f.g.includes('any')).map(f=>f.t);
 }
+// 이름 끝 받침 여부에 맞춰 조사(이/가·은/는·을/를·과/와)를 골라 치환한다.
+function applyName(template:string,name:string):string{
+  const last=name.length?name.charCodeAt(name.length-1):0;
+  const isHangul=last>=0xAC00&&last<=0xD7A3;
+  const hasBatchim=isHangul&&((last-0xAC00)%28!==0);
+  return template
+    .replace(/\{name\}가/g,`${name}${hasBatchim?'이':'가'}`)
+    .replace(/\{name\}는/g,`${name}${hasBatchim?'은':'는'}`)
+    .replace(/\{name\}을/g,`${name}${hasBatchim?'을':'를'}`)
+    .replace(/\{name\}와/g,`${name}${hasBatchim?'과':'와'}`)
+    .replace(/\{name\}/g,name);
+}
 const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={fill_blank:'빈칸 채우기',sentence_continue:'문장 이어쓰기',dialogue_choice:'대사 고르기',bipolar_scale:'A/B 가까움',ranking:'순위 매기기',forced_choice:'둘 중 하나',multi_select:'복수 선택',least_likely:'가장 하지 않을 것',slider:'가능성 슬라이더',relationship_matrix:'관계별 반응',inner_outer:'속마음 · 실제 행동',temporal_compare:'시간별 반응',condition_followup:'조건 변화 비교',in_character_response:'캐릭터 대사 직접 쓰기',owner_meta:'오너 메타 질문'};
 
 function responseTypeOf(question:InterviewQuestion):QuestionResponseType{const candidate=(question as InterviewQuestion&{responseType?:QuestionResponseType}).responseType;return candidate||(question.format==='free_response'?'in_character_response':'fill_blank')}
@@ -259,7 +271,7 @@ export function AnalyzeFlow(){
     return()=>window.clearInterval(id);
   },[busy]);
   const flavorName=(draft?.basicProfile.name||name||'이 캐릭터').trim()||'이 캐릭터';
-  const flavorMessage=(matchedFlavors[flavorTick%matchedFlavors.length]||'').replace('{name}',flavorName);
+  const flavorMessage=applyName(matchedFlavors[flavorTick%matchedFlavors.length]||'',flavorName);
 
   function continueSavedAnalysis(){if(!resumeCandidate)return;persistenceEnabled.current=false;restoreSavedSession(resumeCandidate);setResumeCandidate(null);window.setTimeout(()=>{persistenceEnabled.current=true},0)}
   function startFreshAnalysis(){persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);setResumeCandidate(null);clearProgressState();window.setTimeout(()=>{persistenceEnabled.current=true},0)}
