@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "ai": "^6.0.0",
     "next": "16.2.12",
+    "notion-client": "7.12.0",
+    "notion-utils": "7.12.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "zod": "^4.1.8",
-    "ai": "^6.0.0"
+    "zod": "^4.1.8"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
