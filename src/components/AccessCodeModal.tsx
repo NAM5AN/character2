@@ -59,8 +59,17 @@ export function AccessCodeModal({
       <div className="notice" style={{margin:'14px 0',lineHeight:1.7}}>
         <strong>상세 이용권 3,000원 · 캐릭터 수 제한 없음</strong><br/>
         구매자 본인 이용을 전제로 합니다. 코드 공유·타인 이용이 의심되는 경우 이용 코드는 예고 없이 교체될 수 있으며, 교체 후에는 포스타입 유료 영역에서 최신 코드를 다시 확인해주세요.
+        <div style={{marginTop:14}}>
+          <a
+            className="btn soft"
+            href={postype||undefined}
+            target={postype?'_blank':undefined}
+            rel={postype?'noreferrer':undefined}
+            aria-disabled={!postype}
+            style={{display:'inline-flex',opacity:postype?1:.72,pointerEvents:postype?'auto':'none'}}
+          >포스타입에서 코드 확인하기 ↗</a>
+        </div>
       </div>
-      {postype && <p><a className="btn soft" href={postype} target="_blank" rel="noreferrer">포스타입에서 코드 확인하기 ↗</a></p>}
       <div className="field"><label className="label">이용 코드</label><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} placeholder="예: CHARA82" /></div>
       {error && <div className="error" style={{whiteSpace:'pre-wrap'}}>{error}</div>}
       <div className="actions"><button className="btn primary" disabled={busy||!code.trim()} onClick={validate}>{busy?'확인 중…':submitLabel}</button><button className="btn" disabled={busy} onClick={onClose}>닫기</button></div>
