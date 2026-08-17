@@ -142,7 +142,7 @@ const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리�
 - 실제로 주어진 과거 사건이나 설정은 현재 성격과 연결해도 되지만, 자료에 없는 과거·트라우마·진단·숨겨진 사실은 만들지 마세요.
 - 질문 번호, 점수, 퍼센트, 슬라이더 같은 UI 흔적은 출력하지 마세요.
 
-validatedInsights 전체는 특정 영역에 몰리지 않게 아래 여섯 축을 모두 덮으세요.
+validatedInsights 전체는 특정 영역에 몰리지 않게 아래 여섯 축을 모두 덮으세요. 한 insight가 둘 이상의 축을 연결해도 되며, 축마다 하나씩 억지로 만들 필요는 없습니다.
 - 본질적 성격·겉과 속·자기인식·과거가 남긴 영향·숨은 특성
 - 욕구·결핍·두려움·감정 구조·방어기제·자기기만·원하는 것과 필요한 것
 - 일반 대인관계·신뢰·주도권·사람을 좋아하고 싫어하는 기준·관계 사용 설명서
@@ -332,7 +332,10 @@ function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
 
 function validatedInsightReason(model:PsychologicalModel){
   const passed=model.validatedInsights.filter(qualityPass);
-  if(passed.length<6)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
+  // The six report axes are coverage targets, not a requirement for six separate strong hypotheses.
+  // One high-quality insight can legitimately connect multiple axes. Failing the whole report at 5/6
+  // discarded an otherwise strong analysis and created a false-negative production error.
+  if(passed.length<4)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
   return '';
 }
 
@@ -341,7 +344,7 @@ async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|Unkno
     system:PSYCHE_SYSTEM,
     schema:psychologicalModelSchema,
     maxAttempts:1,
-    input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 여섯 분석 축을 모두 다룰 수 있도록 validatedInsights의 범위를 고르게 분산하세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
+    input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 여섯 분석 축을 모두 다루되, 하나의 충분히 깊은 insight가 여러 축을 연결해도 됩니다. 축별 개수를 맞추기 위해 약한 가설을 억지로 만들지 마세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
     allowFallback:false,
     model:'anthropic/claude-sonnet-5',
   });
