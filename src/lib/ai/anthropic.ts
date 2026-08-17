@@ -4,10 +4,20 @@ import { getCharacterDeepAnalysisSkill } from '@/lib/ai/character-deep-analysis-
 
 const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5';
 const DEFAULT_DETAIL_MODEL = 'anthropic/claude-opus-4.8';
+const DEFAULT_REPORT_MODEL = 'anthropic/claude-sonnet-5';
+
+function isReportWriterSystem(system: string) {
+  return system.includes('리포트를 쓰는 분석가') || system.includes('리포트를 쓰는 전문 해석자');
+}
 
 function resolveClaudeModel(system: string, explicitModel?: string) {
   if (explicitModel) return explicitModel;
   const isPaidDetail = system.includes('유료 상세 캐해 리포트');
+  if (isPaidDetail && isReportWriterSystem(system)) {
+    // 6.2+ 상세 리포트는 출력 섹션이 크게 늘어 Opus 한 번으로 작성하면
+    // Vercel 300초 실행 제한을 넘길 수 있습니다. 최종 서술은 빠른 Sonnet을 기본으로 사용합니다.
+    return process.env.ANTHROPIC_REPORT_MODEL || DEFAULT_REPORT_MODEL;
+  }
   if (isPaidDetail) return process.env.ANTHROPIC_DETAIL_MODEL || DEFAULT_DETAIL_MODEL;
   return process.env.ANTHROPIC_SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL;
 }
@@ -16,7 +26,7 @@ function applyCharacterDeepAnalysisSkill(system: string) {
   if (!system.includes('유료 상세 캐해 리포트')) return system;
 
   const skill = getCharacterDeepAnalysisSkill();
-  const isReportWriter = system.includes('리포트를 쓰는 분석가');
+  const isReportWriter = isReportWriterSystem(system);
 
   if (isReportWriter) {
     return [
