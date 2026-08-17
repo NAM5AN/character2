@@ -395,35 +395,31 @@ function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
 }
 
 function validatedInsightReason(model:PsychologicalModel){
-  const accepted=[...model.validatedInsights,...model.tensions];
-  const failed=accepted.filter(x=>!qualityPass(x));
-  if(failed.length)return `품질 기준 미달 insight ${failed.length}개`;
-  if(model.validatedInsights.length<5)return '검증된 insight 부족';
+  const passed=model.validatedInsights.filter(qualityPass);
+  if(passed.length<4)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
   return '';
 }
 
 async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|UnknownRecord):Promise<PsychologicalModel>{
-  let lastReason='';
-  for(let attempt=0;attempt<2;attempt+=1){
-    const retry=attempt===0?'':`\n\n이전 결과는 스킬의 단계가 충분히 분리되지 않았거나 품질 기준을 통과하지 못했습니다. semanticCodes → themes → 대안가설/반례 → quality → validatedInsights 순서를 다시 지키세요. 실패 이유: ${lastReason}`;
-    const model=await askClaudeJson({
-      system:PSYCHE_SYSTEM,
-      schema:psychologicalModelSchema,
-      maxTokens:7800,
-      input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- semanticCodes는 원 질문을 다시 쓰는 문장이 아니라 행동/판단의 의미 단위여야 합니다.\n- themes는 semanticCodes 여러 개를 연결해 숨은 기능을 설명하세요.\n- alternatives에는 각 theme를 설명할 수 있는 더 단순하거나 다른 가설을 반드시 적으세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- validatedInsights의 evidenceAnchors는 최종 작가에게 전달할 짧고 구체적인 근거입니다. 질문 문장을 보존하지 말고 행동·상황·관계 조건만 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 반대 행동이 같은 욕구에서 갈라지는 경우만 작성하세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.${retry}`,
-      allowFallback:false,
-      model:'anthropic/claude-sonnet-5',
-    });
-    const artifact=uiArtifactReason(allPsychText(model));
-    if(artifact){lastReason=artifact;continue}
-    const quality=validatedInsightReason(model);
-    if(quality){lastReason=quality;continue}
-    return model;
-  }
-  throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${lastReason||'PSYCHOLOGICAL_MODEL_INVALID'}`);
+  const model=await askClaudeJson({
+    system:PSYCHE_SYSTEM,
+    schema:psychologicalModelSchema,
+    maxTokens:6000,
+    maxAttempts:1,
+    input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- semanticCodes는 원 질문을 다시 쓰는 문장이 아니라 행동/판단의 의미 단위여야 합니다.\n- themes는 semanticCodes 여러 개를 연결해 숨은 기능을 설명하세요.\n- alternatives에는 각 theme를 설명할 수 있는 더 단순하거나 다른 가설을 반드시 적으세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- validatedInsights의 evidenceAnchors는 최종 작가에게 전달할 짧고 구체적인 근거입니다. 질문 문장을 보존하지 말고 행동·상황·관계 조건만 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 반대 행동이 같은 욕구에서 갈라지는 경우만 작성하세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
+    allowFallback:false,
+    model:'anthropic/claude-sonnet-5',
+  });
+  const artifact=uiArtifactReason(allPsychText(model));
+  if(artifact)throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${artifact}`);
+  const quality=validatedInsightReason(model);
+  if(quality)throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${quality}`);
+  return model;
 }
 
 function buildReportDossier(model:PsychologicalModel){
+  const validatedInsights=model.validatedInsights.filter(qualityPass);
+  const tensions=model.tensions.filter(qualityPass);
   return {
     coreEngine:model.coreEngine,
     hiddenNeed:model.hiddenNeed,
@@ -433,7 +429,7 @@ function buildReportDossier(model:PsychologicalModel){
     intimacyLogic:model.intimacyLogic,
     conflictLogic:model.conflictLogic,
     selfNarrative:model.selfNarrative,
-    validatedInsights:model.validatedInsights.map(x=>({
+    validatedInsights:validatedInsights.map(x=>({
       conclusion:x.conclusion,
       mechanism:x.mechanism,
       evidenceAnchors:x.evidenceAnchors,
@@ -441,7 +437,7 @@ function buildReportDossier(model:PsychologicalModel){
       confidence:x.confidence,
       prediction:x.prediction,
     })),
-    tensions:model.tensions.map(x=>({
+    tensions:tensions.map(x=>({
       conclusion:x.conclusion,
       mechanism:x.mechanism,
       evidenceAnchors:x.evidenceAnchors,
@@ -464,28 +460,23 @@ async function generateDetailFields(
 
   const baseInput=`캐릭터 이름: ${seed.name}\n\n[검증된 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n중요:\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- evidenceAnchors를 항목별로 나열하지 말고 conclusion과 mechanism을 먼저 설명한 뒤 필요한 곳에만 자연스럽게 녹이세요.\n- 서로 다른 섹션이 같은 insight를 반복하지 않도록 각 섹션의 초점을 분리하세요.\n\n출력 규칙:\n- outerSelf: 타인이 체감하는 표면 태도와 실제 내부 판단 사이의 간극을 해석하세요. 180~320자.\n- innerSelf: hiddenNeed, hiddenFear, selfProtection, selfNarrative를 연결해 실제 선택을 움직이는 심리를 설명하세요. 180~320자.\n- conflictStyle: 무엇이 단순 불편함에서 자기 기준의 침범으로 바뀌는지와 반응 임계점을 설명하세요. 180~320자.\n- affectionStyle: 친밀함에서 무엇을 확인받고 싶어 하는지, 보호·개입·경계가 어떤 공통 욕구에서 나오는지 설명하세요. 180~320자.\n- coreValues / desires / fears: 각각 2~5개. 표면 단어가 아니라 반복 행동을 움직이는 심리적 기능을 적으세요.\n- misunderstoodPoints: 외부 인상과 내부 기능이 엇갈리는 구조를 적으세요.\n- contradictions: 반대 행동이 같은 욕구에서 갈라지는 메커니즘을 적으세요.\n- interestingPoints: validatedInsights 중 원자료에 직접 적혀 있지 않았을 가능성이 높은 새 연결을 우선하세요.\n- detailedReport: 850~1400자. coreEngine에서 숨은 욕구·두려움·자기보호·친밀감·갈등·맹점이 어떻게 파생되는지 하나의 흐름으로 쓰세요. 최소 세 개의 검증된 새 해석을 서로 연결해야 합니다.\n- 문단은 논점이 실제로 바뀔 때만 \\n\\n으로 나누세요. 소제목, 번호, 불릿은 detailedReport 안에 넣지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더 값, 선택지 번호, 분석 출처 표현은 절대 사용하지 마세요.\n\nJSON 키는 outerSelf, innerSelf, coreValues, desires, fears, conflictStyle, affectionStyle, misunderstoodPoints, contradictions, interestingPoints, detailedReport만 사용하세요.`;
 
-  let lastReason='';
-  for(let attempt=0;attempt<3;attempt+=1){
-    const retry=attempt===0?'':`\n\n이전 결과는 검증된 insight를 통합하기보다 evidenceAnchor를 다시 읽어주는 문장에 가까웠습니다. 이번에는 근거를 먼저 말하지 말고 심리적 결론과 메커니즘을 중심으로 다시 쓰세요. 같은 행동을 여러 섹션에서 반복하지 마세요. 실패 이유: ${lastReason}`;
-    const raw=await askClaudeJson({
-      system:REPORT_SYSTEM,
-      schema:detailAnalysisRawSchema,
-      maxTokens:7600,
-      input:`${baseInput}${retry}`,
-      allowFallback:false,
-    });
-    const parsed=detailAnalysisGenerationSchema.safeParse(normalizeDetail(raw));
-    if(!parsed.success){lastReason=validationReason(parsed.error);continue}
-    const reportText=allReportText(parsed.data);
-    const artifact=uiArtifactReason(reportText);
-    if(artifact){lastReason=artifact;continue}
-    const meta=reportMetaReason(reportText);
-    if(meta){lastReason=meta;continue}
-    if(hasLongVerbatimOverlap(reportText,sources)){lastReason='원자료의 긴 문장이 그대로 복사됨';continue}
-    return parsed.data;
-  }
-
-  throw new Error(`AI_JSON_SCHEMA_FAILED: ${lastReason||'DETAIL_INTERPRETATION_FAILED'}`);
+  const raw=await askClaudeJson({
+    system:REPORT_SYSTEM,
+    schema:detailAnalysisRawSchema,
+    maxTokens:5000,
+    maxAttempts:1,
+    input:baseInput,
+    allowFallback:false,
+  });
+  const parsed=detailAnalysisGenerationSchema.safeParse(normalizeDetail(raw));
+  if(!parsed.success)throw new Error(`AI_JSON_SCHEMA_FAILED: ${validationReason(parsed.error)}`);
+  const reportText=allReportText(parsed.data);
+  const artifact=uiArtifactReason(reportText);
+  if(artifact)throw new Error(`AI_JSON_SCHEMA_FAILED: ${artifact}`);
+  const meta=reportMetaReason(reportText);
+  if(meta)throw new Error(`AI_JSON_SCHEMA_FAILED: ${meta}`);
+  if(hasLongVerbatimOverlap(reportText,sources))throw new Error('AI_JSON_SCHEMA_FAILED: 원자료의 긴 문장이 그대로 복사됨');
+  return parsed.data;
 }
 
 export type VersionedFinalAnalysis = FinalAnalysis & {detailVersion:typeof DETAIL_REPORT_VERSION};
