@@ -3,16 +3,15 @@ import { askClaudeJson } from '@/lib/ai/anthropic';
 import {
   analysisTypeSummarySchema,
   characterEvidencePackSchema,
-  detailAnalysisGenerationSchema,
   finalAnalysisSchema,
   interviewAnswerSchema,
-  type DetailAnalysisGeneration,
   type FinalAnalysis,
 } from '@/lib/schemas/character';
 
 type UnknownRecord = Record<string, unknown>;
 
-export const DETAIL_REPORT_VERSION = 'detail-analysis/6.4' as const;
+export const DETAIL_REPORT_VERSION = 'detail-analysis/6.5' as const;
+export const DETAIL_STAGE_COUNT = 3 as const;
 
 const legacyDetailSeedSchema = z.object({
   version: z.literal('detail-seed/1.0'),
@@ -42,7 +41,6 @@ export const privateDetailSourceSchema = z.object({
   relationshipTraits: z.record(z.string(),z.unknown()).default({}),
 });
 
-// Internal analysis keeps structural quality checks, but no character-count limits.
 const qualityScoreSchema = z.object({
   evidenceStrength: z.number().int().min(0).max(3),
   specificity: z.number().int().min(0).max(3),
@@ -77,16 +75,40 @@ const psychologicalModelSchema = z.object({
   uncertainties: z.array(z.string()).default([]),
 });
 
+const reportDossierSchema = z.object({
+  coreEngine:z.string(),
+  hiddenNeed:z.string(),
+  hiddenFear:z.string(),
+  selfProtection:z.string(),
+  blindSpot:z.string(),
+  intimacyLogic:z.string(),
+  conflictLogic:z.string(),
+  selfNarrative:z.string(),
+  validatedInsights:z.array(z.object({
+    conclusion:z.string(),
+    mechanism:z.string(),
+    evidenceAnchors:z.array(z.string()),
+    counterEvidence:z.array(z.string()),
+    confidence:z.string(),
+    prediction:z.string(),
+  })),
+  tensions:z.array(z.object({
+    conclusion:z.string(),
+    mechanism:z.string(),
+    evidenceAnchors:z.array(z.string()),
+    counterEvidence:z.array(z.string()),
+    confidence:z.string(),
+    prediction:z.string(),
+  })),
+  uncertainties:z.array(z.string()),
+});
+
+export type ReportDossier = z.infer<typeof reportDossierSchema>;
 type PsychologicalModel = z.infer<typeof psychologicalModelSchema>;
 type DetailSeed = z.infer<typeof detailSeedSchema>;
 type PrivateDetailSource = z.infer<typeof privateDetailSourceSchema>;
 
-type SemanticAnswer = {
-  question:string;
-  answer:string;
-  reason?:string;
-};
-
+type SemanticAnswer = {question:string;answer:string;reason?:string};
 type SourcePacket = {
   publicProfile:string;
   secretProfile:string;
@@ -95,6 +117,10 @@ type SourcePacket = {
   interview:SemanticAnswer[];
   coverageHints:unknown;
 };
+
+const stage1Schema=z.object({characterOverview:z.string(),innerMechanics:z.string()});
+const stage2Schema=z.object({relationshipStyle:z.string(),attachmentStyle:z.string(),conflictStyleDetailed:z.string()});
+const stage3Schema=z.object({charmAndContradictions:z.string(),integratedReport:z.string()});
 
 const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위한 심층 분석가입니다.
 최종 글을 쓰지 마세요. 입력을 항목별로 다시 정리하는 것도 목적이 아닙니다.
@@ -143,7 +169,7 @@ const REPORT_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리�
 - evidenceAnchors를 목록처럼 다시 읽어주지 말고, 결론과 메커니즘을 먼저 설명한 뒤 구체적 행동은 짧은 예시로만 사용하세요.
 - 같은 행동이나 같은 insight를 여러 카테고리에서 반복하지 마세요.
 - 과거 원인은 실제 자료에 명시된 사건이나 환경이 있을 때만 연결하세요. 근거가 없으면 원인을 만들어내지 말고 현재 구조까지만 설명하세요.
-- 근거가 약한 소주제도 조용히 생략하지 마세요. 단정할 수 없다면 "뚜렷하게 단정하기는 어렵지만"처럼 불확실성을 표시한 뒤 현재 자료에서 읽을 수 있는 범위까지 설명하세요.
+- 근거가 약한 소주제도 조용히 생략하지 마세요. 단정할 수 없다면 불확실성을 표시한 뒤 현재 자료에서 읽을 수 있는 범위까지 설명하세요.
 - 글자 수를 맞추기 위해 내용을 줄이거나 생략하지 마세요.
 - 질문 번호, 점수, 퍼센트, 슬라이더, 분석 출처 표현은 절대 쓰지 마세요.`;
 
@@ -175,7 +201,6 @@ function qualitativePosition(value:number,left:string,right:string){
 function semanticAnswer(answer:z.infer<typeof interviewAnswerSchema>):SemanticAnswer{
   const type=contextString(answer.branchContext,'responseType');
   let text=answer.answer.replace(/\s+/g,' ').trim();
-
   if(type==='bipolar_scale'){
     const match=text.match(/^(.*?)\s+(\d{1,3})%\s*\/\s*(.*?)\s+(\d{1,3})%$/u);
     if(match)text=qualitativePosition(Number(match[4]),match[1].trim(),match[3].trim());
@@ -185,19 +210,16 @@ function semanticAnswer(answer:z.infer<typeof interviewAnswerSchema>):SemanticAn
   }else if(type==='ranking'){
     text=text.replace(/\b\d+\s*위\s*/gu,'').replace(/\s*>\s*/g,' → ').trim();
   }
-
   text=text
     .replace(/\b\d{1,3}\s*\/\s*(?:5|100)\b/gu,'정도의 차이')
     .replace(/\b\d{1,3}\s*[%％]/gu,'강한 정도')
     .replace(/\b\d{1,2}\s*번\s*(?:문항|질문|답변)?/gu,'해당 상황')
     .replace(/\s+/g,' ')
     .trim();
-
   const question=answer.question
     .replace(/^\s*\d+\s*[.)]\s*/u,'')
     .replace(/\b\d{1,2}\s*번\s*(?:문항|질문|답변)?/gu,'해당 상황')
     .trim();
-
   return {question,answer:text,...(answer.reason?.trim()?{reason:answer.reason.trim()}: {})};
 }
 
@@ -254,7 +276,6 @@ function buildSourcePacket(seed:DetailSeed,publicProfileText:string,privateSourc
     };
     return {packet,sources:rawSourceStrings(publicProfileText,source)};
   }
-
   return {
     packet:{summary:seed.summary,analysisSeeds:seed.analysisSeeds,note:'구버전 캐릭터라 저장된 해석 씨앗만 사용할 수 있음'},
     sources:[...seed.analysisSeeds,seed.oneLineSummary,...Object.values(seed.summary)],
@@ -268,18 +289,6 @@ function allPsychText(model:PsychologicalModel){
     ...model.validatedInsights.flatMap(x=>[x.conclusion,x.mechanism,...x.evidenceAnchors,...x.counterEvidence,x.prediction]),
     ...model.tensions.flatMap(x=>[x.conclusion,x.mechanism,...x.evidenceAnchors,...x.counterEvidence,x.prediction]),
     ...model.uncertainties,
-  ].join(' ');
-}
-
-function allReportText(detail:DetailAnalysisGeneration){
-  return [
-    detail.characterOverview,
-    detail.innerMechanics,
-    detail.relationshipStyle,
-    detail.attachmentStyle,
-    detail.conflictStyleDetailed,
-    detail.charmAndContradictions,
-    detail.integratedReport,
   ].join(' ');
 }
 
@@ -343,10 +352,10 @@ async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|Unkno
   return model;
 }
 
-function buildReportDossier(model:PsychologicalModel){
+function buildReportDossier(model:PsychologicalModel):ReportDossier{
   const validatedInsights=model.validatedInsights.filter(qualityPass);
   const tensions=model.tensions.filter(qualityPass);
-  return {
+  return reportDossierSchema.parse({
     coreEngine:model.coreEngine,
     hiddenNeed:model.hiddenNeed,
     hiddenFear:model.hiddenFear,
@@ -358,36 +367,69 @@ function buildReportDossier(model:PsychologicalModel){
     validatedInsights:validatedInsights.map(x=>({conclusion:x.conclusion,mechanism:x.mechanism,evidenceAnchors:x.evidenceAnchors,counterEvidence:x.counterEvidence,confidence:x.confidence,prediction:x.prediction})),
     tensions:tensions.map(x=>({conclusion:x.conclusion,mechanism:x.mechanism,evidenceAnchors:x.evidenceAnchors,counterEvidence:x.counterEvidence,confidence:x.confidence,prediction:x.prediction})),
     uncertainties:model.uncertainties,
-  };
+  });
 }
 
-async function generateDetailFields(seed:DetailSeed,publicProfileText:string,privateSourceInput?:unknown):Promise<DetailAnalysisGeneration>{
+function commonWriterInput(seed:DetailSeed,dossier:ReportDossier){
+  return `캐릭터 이름: ${seed.name}\n\n[검증된 심층 해석 묶음]\n${JSON.stringify(dossier)}\n\n공통 규칙:\n- 글자 수 제한은 없습니다. 해당 페이지에 배정된 소주제를 하나도 빠뜨리지 마세요.\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- 모든 문장은 자연스러운 해요체 존댓말로 완결하세요.\n- 같은 insight를 여러 문단에서 반복하지 말고 맥락이 자연스럽게 이어지게 쓰세요.\n- 근거가 부족한 소주제는 삭제하지 말고 불확실성을 표시한 뒤 현재 읽을 수 있는 범위까지 설명하세요.\n- 새로운 과거 사건이나 숨겨진 설정을 창작하지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더, 선택지 번호, 분석 과정이나 입력 출처를 드러내는 표현은 사용하지 마세요.`;
+}
+
+async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
+  return askClaudeJson({
+    system:REPORT_SYSTEM,
+    schema:stage1Schema,
+    maxAttempts:1,
+    allowFallback:false,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 첫 페이지의 아래 2개 필드만 작성하세요.\n\ncharacterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\ninnerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리`,
+  });
+}
+
+async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
+  return askClaudeJson({
+    system:REPORT_SYSTEM,
+    schema:stage2Schema,
+    maxAttempts:1,
+    allowFallback:false,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 두 번째 페이지의 아래 3개 필드만 작성하세요.\n\nrelationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\nattachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\nconflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유`,
+  });
+}
+
+async function writeStage3(seed:DetailSeed,dossier:ReportDossier){
+  return askClaudeJson({
+    system:REPORT_SYSTEM,
+    schema:stage3Schema,
+    maxAttempts:1,
+    allowFallback:false,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 마지막 페이지의 아래 2개 필드만 작성하세요.\n\ncharmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\nintegratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.`,
+  });
+}
+
+function validateVisibleText(text:string,sources?:string[]){
+  const artifact=uiArtifactReason(text);
+  if(artifact)throw new Error(`AI_JSON_SCHEMA_FAILED: ${artifact}`);
+  if(sources&&hasLongVerbatimOverlap(text,sources))throw new Error('AI_JSON_SCHEMA_FAILED: 원자료의 긴 문장이 그대로 복사됨');
+}
+
+export async function generatePaidDetailStage1(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown):Promise<{analysis:FinalAnalysis;dossier:ReportDossier}>{
+  const seed=detailSeedSchema.parse(seedInput);
   const {packet,sources}=buildSourcePacket(seed,publicProfileText,privateSourceInput);
   const psyche=await buildPsychologicalModel(seed,packet);
   const dossier=buildReportDossier(psyche);
-
-  const input=`캐릭터 이름: ${seed.name}\n\n[검증된 심층 해석 묶음 — 최종 작가가 사용할 수 있는 전부]\n${JSON.stringify(dossier)}\n\n최종 결과는 아래 7개 문자열 필드만 작성하세요. 각 필드는 화면의 큰 카테고리 하나가 됩니다. 글자 수 제한은 없으며, 해당 카테고리에 배정된 소주제를 하나도 빠뜨리지 마세요. 근거가 부족한 소주제는 삭제하지 말고 불확실성을 표시해서 현재 읽을 수 있는 범위까지 설명하세요.\n\n1) characterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\n2) innerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리\n\n3) relationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\n4) attachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\n5) conflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유\n\n6) charmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\n7) integratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.\n\n공통:\n- 모든 필드는 자연스러운 해요체 존댓말로 작성하세요.\n- 내용이 겹칠 때는 같은 문장을 반복하지 말고, 각 카테고리의 관점에 맞게 다음 논점으로 이어가세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더, 선택지 번호, 분석 과정이나 입력 출처를 드러내는 표현은 사용하지 마세요.`;
-
-  const detail=await askClaudeJson({
-    system:REPORT_SYSTEM,
-    schema:detailAnalysisGenerationSchema,
-    maxAttempts:1,
-    input,
-    allowFallback:false,
-  });
-
-  const reportText=allReportText(detail);
-  const artifact=uiArtifactReason(reportText);
-  if(artifact)throw new Error(`AI_JSON_SCHEMA_FAILED: ${artifact}`);
-  if(hasLongVerbatimOverlap(reportText,sources))throw new Error('AI_JSON_SCHEMA_FAILED: 원자료의 긴 문장이 그대로 복사됨');
-  return detail;
+  const stage=await writeStage1(seed,dossier);
+  validateVisibleText(`${stage.characterOverview} ${stage.innerMechanics}`,sources);
+  const analysis=finalAnalysisSchema.parse({oneLineSummary:seed.oneLineSummary,summary:seed.summary,...stage});
+  return {analysis,dossier};
 }
 
-export type VersionedFinalAnalysis = FinalAnalysis & {detailVersion:typeof DETAIL_REPORT_VERSION};
-
-export async function generatePaidDetail(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown):Promise<VersionedFinalAnalysis>{
+export async function generatePaidDetailContinuation(seedInput:unknown,dossierInput:unknown,stage:2|3):Promise<Partial<FinalAnalysis>>{
   const seed=detailSeedSchema.parse(seedInput);
-  const detail=await generateDetailFields(seed,publicProfileText,privateSourceInput);
-  const analysis=finalAnalysisSchema.parse({oneLineSummary:seed.oneLineSummary,summary:seed.summary,...detail});
-  return {...analysis,detailVersion:DETAIL_REPORT_VERSION};
+  const dossier=reportDossierSchema.parse(dossierInput);
+  if(stage===2){
+    const result=await writeStage2(seed,dossier);
+    validateVisibleText(`${result.relationshipStyle} ${result.attachmentStyle} ${result.conflictStyleDetailed}`);
+    return result;
+  }
+  const result=await writeStage3(seed,dossier);
+  validateVisibleText(`${result.charmAndContradictions} ${result.integratedReport}`);
+  return result;
 }
