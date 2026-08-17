@@ -28,12 +28,12 @@ export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.strin
 export const characterDraftSchema=z.object({basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),analysisConfidence:z.number().min(0).max(100)});
 
 export const analysisTypeSummarySchema=z.object({outerSelf:z.string().min(20).max(160),innerSelf:z.string().min(20).max(160),conflictStyle:z.string().min(20).max(160),affectionStyle:z.string().min(20).max(160)});
-const reportItemSchema=z.string().min(8).max(220);
-const reportListSchema=z.array(reportItemSchema).min(2).max(5);
-const evidenceBackedListSchema=z.array(reportItemSchema).max(5).default([]);
-const deepSectionSchema=z.string().min(160).max(900);
-const compactDeepSectionSchema=z.string().min(120).max(700);
-const manualListSchema=z.array(z.string().min(8).max(180)).min(1).max(4);
+const reportItemSchema=z.string().min(4).max(320);
+const reportListSchema=z.array(reportItemSchema).min(1).max(6);
+const evidenceBackedListSchema=z.array(reportItemSchema).max(6).default([]);
+const deepSectionSchema=z.string().min(60).max(1200);
+const compactDeepSectionSchema=z.string().min(40).max(900);
+const manualListSchema=z.array(z.string().min(4).max(240)).min(1).max(5);
 export const relationshipManualSchema=z.object({
   gettingClose:manualListSchema,
   avoid:manualListSchema,
@@ -67,13 +67,13 @@ export const detailAnalysisRawSchema=z.object({
 }).passthrough();
 
 export const detailAnalysisGenerationSchema=z.object({
-  outerSelf:z.string().min(140).max(520),
-  innerSelf:z.string().min(140).max(520),
+  outerSelf:z.string().min(80).max(900),
+  innerSelf:z.string().min(80).max(900),
   coreValues:reportListSchema,
   desires:reportListSchema,
   fears:reportListSchema,
-  conflictStyle:z.string().min(140).max(520),
-  affectionStyle:z.string().min(140).max(520),
+  conflictStyle:z.string().min(80).max(900),
+  affectionStyle:z.string().min(80).max(900),
   misunderstoodPoints:evidenceBackedListSchema,
   contradictions:evidenceBackedListSchema,
   interestingPoints:reportListSchema,
@@ -93,7 +93,7 @@ export const detailAnalysisGenerationSchema=z.object({
   charmPoints:reportListSchema,
   hiddenTraits:reportListSchema,
   relationshipManual:relationshipManualSchema,
-  detailedReport:z.string().min(800).max(1800),
+  detailedReport:z.string().min(400).max(2600),
 });
 
 export const finalAnalysisRawSchema=z.object({
