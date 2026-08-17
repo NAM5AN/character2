@@ -3,7 +3,7 @@ import Link from 'next/link';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CHARA LAB — 자캐 정밀 분석',
+  title: 'CHARA LAB — 캐릭터 정밀 분석',
   description: '프로필과 20문항으로 만드는 공유 가능한 Character Passport',
 };
 
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <span className="deploy-version" title={deploymentTitle}>배포 {deploymentVersion}</span>
             </div>
             <nav className="nav-links">
-              <Link className="nav-link" href="/analyze">자캐 분석</Link>
+              <Link className="nav-link" href="/analyze">캐릭터 분석</Link>
               <Link className="nav-link optional" href="/#lookup">저장 캐릭터</Link>
             </nav>
           </div>
