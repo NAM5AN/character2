@@ -14,7 +14,8 @@ type SavedAnalysisSession={version:1;stage:SavedStage;name:string;profileText:st
 type ResponseData={selected?:string;custom?:string;multiSelected?:string[];ranking?:string[];sliderValue?:number;matrixAnswers?:Record<string,string>;secondary?:string};
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
-// 심즈 로딩 문구 스타일: 상담(인터뷰) 자리에서 캐릭터가 벌일 법한 엉뚱한 짓 "~하는 중".
+// 심즈 로딩 문구 스타일: 상담(인터뷰) 자리에서 캐릭터가 벌일 법한 짓 "~하는 중".
+// 뜬금없어도 '그 자리에서 일어날 수 있는' 것이면 OK (창밖 비둘기 눈싸움 등).
 const LOADING_FLAVORS=[
   '{name}가 의자에 앉자마자 다리 떠는 중',
   '{name}가 괜찮다면서 눈은 안 마주치는 중',
@@ -23,7 +24,9 @@ const LOADING_FLAVORS=[
   '{name}가 눈치 보며 모범답안을 고민하는 중',
   '{name}가 쿠션 끌어안고 방어 태세 잡는 중',
   '{name}가 "그런 적 없는데요" 하며 시선 피하는 중',
-  '{name}가 질문 못 들은 척 창밖만 보는 중',
+  '{name}가 창밖 비둘기랑 눈싸움하는 중',
+  '{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중',
+  '{name}가 폰 안 보는 척하며 몰래 보는 중',
   '{name}가 다 안다는 듯 팔짱 끼는 중',
   '{name}가 농담으로 진지한 질문 넘기려는 중',
   '{name}가 티슈 뽑아놓고 안 우는 척하는 중',
@@ -32,7 +35,9 @@ const LOADING_FLAVORS=[
   '{name}가 괜히 시계 보며 끝나길 기다리는 중',
   '{name}가 상담사를 거꾸로 분석하려 드는 중',
   '{name}가 "이거 마지막 질문이죠?" 하고 슬쩍 떠보는 중',
-  '{name}가 별일 아니라며 슬그머니 화제 돌리는 중',
+  '{name}가 벽에 걸린 그림 삐뚤어졌나 계속 신경 쓰는 중',
+  '{name}가 대기실에서 연습한 말 다 까먹은 중',
+  '{name}가 이어폰 줄 푸는 데 인생 거는 중',
   '{name}가 속으론 다 계산하며 태연한 척하는 중',
 ];
 const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={fill_blank:'빈칸 채우기',sentence_continue:'문장 이어쓰기',dialogue_choice:'대사 고르기',bipolar_scale:'A/B 가까움',ranking:'순위 매기기',forced_choice:'둘 중 하나',multi_select:'복수 선택',least_likely:'가장 하지 않을 것',slider:'가능성 슬라이더',relationship_matrix:'관계별 반응',inner_outer:'속마음 · 실제 행동',temporal_compare:'시간별 반응',condition_followup:'조건 변화 비교',in_character_response:'캐릭터 대사 직접 쓰기',owner_meta:'오너 메타 질문'};
