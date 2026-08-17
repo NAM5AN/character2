@@ -15,11 +15,16 @@ function hostMatches(hostname: string, domain: string) {
   return hostname === domain || hostname.endsWith(`.${domain}`);
 }
 
+function isNotionHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  return hostMatches(host, 'notion.so') || hostMatches(host, 'notion.site') || host === 'app.notion.com';
+}
+
 function kindForUrl(url: URL): ProfileLinkKind | null {
   const host = url.hostname.toLowerCase();
   if (host === 'docs.google.com' && /^\/document\/d\/[a-zA-Z0-9_-]+/u.test(url.pathname)) return 'google_docs';
   if (hostMatches(host, 'postype.com')) return 'postype';
-  if (hostMatches(host, 'notion.so') || hostMatches(host, 'notion.site')) return 'notion';
+  if (isNotionHost(host)) return 'notion';
   return null;
 }
 
@@ -27,7 +32,7 @@ function redirectAllowed(kind: ProfileLinkKind, url: URL) {
   const host = url.hostname.toLowerCase();
   if (kind === 'google_docs') return host === 'docs.google.com' || hostMatches(host, 'googleusercontent.com');
   if (kind === 'postype') return hostMatches(host, 'postype.com');
-  return hostMatches(host, 'notion.so') || hostMatches(host, 'notion.site');
+  return isNotionHost(host);
 }
 
 function googleDocsExportUrl(url: URL) {
