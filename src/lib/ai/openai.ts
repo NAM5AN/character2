@@ -6,6 +6,7 @@ export async function askOpenAIJson<T>(args: {
   input: string;
   schema: z.ZodType<T>;
   maxOutputTokens?: number;
+  images?: string[];
 }): Promise<T> {
   const primaryModel = process.env.OPENAI_MODEL || 'openai/gpt-5.6-luna';
   try {
@@ -15,6 +16,7 @@ export async function askOpenAIJson<T>(args: {
       prompt: args.input,
       schema: args.schema,
       maxOutputTokens: args.maxOutputTokens,
+      images: args.images,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -27,6 +29,7 @@ export async function askOpenAIJson<T>(args: {
       prompt: args.input,
       schema: args.schema,
       maxOutputTokens: args.maxOutputTokens,
+      images: args.images,
     });
   }
 }
