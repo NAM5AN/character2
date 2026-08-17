@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getSupabaseServer } from '@/lib/supabase/server';
 import { characterReportPreviewSchema, type CharacterReportPreview } from '@/lib/character-report';
-import { CharacterReportView } from '@/components/CharacterReportView';
+import { CharacterReportClient } from '@/components/CharacterReportClient';
 
 async function loadPreview(name:string,ownerName:string):Promise<CharacterReportPreview|null>{
   const sb=getSupabaseServer();
@@ -22,5 +22,5 @@ export default async function CharacterLookupPage({searchParams}:{searchParams:P
   if(!name||!ownerName)notFound();
   const preview=await loadPreview(name,ownerName);
   if(!preview)notFound();
-  return <main className="container page"><CharacterReportView preview={preview}/></main>;
+  return <main className="container page"><CharacterReportClient preview={preview}/></main>;
 }
