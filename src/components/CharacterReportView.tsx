@@ -151,6 +151,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         return;
       }
       mergeDetail(body.detail);
+
+      // 2페이지 생성이 끝나면 사용자가 아직 1페이지를 읽는 중이어도
+      // 곧바로 마지막 페이지까지 이어서 선생성합니다.
+      if(stage===2&&stageReadyRef.current<3)void requestStage(3);
     }catch(cause){
       const details=cause instanceof Error?cause.message:String(cause);
       setPrefetchError(formatError('다음 페이지 준비 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
@@ -190,7 +194,12 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       setReportPage(1);
       mergeDetail(body.detail);
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
-      if(token&&(body.detail.stageReady||0)<2)void requestStage(2);
+
+      const ready=body.detail.stageReady||0;
+      if(token){
+        if(ready<2)void requestStage(2);
+        else if(ready<3)void requestStage(3);
+      }
     }catch(cause){
       const details=cause instanceof Error?cause.message:String(cause);
       setError(formatError('상세 리포트 요청 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
@@ -217,9 +226,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
   const nextStage=reportPage===1?2:reportPage===2?3:3;
   const nextPageReady=reportPage===3||stageReady>=nextStage;
+  const isPagedReport=Boolean(detail?.analysis.characterOverview);
 
   return <>
-    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 만들고, 읽는 동안 다음 페이지를 미리 준비합니다." submitLabel="코드 확인하고 상세 생성" />
+    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 만들고, 읽는 동안 남은 페이지도 순서대로 미리 준비합니다." submitLabel="코드 확인하고 상세 생성" />
 
     <div className="result-hero"><div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div><div><div className="label">공유 코드</div><div className="share-code">{preview.shareCode}</div><button className="btn soft" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(preview.shareCode)}>코드 복사</button></div></div>
 
@@ -255,16 +265,16 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 다음 페이지는 뒤에서 미리 준비해요.</p>
+        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 나머지 페이지는 뒤에서 순서대로 계속 준비해요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 지금 페이지를 읽는 동안 다음 페이지를 뒤에서 미리 만들어둡니다.</p>
+      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 첫 페이지를 읽는 동안 2페이지와 3페이지까지 순서대로 미리 만들어둡니다.</p>
 
-      {detail.analysis.characterOverview ? <>
+      {isPagedReport ? <>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:14,marginTop:20,flexWrap:'wrap'}}>
           <strong>페이지 {reportPage} / 3</strong>
           {reportPage<3&&<span className="muted" style={{fontSize:13}}>{stageReady>=nextStage?'다음 페이지 준비 완료':prefetchBusy?'다음 페이지 준비 중…':'다음 페이지 대기 중'}</span>}
@@ -288,11 +298,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           {prefetchError}
           <div style={{marginTop:12}}><button className="btn" onClick={()=>void requestStage(nextStage as 2|3)}>다시 준비하기</button></div>
         </div>}
-
-        <div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'wrap'}}>
-          <div>{reportPage>1&&<button className="btn" onClick={()=>changeReportPage((reportPage-1) as 1|2)}>← 이전 페이지</button>}</div>
-          <div>{reportPage<3&&<button className="btn primary" disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>{nextPageReady?'다음 페이지 →':'다음 페이지 준비 중…'}</button>}</div>
-        </div>
       </> : <>
         <div className="result-grid" style={{marginTop:20}}>
           <TextSection title="겉으로 보이는 모습" text={detail.analysis.outerSelf}/>
@@ -332,7 +337,19 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         {detail.analysis.detailedReport&&<section className="card" style={{marginTop:22,padding:'32px'}}><div className="eyebrow">Deep report</div><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:10}}>통합 상세 해석</h2><div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div></section>}
       </>}
 
-      <div className="actions"><button className="btn" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
+      {isPagedReport?<div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>
+        <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0}}>
+          <button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button>
+          <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
+        </div>
+        <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0,marginLeft:'auto'}}>
+          {reportPage>1&&<button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>changeReportPage((reportPage-1) as 1|2)}>← 이전 페이지</button>}
+          {reportPage<3&&<button className="btn primary" style={{whiteSpace:'nowrap'}} disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>{nextPageReady?'다음 페이지 →':'다음 페이지 준비 중…'}</button>}
+        </div>
+      </div>:<div className="actions" style={{marginTop:24,flexWrap:'nowrap',overflowX:'auto'}}>
+        <button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button>
+        <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
+      </div>}
     </div>}
   </>;
 }
