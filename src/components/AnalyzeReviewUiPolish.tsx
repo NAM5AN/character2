@@ -4,12 +4,11 @@ import { useEffect } from 'react';
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 
-// 질문/답변 화자 일치 검증은 질문 생성 API에서 처리하고, 이 컴포넌트는 화면 문구와 진행 상태만 다듬습니다.
+// 질문/답변 화자 일치 검증은 질문 생성 API에서 처리하고, 이 컴포넌트는 화면 문구만 다듬습니다.
+// 요약 단계의 진행률 %는 AnalyzeFlow가 스트리밍 실제 진행률로 직접 표시합니다.
 export function AnalyzeReviewUiPolish(){
   useEffect(()=>{
     let currentName='';
-    let summaryProgress=6;
-    let summaryWasVisible=false;
 
     const savedName=()=>{
       try{
@@ -36,33 +35,6 @@ export function AnalyzeReviewUiPolish(){
         dots.push(dot);
       }
       dots.slice(3).forEach(dot=>dot.remove());
-    };
-
-    const summaryLoader=()=>[...document.querySelectorAll<HTMLElement>('.loading')].find(element=>{
-      const label=element.textContent?.replace(/\s+/gu,' ').trim()||'';
-      return label.startsWith('캐릭터 요약을 정리하고 있어요')||label.includes('답변을 살펴보고 있어요');
-    });
-
-    const syncSummaryProgress=()=>{
-      const loading=summaryLoader();
-      if(!loading){summaryWasVisible=false;summaryProgress=6;return}
-      if(!summaryWasVisible){summaryWasVisible=true;summaryProgress=6}
-      const card=loading.closest<HTMLElement>('.card');
-      if(!card)return;
-      card.querySelectorAll<HTMLElement>('p.muted').forEach(p=>p.remove());
-      let progress=card.querySelector<HTMLElement>('.summary-progress-value');
-      if(!progress){
-        progress=document.createElement('div');
-        progress.className='summary-progress-value';
-        progress.style.marginTop='18px';
-        progress.style.fontSize='32px';
-        progress.style.lineHeight='1';
-        progress.style.fontWeight='900';
-        progress.style.fontVariantNumeric='tabular-nums';
-        loading.insertAdjacentElement('afterend',progress);
-      }
-      const value=`${Math.floor(summaryProgress)}%`;
-      if(progress.textContent!==value)progress.textContent=value;
     };
 
     const apply=()=>{
@@ -98,24 +70,12 @@ export function AnalyzeReviewUiPolish(){
         const desired=!inputStage&&currentName?`${currentName} 정밀 분석`:'캐릭터 정밀 분석';
         if(pageTitle.textContent!==desired)pageTitle.textContent=desired;
       }
-
-      syncSummaryProgress();
     };
 
     apply();
     const observer=new MutationObserver(apply);
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-    const timer=window.setInterval(()=>{
-      const loading=summaryLoader();
-      if(loading){
-        if(summaryProgress<55)summaryProgress=Math.min(55,summaryProgress+2);
-        else if(summaryProgress<80)summaryProgress=Math.min(80,summaryProgress+1);
-        else if(summaryProgress<92)summaryProgress=Math.min(92,summaryProgress+.5);
-        else summaryProgress=Math.min(96,summaryProgress+.2);
-      }
-      syncSummaryProgress();
-    },700);
-    return()=>{observer.disconnect();window.clearInterval(timer)};
+    return()=>observer.disconnect();
   },[]);
 
   return null;

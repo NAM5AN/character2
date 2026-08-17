@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { generateValidatedJson } from '@/lib/ai/json';
+import { generateValidatedJson, streamValidatedJson } from '@/lib/ai/json';
 import { getCharacterDeepAnalysisSkill } from '@/lib/ai/character-deep-analysis-skill';
 import { rewriteDetailedReportParagraphLeads } from '@/lib/ai/report-paragraph-leads';
 
@@ -90,6 +90,54 @@ export async function askClaudeJson<T>(args: {
       schema: args.schema,
       maxOutputTokens,
       maxAttempts,
+    });
+    return finalizeClaudeResult(result, args.system, fallbackModel);
+  }
+}
+
+// Streaming variant of askClaudeJson: same model resolution, skill priming and
+// fallback behavior, but reports real generation progress via onProgress.
+export async function streamClaudeJson<T>(args: {
+  system: string;
+  input: string;
+  schema: z.ZodType<T>;
+  maxTokens?: number;
+  maxAttempts?: number;
+  allowFallback?: boolean;
+  model?: string;
+  onProgress?: (ratio: number) => void;
+}): Promise<T> {
+  const primaryModel = resolveClaudeModel(args.system, args.model);
+  const resolvedSystem = applyCharacterDeepAnalysisSkill(args.system);
+  const isPaidDetail = args.system.includes('유료 상세 캐해 리포트');
+  const maxAttempts = args.maxAttempts ?? (isPaidDetail ? 1 : undefined);
+  const maxOutputTokens = isPaidDetail ? undefined : args.maxTokens;
+
+  try {
+    const result = await streamValidatedJson({
+      model: primaryModel,
+      system: resolvedSystem,
+      prompt: args.input,
+      schema: args.schema,
+      maxOutputTokens,
+      maxAttempts,
+      onProgress: args.onProgress,
+    });
+    return await finalizeClaudeResult(result, args.system, primaryModel);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
+    if (args.allowFallback === false) throw error;
+
+    const fallbackModel = process.env.CLAUDE_JSON_FALLBACK_MODEL || 'openai/gpt-5.6-luna';
+    const result = await streamValidatedJson({
+      model: fallbackModel,
+      system: `${resolvedSystem}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
+      prompt: args.input,
+      schema: args.schema,
+      maxOutputTokens,
+      maxAttempts,
+      onProgress: args.onProgress,
     });
     return finalizeClaudeResult(result, args.system, fallbackModel);
   }
