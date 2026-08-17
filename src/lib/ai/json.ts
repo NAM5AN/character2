@@ -1,5 +1,6 @@
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
+import { aiGatewayUsageOptions, scheduleAiUsageRecord } from '@/lib/ai/usage';
 
 function imageFilePart(dataUrl:string){
   const match=dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/iu);
@@ -31,6 +32,7 @@ export async function generateValidatedJson<T>(args: {
       ? ''
       : `\n\n이전 생성은 구조 검증에 실패했습니다. 이전 출력을 복사하거나 수리하려 하지 말고 원본 입력만 보고 처음부터 다시 작성하세요. 실패 원인: ${lastReason}`;
     const prompt = `${args.prompt}${retryNote}`;
+    const providerOptions=aiGatewayUsageOptions();
 
     try {
       const response = await generateText({
@@ -52,9 +54,11 @@ export async function generateValidatedJson<T>(args: {
           }),
         },
         toolChoice: { type: 'tool', toolName: 'submit_result' },
+        ...(providerOptions?{providerOptions}:{}),
         ...(typeof args.maxOutputTokens === 'number' ? { maxOutputTokens: args.maxOutputTokens } : {}),
       });
 
+      scheduleAiUsageRecord({model:args.model,attempt:attempt+1,response});
       const call = response.toolCalls.find(item => item.toolName === 'submit_result');
       if (!call) throw new Error('AI_TOOL_RESULT_MISSING');
       return args.schema.parse(call.input);
