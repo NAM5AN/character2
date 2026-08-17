@@ -66,19 +66,103 @@ function fmtDate(value: string | null): string {
   return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginTop: 20 }}>
-      <div className="eyebrow" style={{ marginBottom: 8 }}>{title}</div>
-      {children}
-    </div>
-  );
-}
-
 function Prose({ text }: { text: string }) {
   const clean = (text || '').trim();
   if (!clean) return <p className="muted" style={{ margin: 0 }}>—</p>;
   return <p style={{ margin: 0, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{clean}</p>;
+}
+
+type SectionDef = { key: string; label: string; count?: number; empty: boolean; render: () => React.ReactNode };
+
+function buildSections(c: AdminCharacter): SectionDef[] {
+  const detailKeys = c.detailReport
+    ? DETAIL_LABELS.filter(([k]) => typeof c.detailReport?.[k] === 'string' && (c.detailReport?.[k] as string).trim())
+    : [];
+  return [
+    {
+      key: 'public', label: '공개 프로필', empty: !c.publicProfile?.trim(),
+      render: () => <Prose text={c.publicProfile} />,
+    },
+    {
+      key: 'secret', label: '비밀 프로필', empty: !c.secretProfile?.trim(),
+      render: () => <Prose text={c.secretProfile} />,
+    },
+    {
+      key: 'summary', label: '요약 리포트', empty: !c.oneLineSummary?.trim() && !c.summary,
+      render: () => (
+        <>
+          <p style={{ margin: '0 0 14px', fontWeight: 800, lineHeight: 1.6 }}>{c.oneLineSummary || '—'}</p>
+          <div className="stack" style={{ gap: 12 }}>
+            {SUMMARY_LABELS.map(([key, label]) => (
+              <div className="result-block" key={key} style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{label}</h3>
+                <Prose text={(c.summary?.[key] as string) || ''} />
+              </div>
+            ))}
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'inferences', label: '추론', count: c.inferences?.length || 0, empty: (c.inferences?.length || 0) === 0,
+      render: () => (
+        <>
+          {(c.inferences || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
+          {(c.inferences || []).map((inf, i) => (
+            <div className="inference" key={inf.id || i}>
+              <div className="inference-top">
+                <p style={{ fontWeight: 700 }}>{inf.text || '—'}</p>
+                <span className="tag" style={{ whiteSpace: 'nowrap' }}>
+                  {VERDICT_LABEL[inf.ownerVerdict || 'unreviewed'] || inf.ownerVerdict}
+                  {typeof inf.confidence === 'number' && ` · ${inf.confidence}`}
+                </span>
+              </div>
+              {inf.ownerFeedback && <p className="muted" style={{ margin: '6px 0 0' }}>오너 메모: {inf.ownerFeedback}</p>}
+              {Array.isArray(inf.evidence) && inf.evidence.length > 0 && (
+                <div className="pills">{inf.evidence.map((e, j) => <span className="pill" key={j}>{e}</span>)}</div>
+              )}
+            </div>
+          ))}
+        </>
+      ),
+    },
+    {
+      key: 'answers', label: '질문 응답', count: c.answers?.length || 0, empty: (c.answers?.length || 0) === 0,
+      render: () => (
+        <>
+          {(c.answers || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
+          {(c.answers || []).map((a, i) => (
+            <div className="inference" key={a.order ?? i}>
+              <p style={{ fontWeight: 700, margin: 0 }}>{a.order ? `${a.order}. ` : ''}{a.question || '—'}</p>
+              <p style={{ margin: '6px 0 0', lineHeight: 1.6 }}>{a.answer || '—'}</p>
+              {a.reason && <p className="muted" style={{ margin: '4px 0 0' }}>이유: {a.reason}</p>}
+            </div>
+          ))}
+        </>
+      ),
+    },
+    {
+      key: 'detail', label: '상세 리포트', empty: !c.detailReport,
+      render: () => (
+        <>
+          {!c.detailReport && <p className="muted" style={{ margin: 0 }}>아직 생성되지 않았어요.</p>}
+          {c.detailReport && (
+            <>
+              <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>생성 {fmtDate(c.detailGeneratedAt)}</p>
+              <div className="stack" style={{ gap: 12 }}>
+                {detailKeys.map(([key, label]) => (
+                  <div className="result-block" key={key} style={{ padding: 16 }}>
+                    <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{label}</h3>
+                    <Prose text={c.detailReport?.[key] as string} />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      ),
+    },
+  ];
 }
 
 export default function AdminConsolePage() {
@@ -87,7 +171,8 @@ export default function AdminConsolePage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'denied' | 'error'>('loading');
   const [errorText, setErrorText] = useState('');
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detailChar, setDetailChar] = useState<AdminCharacter | null>(null);
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AdminCharacter | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
@@ -116,6 +201,25 @@ export default function AdminConsolePage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [load]);
 
+  // Keep the open modal in sync with refreshed data; drop it if the character is gone.
+  useEffect(() => {
+    if (!detailChar || !characters) return;
+    const fresh = characters.find(c => c.shareCode === detailChar.shareCode);
+    if (!fresh) setDetailChar(null);
+    else if (fresh !== detailChar) setDetailChar(fresh);
+  }, [characters, detailChar]);
+
+  // Close modals with Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (pendingDelete) setPendingDelete(null);
+      else if (detailChar) setDetailChar(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailChar, pendingDelete]);
+
   const filtered = useMemo(() => {
     const list = characters || [];
     const q = query.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -126,6 +230,11 @@ export default function AdminConsolePage() {
       (c.shareCode || '').toLowerCase().includes(q)
     );
   }, [characters, query]);
+
+  function openDetail(c: AdminCharacter) {
+    setDetailChar(c);
+    setOpenSection(null);
+  }
 
   async function logout() {
     await fetch('/api/admin/session', { method: 'DELETE' }).catch(() => {});
@@ -144,6 +253,7 @@ export default function AdminConsolePage() {
         return;
       }
       setCharacters(prev => (prev || []).filter(c => c.shareCode !== pendingDelete.shareCode));
+      if (detailChar?.shareCode === pendingDelete.shareCode) setDetailChar(null);
       setPendingDelete(null);
     } finally {
       setDeleting(false);
@@ -166,6 +276,8 @@ export default function AdminConsolePage() {
       </main>
     );
   }
+
+  const sections = detailChar ? buildSections(detailChar) : [];
 
   return (
     <main className="container page">
@@ -197,107 +309,98 @@ export default function AdminConsolePage() {
       {filtered.length === 0 && <p className="muted">표시할 캐릭터가 없어요.</p>}
 
       <div className="stack" style={{ marginTop: 8 }}>
-        {filtered.map(c => {
-          const open = expanded === c.shareCode;
-          return (
-            <div className="card" key={c.shareCode} style={{ padding: 22 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {filtered.map(c => (
+          <div className="card" key={c.shareCode} style={{ padding: 22 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => openDetail(c)}
+                style={{ textAlign: 'left', background: 'transparent', border: 0, padding: 0, minWidth: 0, flex: 1, cursor: 'pointer' }}
+                aria-label={`${c.name} 상세 열기`}
+              >
+                <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: 22, letterSpacing: '-.02em' }}>{c.name || '(이름 없음)'}</strong>
+                  <span className="muted">오너 · {c.ownerName || '—'}</span>
+                  <span className="tag" style={{ fontFamily: 'monospace', letterSpacing: '.08em' }}>{c.shareCode}</span>
+                </div>
+                <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>
+                  {c.oneLineSummary || '한 줄 요약 없음'}
+                </p>
+                <p className="muted" style={{ margin: '6px 0 0', fontSize: 12 }}>
+                  생성 {fmtDate(c.createdAt)} · 수정 {fmtDate(c.updatedAt)}
+                  {c.analysisConfidence != null && ` · 신뢰도 ${c.analysisConfidence}`}
+                  {c.detailReport ? ' · 상세리포트 있음' : ' · 상세리포트 없음'}
+                </p>
+              </button>
+              <div className="actions" style={{ marginTop: 0 }}>
+                <button className="btn" onClick={() => openDetail(c)}>자세히</button>
+                <button className="btn danger" onClick={() => setPendingDelete(c)}>삭제</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {detailChar && (
+        <div className="modal-backdrop" onClick={() => setDetailChar(null)}>
+          <div
+            className="modal"
+            style={{ width: 'min(760px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: 22, letterSpacing: '-.02em' }}>{c.name || '(이름 없음)'}</strong>
-                    <span className="muted">오너 · {c.ownerName || '—'}</span>
-                    <span className="tag" style={{ fontFamily: 'monospace', letterSpacing: '.08em' }}>{c.shareCode}</span>
+                    <strong style={{ fontSize: 24, letterSpacing: '-.02em' }}>{detailChar.name || '(이름 없음)'}</strong>
+                    <span className="muted">오너 · {detailChar.ownerName || '—'}</span>
+                    <span className="tag" style={{ fontFamily: 'monospace', letterSpacing: '.08em' }}>{detailChar.shareCode}</span>
                   </div>
-                  <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>
-                    {c.oneLineSummary || '한 줄 요약 없음'}
-                  </p>
-                  <p className="muted" style={{ margin: '6px 0 0', fontSize: 12 }}>
-                    생성 {fmtDate(c.createdAt)} · 수정 {fmtDate(c.updatedAt)}
-                    {c.analysisConfidence != null && ` · 신뢰도 ${c.analysisConfidence}`}
-                    {c.detailReport ? ' · 상세리포트 있음' : ' · 상세리포트 없음'}
-                  </p>
+                  <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>{detailChar.oneLineSummary || '한 줄 요약 없음'}</p>
                 </div>
-                <div className="actions" style={{ marginTop: 0 }}>
-                  <button className="btn" onClick={() => setExpanded(open ? null : c.shareCode)}>
-                    {open ? '접기' : '자세히'}
-                  </button>
-                  <button className="btn danger" onClick={() => setPendingDelete(c)}>삭제</button>
-                </div>
+                <button className="btn" style={{ padding: '8px 12px' }} onClick={() => setDetailChar(null)} aria-label="닫기">✕</button>
+              </div>
+              <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>항목을 눌러 내용을 펼쳐보세요.</p>
+            </div>
+
+            <div style={{ overflow: 'auto', padding: '12px 16px 20px' }}>
+              <div className="stack" style={{ gap: 8 }}>
+                {sections.map(s => {
+                  const open = openSection === s.key;
+                  return (
+                    <div key={s.key} style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', background: 'var(--paper)' }}>
+                      <button
+                        onClick={() => setOpenSection(open ? null : s.key)}
+                        style={{
+                          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                          padding: '15px 18px', background: open ? 'var(--accent-soft)' : 'transparent', border: 0,
+                          fontWeight: 800, fontSize: 15, textAlign: 'left', cursor: 'pointer',
+                        }}
+                        aria-expanded={open}
+                      >
+                        <span>
+                          {s.label}
+                          {s.count != null && <span className="muted" style={{ fontWeight: 700 }}> · {s.count}개</span>}
+                          {s.empty && <span className="muted" style={{ fontWeight: 700 }}> · 없음</span>}
+                        </span>
+                        <span aria-hidden style={{ fontSize: 18, color: 'var(--muted)' }}>{open ? '−' : '+'}</span>
+                      </button>
+                      {open && (
+                        <div style={{ padding: '4px 18px 20px', borderTop: '1px solid var(--line)' }}>
+                          {s.render()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {open && (
-                <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-                  <Section title="공개 프로필"><Prose text={c.publicProfile} /></Section>
-                  <Section title="비밀 프로필"><Prose text={c.secretProfile} /></Section>
-
-                  <Section title="요약 리포트">
-                    <p style={{ margin: '0 0 12px', fontWeight: 800 }}>{c.oneLineSummary || '—'}</p>
-                    <div className="result-grid" style={{ marginTop: 0 }}>
-                      {SUMMARY_LABELS.map(([key, label]) => (
-                        <div className="result-block" key={key}>
-                          <h3 style={{ fontSize: 15 }}>{label}</h3>
-                          <Prose text={(c.summary?.[key] as string) || ''} />
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-
-                  <Section title={`추론 (${c.inferences?.length || 0}개)`}>
-                    {(c.inferences || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
-                    {(c.inferences || []).map((inf, i) => (
-                      <div className="inference" key={inf.id || i}>
-                        <div className="inference-top">
-                          <p style={{ fontWeight: 700 }}>{inf.text || '—'}</p>
-                          <span className="tag" style={{ whiteSpace: 'nowrap' }}>
-                            {VERDICT_LABEL[inf.ownerVerdict || 'unreviewed'] || inf.ownerVerdict}
-                            {typeof inf.confidence === 'number' && ` · ${inf.confidence}`}
-                          </span>
-                        </div>
-                        {inf.ownerFeedback && <p className="muted" style={{ margin: '6px 0 0' }}>오너 메모: {inf.ownerFeedback}</p>}
-                        {Array.isArray(inf.evidence) && inf.evidence.length > 0 && (
-                          <div className="pills">{inf.evidence.map((e, j) => <span className="pill" key={j}>{e}</span>)}</div>
-                        )}
-                      </div>
-                    ))}
-                  </Section>
-
-                  <Section title={`질문 응답 (${c.answers?.length || 0}개)`}>
-                    {(c.answers || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
-                    {(c.answers || []).map((a, i) => (
-                      <div className="inference" key={a.order ?? i}>
-                        <p style={{ fontWeight: 700, margin: 0 }}>{a.order ? `${a.order}. ` : ''}{a.question || '—'}</p>
-                        <p style={{ margin: '6px 0 0', lineHeight: 1.6 }}>{a.answer || '—'}</p>
-                        {a.reason && <p className="muted" style={{ margin: '4px 0 0' }}>이유: {a.reason}</p>}
-                      </div>
-                    ))}
-                  </Section>
-
-                  <Section title="상세 리포트">
-                    {!c.detailReport && <p className="muted" style={{ margin: 0 }}>아직 생성되지 않았어요.</p>}
-                    {c.detailReport && (
-                      <>
-                        <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>생성 {fmtDate(c.detailGeneratedAt)}</p>
-                        <div className="stack" style={{ gap: 14 }}>
-                          {DETAIL_LABELS.map(([key, label]) => {
-                            const value = c.detailReport?.[key];
-                            if (typeof value !== 'string' || !value.trim()) return null;
-                            return (
-                              <div className="result-block" key={key}>
-                                <h3 style={{ fontSize: 15 }}>{label}</h3>
-                                <Prose text={value} />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </Section>
-                </div>
-              )}
+              <div className="actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                <button className="btn danger" onClick={() => setPendingDelete(detailChar)}>이 캐릭터 삭제</button>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
 
       {pendingDelete && (
         <div className="modal-backdrop" onClick={() => !deleting && setPendingDelete(null)}>
