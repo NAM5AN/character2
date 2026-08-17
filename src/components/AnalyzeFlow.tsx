@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion, QuestionResponseType } from '@/lib/schemas/question';
 import type { CharacterReportPreview } from '@/lib/character-report';
@@ -15,31 +15,111 @@ type ResponseData={selected?:string;custom?:string;multiSelected?:string[];ranki
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 // 심즈 로딩 문구 스타일: 상담(인터뷰) 자리에서 캐릭터가 벌일 법한 짓 "~하는 중".
-// 뜬금없어도 '그 자리에서 일어날 수 있는' 것이면 OK (창밖 비둘기 눈싸움 등).
-const LOADING_FLAVORS=[
-  '{name}가 의자에 앉자마자 다리 떠는 중',
-  '{name}가 괜찮다면서 눈은 안 마주치는 중',
-  '{name}가 질문마다 "음…" 하고 한참 뜸 들이는 중',
-  '{name}가 별거 아니라며 손톱만 만지작거리는 중',
-  '{name}가 눈치 보며 모범답안을 고민하는 중',
-  '{name}가 쿠션 끌어안고 방어 태세 잡는 중',
-  '{name}가 "그런 적 없는데요" 하며 시선 피하는 중',
-  '{name}가 창밖 비둘기랑 눈싸움하는 중',
-  '{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중',
-  '{name}가 폰 안 보는 척하며 몰래 보는 중',
-  '{name}가 다 안다는 듯 팔짱 끼는 중',
-  '{name}가 농담으로 진지한 질문 넘기려는 중',
-  '{name}가 티슈 뽑아놓고 안 우는 척하는 중',
-  '{name}가 물컵만 만지작대며 딴청 부리는 중',
-  '{name}가 대답 대신 어깨만 으쓱하는 중',
-  '{name}가 괜히 시계 보며 끝나길 기다리는 중',
-  '{name}가 상담사를 거꾸로 분석하려 드는 중',
-  '{name}가 "이거 마지막 질문이죠?" 하고 슬쩍 떠보는 중',
-  '{name}가 벽에 걸린 그림 삐뚤어졌나 계속 신경 쓰는 중',
-  '{name}가 대기실에서 연습한 말 다 까먹은 중',
-  '{name}가 이어폰 줄 푸는 데 인생 거는 중',
-  '{name}가 속으론 다 계산하며 태연한 척하는 중',
+// 뜬금없어도 '그 자리에서 일어날 수 있는' 것이면 OK. 각 문구에 어울리는 성격 태그를 달아두고,
+// 이미 분석한 텍스트(프로필·추론·성향 라벨·문답)에서 감지한 태그와 겹치는 문구만 노출합니다.
+// AI를 쓰지 않는 순수 키워드 매칭이라 토큰이 들지 않습니다.
+type Flavor={t:string;g:string[]};
+const FLAVOR_POOL:Flavor[]=[
+  // any: 성격과 무관하게 늘 어울리는 상담실 기본 상황
+  {t:'{name}가 의자에 앉자마자 자세부터 고쳐 앉는 중',g:['any']},
+  {t:'{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중',g:['any']},
+  {t:'{name}가 폰 안 보는 척하며 몰래 보는 중',g:['any']},
+  {t:'{name}가 괜히 시계 보며 끝나길 기다리는 중',g:['any']},
+  {t:'{name}가 "이거 마지막 질문이죠?" 하고 슬쩍 떠보는 중',g:['any']},
+  {t:'{name}가 대기실에서 연습한 말 다 까먹은 중',g:['any']},
+  {t:'{name}가 물컵만 만지작대며 딴청 부리는 중',g:['any']},
+  {t:'{name}가 벽에 걸린 그림 삐뚤어졌나 계속 신경 쓰는 중',g:['any']},
+  // shy: 소심·수줍·내성
+  {t:'{name}가 대답할수록 목소리가 작아지는 중',g:['shy']},
+  {t:'{name}가 손 어디 둘지 몰라 무릎에 얹었다 뗐다 하는 중',g:['shy']},
+  {t:'{name}가 대답 다 해놓고 "아 아니에요" 무르는 중',g:['shy']},
+  // proud: 도도·자신감·거만
+  {t:'{name}가 다리 꼬고 여유로운 척 앉아있는 중',g:['proud']},
+  {t:'{name}가 "그 정도쯤이야" 하며 콧대 세우는 중',g:['proud']},
+  {t:'{name}가 질문을 시시하다는 듯 웃어넘기는 중',g:['proud']},
+  // cold: 차갑·시크·무뚝뚝·무심
+  {t:'{name}가 단답으로 끊고 침묵으로 버티는 중',g:['cold']},
+  {t:'{name}가 "그게 중요한가요" 하고 되묻는 중',g:['cold']},
+  {t:'{name}가 표정 하나 안 바꾸고 앉아있는 중',g:['cold']},
+  // warm: 다정·따뜻·배려
+  {t:'{name}가 상담사 컨디션까지 걱정해주는 중',g:['warm']},
+  {t:'{name}가 "천천히 하셔도 돼요" 하고 배려하는 중',g:['warm']},
+  {t:'{name}가 대답 끝에 괜히 한 번 웃어주는 중',g:['warm']},
+  // playful: 장난·짓궂·능글
+  {t:'{name}가 질문을 농담으로 되받아치는 중',g:['playful']},
+  {t:'{name}가 상담사 표정 따라 하며 장난치는 중',g:['playful']},
+  {t:'{name}가 일부러 엉뚱한 답으로 반응 떠보는 중',g:['playful']},
+  // cheerful: 활발·밝·명랑
+  {t:'{name}가 신나서 안 물어본 것까지 말하는 중',g:['cheerful']},
+  {t:'{name}가 손짓 발짓 다 써가며 설명하는 중',g:['cheerful']},
+  {t:'{name}가 웃음소리로 상담실을 채우는 중',g:['cheerful']},
+  // anxious: 예민·불안·눈치
+  {t:'{name}가 이 대답이 맞았나 계속 곱씹는 중',g:['anxious']},
+  {t:'{name}가 상담사 눈치를 세 번째 보는 중',g:['anxious']},
+  {t:'{name}가 다리를 쉴 새 없이 떠는 중',g:['anxious']},
+  // chaotic: 충동·엉뚱·산만·4차원
+  {t:'{name}가 창밖 비둘기랑 눈싸움하는 중',g:['chaotic']},
+  {t:'{name}가 질문은 잊고 천장 무늬 세는 중',g:['chaotic']},
+  {t:'{name}가 갑자기 딴 얘기로 새는 중',g:['chaotic']},
+  // serious: 진지·원칙·논리
+  {t:'{name}가 질문 의도부터 정색하고 따지는 중',g:['serious']},
+  {t:'{name}가 대답을 논리적으로 정리해 말하는 중',g:['serious']},
+  {t:'{name}가 "정확히 말하면요" 하고 고쳐주는 중',g:['serious']},
+  // gloomy: 우울·냉소·무기력
+  {t:'{name}가 "어차피 뻔하잖아요" 하고 한숨 쉬는 중',g:['gloomy']},
+  {t:'{name}가 시선을 바닥에 오래 두는 중',g:['gloomy']},
+  {t:'{name}가 다 귀찮다는 듯 대충 답하는 중',g:['gloomy','lazy']},
+  // aggressive: 공격·다혈질·까칠
+  {t:'{name}가 질문이 마음에 안 들어 발끈하는 중',g:['aggressive']},
+  {t:'{name}가 팔짱 끼고 "그래서요?" 쏘아붙이는 중',g:['aggressive']},
+  {t:'{name}가 언성부터 높였다 스스로 놀라는 중',g:['aggressive']},
+  // guarded: 츤데레·방어·경계
+  {t:'{name}가 별거 아닌 척 속마음은 끝까지 숨기는 중',g:['guarded']},
+  {t:'{name}가 쿠션 끌어안고 방어 태세 잡는 중',g:['guarded']},
+  {t:'{name}가 "그런 적 없는데요" 하며 시선 피하는 중',g:['guarded']},
+  // calm: 침착·차분·담담
+  {t:'{name}가 물 한 모금 마시고 차분히 답하는 중',g:['calm']},
+  {t:'{name}가 서두르지 않고 한 박자 쉬어 말하는 중',g:['calm']},
+  // lazy: 게으름·느긋·귀찮
+  {t:'{name}가 의자에 늘어져 반쯤 눕는 중',g:['lazy']},
+  {t:'{name}가 "음... 몰라요" 하고 편하게 넘기는 중',g:['lazy']},
 ];
+const FLAVOR_KEYWORDS:Record<string,string[]>={
+  shy:['소심','수줍','낯가림','낯을','내성적','부끄','숫기','조용','움츠','쭈뼛'],
+  proud:['도도','거만','오만','자신감','당당','자부심','콧대','우월','자존심','프라이드','고고'],
+  cold:['차가','시크','무뚝뚝','냉정','무심','쌀쌀','건조','무표정','까칠'],
+  warm:['다정','따뜻','상냥','배려','친절','포근','자상','챙기','살가'],
+  playful:['장난','짓궂','까불','능글','유쾌','익살','너스레','농담'],
+  cheerful:['활발','명랑','쾌활','발랄','에너지','텐션','싹싹','밝은','밝고','밝다'],
+  anxious:['예민','불안','걱정','눈치','긴장','초조','신경질','노심','조마'],
+  chaotic:['충동','즉흥','엉뚱','산만','사차원','4차원','제멋대로','변덕','자유분방','괴짜','기이','파괴','정신없','종잡'],
+  serious:['진지','원칙','규칙','완고','엄격','고지식','반듯','철저','책임감','논리','성실','올곧'],
+  gloomy:['우울','어둡','무기력','냉소','비관','침울','그늘','자조','염세','시니컬'],
+  aggressive:['공격','다혈질','폭력','사나','과격','거칠','호전','불같','성깔','욱하','드센'],
+  guarded:['츤데레','방어적','경계','무장','내숭','새침','벽을','벽이','속마음','비밀'],
+  calm:['침착','차분','냉철','담담','평온','태연','의젓','묵직'],
+  lazy:['게으','느긋','태평','귀찮','나태','늘어지','늘어진'],
+};
+function detectFlavorTags(text:string):Set<string>{
+  const t=(text||'').toLowerCase();
+  const tags=new Set<string>();
+  for(const tag of Object.keys(FLAVOR_KEYWORDS)){
+    if(FLAVOR_KEYWORDS[tag].some(word=>t.includes(word)))tags.add(tag);
+  }
+  return tags;
+}
+function pickFlavors(text:string):string[]{
+  const tags=detectFlavorTags(text);
+  const out:string[]=[];
+  const seen=new Set<string>();
+  for(const flavor of FLAVOR_POOL){
+    if(!flavor.g.some(tag=>tag==='any'||tags.has(tag)))continue;
+    if(seen.has(flavor.t))continue;
+    seen.add(flavor.t);
+    out.push(flavor.t);
+  }
+  return out.length?out:FLAVOR_POOL.filter(f=>f.g.includes('any')).map(f=>f.t);
+}
 const RESPONSE_TYPE_LABELS:Record<QuestionResponseType,string>={fill_blank:'빈칸 채우기',sentence_continue:'문장 이어쓰기',dialogue_choice:'대사 고르기',bipolar_scale:'A/B 가까움',ranking:'순위 매기기',forced_choice:'둘 중 하나',multi_select:'복수 선택',least_likely:'가장 하지 않을 것',slider:'가능성 슬라이더',relationship_matrix:'관계별 반응',inner_outer:'속마음 · 실제 행동',temporal_compare:'시간별 반응',condition_followup:'조건 변화 비교',in_character_response:'캐릭터 대사 직접 쓰기',owner_meta:'오너 메타 질문'};
 
 function responseTypeOf(question:InterviewQuestion):QuestionResponseType{const candidate=(question as InterviewQuestion&{responseType?:QuestionResponseType}).responseType;return candidate||(question.format==='free_response'?'in_character_response':'fill_blank')}
@@ -128,15 +208,31 @@ export function AnalyzeFlow(){
     return()=>window.clearTimeout(timer);
   },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary]);
 
+  // Everything we've analyzed so far, used to pick character-fitting loading flavor
+  // without any AI call. At parse time this is the pasted profile; by finalize it also
+  // includes inferences, confirmed facts, trait labels and the 20 answers.
+  const characterSignalText=useMemo(()=>{
+    const parts:string[]=[profileText,secretProfileText];
+    if(draft){
+      parts.push(...draft.aiInferences.map(x=>x.text));
+      parts.push(...draft.confirmedFacts.map(f=>`${f.key} ${String(f.value)}`));
+      parts.push(...Object.keys(draft.traits||{}));
+      parts.push(...Object.keys(draft.relationshipTraits||{}));
+    }
+    parts.push(...answers.map(a=>`${a.answer} ${a.reason||''}`));
+    return parts.join(' ');
+  },[profileText,secretProfileText,draft,answers]);
+  const matchedFlavors=useMemo(()=>pickFlavors(characterSignalText),[characterSignalText]);
+
   // Cute rotating "loading flavor" text while a generation step runs.
   useEffect(()=>{
     if(!busy)return;
-    setFlavorTick(Math.floor(Math.random()*LOADING_FLAVORS.length));
+    setFlavorTick(Math.floor(Math.random()*997));
     const id=window.setInterval(()=>setFlavorTick(t=>t+1),2600);
     return()=>window.clearInterval(id);
   },[busy]);
   const flavorName=(draft?.basicProfile.name||name||'이 캐릭터').trim()||'이 캐릭터';
-  const flavorMessage=LOADING_FLAVORS[flavorTick%LOADING_FLAVORS.length].replace('{name}',flavorName);
+  const flavorMessage=(matchedFlavors[flavorTick%matchedFlavors.length]||'').replace('{name}',flavorName);
 
   function continueSavedAnalysis(){if(!resumeCandidate)return;persistenceEnabled.current=false;restoreSavedSession(resumeCandidate);setResumeCandidate(null);window.setTimeout(()=>{persistenceEnabled.current=true},0)}
   function startFreshAnalysis(){persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);setResumeCandidate(null);clearProgressState();window.setTimeout(()=>{persistenceEnabled.current=true},0)}
