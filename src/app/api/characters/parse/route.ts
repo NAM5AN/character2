@@ -2,20 +2,27 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas/character';
 import { askOpenAIJson } from '@/lib/ai/openai';
+import { analyzeAppearanceImages } from '@/lib/ai/appearance';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 import { resolveProfileInput } from '@/lib/profile-source';
+
+const appearanceImageSchema = z.object({
+  name: z.string().min(1).max(180),
+  dataUrl: z.string().max(750_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/iu),
+});
 
 const requestSchema = z.object({
   name: z.string().min(1).max(80),
   profileText: z.string().min(1).max(50_000),
   secretProfileText: z.string().max(50_000).optional().default(''),
+  appearanceImages: z.array(appearanceImageSchema).max(4).optional().default([]),
 });
 
 type UnknownRecord = Record<string, unknown>;
 type SourceAnchor = {
   id: string;
-  layer: 'public' | 'secret';
+  layer: 'public' | 'secret' | 'appearance';
   text: string;
 };
 
@@ -25,13 +32,19 @@ const PARSER_INSTRUCTIONS_V2 = `당신은 자캐커뮤니티 캐릭터 프로필
 명시되지 않은 과거 사건, 감정, 관계를 공식 설정처럼 추가하지 마세요.
 traits와 relationshipTraits의 수치형 항목은 0~100으로 표현하되 정보가 불충분하면 문자열 "unknown"을 사용하세요.
 
+SOURCE_FACTS에는 공개 프로필, 비밀 프로필 외에 layer=appearance인 외관 자료 관찰 메모가 들어올 수 있습니다.
+- appearance는 이미지에서 직접 관찰한 외형·의상·소품·표현 방식의 보조 정보입니다.
+- 외관만 보고 성격, 동기, 정신상태, 과거, 관계 성향을 확정하지 마세요.
+- appearance를 심리적 aiInference 근거로 사용한다면 반드시 public 또는 secret의 독립 텍스트 근거를 하나 이상 함께 연결하세요.
+- 그림체, 조명, 포즈 한 장만으로 캐릭터 설정을 확정하지 마세요.
+
 aiInferences에는 캐릭터 자체에 대한 '한 단계 높은 해석'만 넣으세요.
 다음은 aiInferences에 넣지 마세요.
 - 공개/비밀 프로필의 이름 표기 차이, 문장 표현, 작성 방식, 정보 누락 등 프로필 문서 자체를 평가하는 내용.
 - "명시되지 않았다", "확정하기 어렵다", "정보가 부족하다"처럼 설정 문서의 부족함을 설명하는 내용.
 - 프로필에 이미 직접 적힌 성격·행동을 추상적인 말로 바꾸어 반복한 것뿐인 내용.
 
-서버가 프로필의 모든 원문 조각에 fact_### 형식의 ID를 붙여 SOURCE_FACTS로 제공합니다.
+서버가 입력의 원문 조각에 fact_### 형식의 ID를 붙여 SOURCE_FACTS로 제공합니다.
 AI 추론은 반드시 이 ID들을 근거로 연결해서 만드세요.
 - 각 aiInference마다 evidenceIds를 2~4개 넣으세요.
 - evidenceIds에는 SOURCE_FACTS에 실제 존재하는 ID만 사용하세요.
@@ -149,7 +162,7 @@ function profileFragments(text: string) {
   return fragments;
 }
 
-function buildSourceAnchors(publicText: string, secretText: string) {
+function buildSourceAnchors(publicText: string, secretText: string, appearanceNotes: string) {
   const anchors: SourceAnchor[] = [];
   const addLayer = (layer: SourceAnchor['layer'], text: string) => {
     for (const fragment of profileFragments(text)) {
@@ -159,6 +172,7 @@ function buildSourceAnchors(publicText: string, secretText: string) {
   };
   addLayer('public', publicText);
   if (secretText.trim()) addLayer('secret', secretText);
+  if (appearanceNotes.trim()) addLayer('appearance', appearanceNotes);
   return anchors;
 }
 
@@ -181,7 +195,9 @@ function normalizeInferences(items: unknown[], anchors: SourceAnchor[]) {
 
     const evidenceIds = normalizeEvidenceIds(record, anchorMap);
     if (evidenceIds.length < 2) return [];
-    const evidence = evidenceIds.map(id => anchorMap.get(id)!.text);
+    const selectedAnchors = evidenceIds.map(id => anchorMap.get(id)!).filter(Boolean);
+    if (selectedAnchors.some(anchor=>anchor.layer==='appearance') && selectedAnchors.every(anchor=>anchor.layer==='appearance')) return [];
+    const evidence = selectedAnchors.map(anchor => anchor.text);
 
     const confidence = normalizeScore(record.confidence ?? record.score ?? record.probability ?? record.certainty, 60);
     return [{
@@ -199,20 +215,21 @@ export async function POST(request: Request) {
   try {
     await assertRateLimit('character_parse', 10, 30);
     const body = requestSchema.parse(await request.json());
-    const [publicSource, secretSource] = await Promise.all([
+    const [publicSource, secretSource, appearanceNotes] = await Promise.all([
       resolveProfileInput(body.profileText, true),
       resolveProfileInput(body.secretProfileText, false),
+      analyzeAppearanceImages(body.appearanceImages),
     ]);
     const profileText = publicSource.text;
     const secretProfileText = secretSource.text;
 
-    const sourceAnchors = buildSourceAnchors(profileText, secretProfileText);
+    const sourceAnchors = buildSourceAnchors(profileText, secretProfileText, appearanceNotes);
 
     const raw = await askOpenAIJson({
       instructions: PARSER_INSTRUCTIONS_V2,
       schema: initialCharacterDraftSchema,
       maxOutputTokens: 3600,
-      input: `캐릭터 이름: ${body.name}\n\nSOURCE_FACTS — 서버가 공개/비밀 프로필 원문 순서대로 만든 근거 ID 목록입니다:\n${JSON.stringify(sourceAnchors)}\n\n위 SOURCE_FACTS가 이번 분석의 전체 프로필 입력입니다. layer=public은 공개 프로필, layer=secret은 비밀 프로필입니다.\n공개와 비밀 정보층의 차이는 캐릭터 해석에 활용할 수 있지만, 문서 표기 차이나 누락 자체를 aiInference로 만들지는 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidenceIds} 배열로 출력하세요. evidenceIds는 SOURCE_FACTS에 실제 존재하는 서로 다른 fact ID 2~4개입니다. id와 ownerVerdict는 서버가 생성합니다.`,
+      input: `캐릭터 이름: ${body.name}\n\nSOURCE_FACTS — 서버가 공개/비밀 프로필과 외관 관찰 메모를 순서대로 만든 근거 ID 목록입니다:\n${JSON.stringify(sourceAnchors)}\n\nlayer=public은 공개 프로필, layer=secret은 비밀 프로필, layer=appearance는 첨부 이미지에서 직접 관찰한 외관 보조 정보입니다.\nappearance는 외형·의상·소품·시각적 인상을 보완하는 자료이며, 심리나 과거를 단독으로 확정하는 근거로 쓰면 안 됩니다.\n공개와 비밀 정보층의 차이는 캐릭터 해석에 활용할 수 있지만, 문서 표기 차이나 누락 자체를 aiInference로 만들지는 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText/appearanceNotes는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidenceIds} 배열로 출력하세요. evidenceIds는 SOURCE_FACTS에 실제 존재하는 서로 다른 fact ID 2~4개입니다. id와 ownerVerdict는 서버가 생성합니다.`,
     });
 
     const basic = asRecord(raw.basicProfile);
@@ -223,6 +240,7 @@ export async function POST(request: Request) {
         gender: typeof basic.gender === 'string' ? basic.gender : null,
         profileText,
         ...(secretProfileText.trim() ? { secretProfileText } : {}),
+        ...(appearanceNotes.trim() ? { appearanceNotes } : {}),
       },
       traits: normalizeTraitRecord(raw.traits),
       relationshipTraits: normalizeTraitRecord(raw.relationshipTraits),
