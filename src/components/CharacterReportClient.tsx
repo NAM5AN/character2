@@ -15,7 +15,7 @@ export function CharacterReportClient({preview,completedDetail}:{preview:Charact
     }catch{}
   },[preview.shareCode]);
 
-  if(completedDetail?.complete){
+  if(completedDetail){
     return <CompletedCharacterReportView preview={preview} detail={completedDetail}/>;
   }
 
