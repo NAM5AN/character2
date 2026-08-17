@@ -28,17 +28,6 @@ export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.strin
 export const characterDraftSchema=z.object({basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),analysisConfidence:z.number().min(0).max(100)});
 
 export const analysisTypeSummarySchema=z.object({outerSelf:z.string().min(20).max(160),innerSelf:z.string().min(20).max(160),conflictStyle:z.string().min(20).max(160),affectionStyle:z.string().min(20).max(160)});
-const reportItemSchema=z.string().min(4).max(320);
-const reportListSchema=z.array(reportItemSchema).min(1).max(6);
-const evidenceBackedListSchema=z.array(reportItemSchema).max(6).default([]);
-const deepSectionSchema=z.string().min(60).max(1200);
-const compactDeepSectionSchema=z.string().min(40).max(900);
-const manualListSchema=z.array(z.string().min(4).max(240)).min(1).max(5);
-export const relationshipManualSchema=z.object({
-  gettingClose:manualListSchema,
-  avoid:manualListSchema,
-  affectionSignals:manualListSchema,
-});
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
 
@@ -61,52 +50,51 @@ export const characterEvidencePackSchema=z.object({
 export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:z.record(z.string(),z.unknown()).optional().default({}),evidencePack:z.record(z.string(),z.unknown()).optional().default({})}).passthrough();
 export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,evidencePack:characterEvidencePackSchema});
 
+// Paid detail 6.4+: seven large narrative sections only.
+// No character-count limits are applied to these generated sections.
 export const detailAnalysisRawSchema=z.object({
-  outerSelf:z.unknown(),innerSelf:z.unknown(),coreValues:z.unknown(),desires:z.unknown(),fears:z.unknown(),conflictStyle:z.unknown(),affectionStyle:z.unknown(),misunderstoodPoints:z.unknown(),contradictions:z.unknown(),interestingPoints:z.unknown(),detailedReport:z.unknown(),
-  corePersonality:z.unknown(),developmentalRoots:z.unknown(),emotionalStructure:z.unknown(),defenseAndStress:z.unknown(),relationshipPattern:z.unknown(),attachmentPattern:z.unknown(),romanceStyle:z.unknown(),attractionCriteria:z.unknown(),moralAndExtremeChoices:z.unknown(),selfDeception:z.unknown(),wantsVsNeeds:z.unknown(),statedVsEnacted:z.unknown(),strengthsAndRisks:z.unknown(),charmPoints:z.unknown(),hiddenTraits:z.unknown(),relationshipManual:z.unknown(),
+  characterOverview:z.unknown(),
+  innerMechanics:z.unknown(),
+  relationshipStyle:z.unknown(),
+  attachmentStyle:z.unknown(),
+  conflictStyleDetailed:z.unknown(),
+  charmAndContradictions:z.unknown(),
+  integratedReport:z.unknown(),
 }).passthrough();
 
 export const detailAnalysisGenerationSchema=z.object({
-  outerSelf:z.string().min(80).max(900),
-  innerSelf:z.string().min(80).max(900),
-  coreValues:reportListSchema,
-  desires:reportListSchema,
-  fears:reportListSchema,
-  conflictStyle:z.string().min(80).max(900),
-  affectionStyle:z.string().min(80).max(900),
-  misunderstoodPoints:evidenceBackedListSchema,
-  contradictions:evidenceBackedListSchema,
-  interestingPoints:reportListSchema,
-  corePersonality:deepSectionSchema,
-  developmentalRoots:compactDeepSectionSchema,
-  emotionalStructure:deepSectionSchema,
-  defenseAndStress:deepSectionSchema,
-  relationshipPattern:deepSectionSchema,
-  attachmentPattern:deepSectionSchema,
-  romanceStyle:compactDeepSectionSchema,
-  attractionCriteria:compactDeepSectionSchema,
-  moralAndExtremeChoices:deepSectionSchema,
-  selfDeception:deepSectionSchema,
-  wantsVsNeeds:compactDeepSectionSchema,
-  statedVsEnacted:compactDeepSectionSchema,
-  strengthsAndRisks:reportListSchema,
-  charmPoints:reportListSchema,
-  hiddenTraits:reportListSchema,
-  relationshipManual:relationshipManualSchema,
-  detailedReport:z.string().min(400).max(2600),
+  characterOverview:z.string(),
+  innerMechanics:z.string(),
+  relationshipStyle:z.string(),
+  attachmentStyle:z.string(),
+  conflictStyleDetailed:z.string(),
+  charmAndContradictions:z.string(),
+  integratedReport:z.string(),
 });
 
 export const finalAnalysisRawSchema=z.object({
   oneLineSummary:z.unknown(),summary:z.record(z.string(),z.unknown()).optional().default({}),
-  outerSelf:z.unknown(),innerSelf:z.unknown(),coreValues:z.unknown(),desires:z.unknown(),fears:z.unknown(),conflictStyle:z.unknown(),affectionStyle:z.unknown(),misunderstoodPoints:z.unknown(),contradictions:z.unknown(),interestingPoints:z.unknown(),detailedReport:z.unknown(),
-  corePersonality:z.unknown(),developmentalRoots:z.unknown(),emotionalStructure:z.unknown(),defenseAndStress:z.unknown(),relationshipPattern:z.unknown(),attachmentPattern:z.unknown(),romanceStyle:z.unknown(),attractionCriteria:z.unknown(),moralAndExtremeChoices:z.unknown(),selfDeception:z.unknown(),wantsVsNeeds:z.unknown(),statedVsEnacted:z.unknown(),strengthsAndRisks:z.unknown(),charmPoints:z.unknown(),hiddenTraits:z.unknown(),relationshipManual:z.unknown(),
+  characterOverview:z.unknown(),innerMechanics:z.unknown(),relationshipStyle:z.unknown(),attachmentStyle:z.unknown(),conflictStyleDetailed:z.unknown(),charmAndContradictions:z.unknown(),integratedReport:z.unknown(),
 }).passthrough();
 export const finalAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,...detailAnalysisGenerationSchema.shape});
 
 export const finalAnalysisSchema=z.object({
-  oneLineSummary:z.string(),summary:analysisTypeSummarySchema.optional(),
-  outerSelf:z.string(),innerSelf:z.string(),coreValues:z.array(z.string()),desires:z.array(z.string()),fears:z.array(z.string()),conflictStyle:z.string(),affectionStyle:z.string(),misunderstoodPoints:z.array(z.string()),contradictions:z.array(z.string()),interestingPoints:z.array(z.string()),detailedReport:z.string().optional(),
-  corePersonality:z.string().optional(),developmentalRoots:z.string().optional(),emotionalStructure:z.string().optional(),defenseAndStress:z.string().optional(),relationshipPattern:z.string().optional(),attachmentPattern:z.string().optional(),romanceStyle:z.string().optional(),attractionCriteria:z.string().optional(),moralAndExtremeChoices:z.string().optional(),selfDeception:z.string().optional(),wantsVsNeeds:z.string().optional(),statedVsEnacted:z.string().optional(),strengthsAndRisks:z.array(z.string()).optional(),charmPoints:z.array(z.string()).optional(),hiddenTraits:z.array(z.string()).optional(),relationshipManual:relationshipManualSchema.optional(),
+  oneLineSummary:z.string(),
+  summary:analysisTypeSummarySchema.optional(),
+
+  // 6.4+ grouped detail fields.
+  characterOverview:z.string().optional(),
+  innerMechanics:z.string().optional(),
+  relationshipStyle:z.string().optional(),
+  attachmentStyle:z.string().optional(),
+  conflictStyleDetailed:z.string().optional(),
+  charmAndContradictions:z.string().optional(),
+  integratedReport:z.string().optional(),
+
+  // Legacy detail fields are kept optional so already-saved reports remain readable.
+  outerSelf:z.string().optional(),innerSelf:z.string().optional(),coreValues:z.array(z.string()).optional(),desires:z.array(z.string()).optional(),fears:z.array(z.string()).optional(),conflictStyle:z.string().optional(),affectionStyle:z.string().optional(),misunderstoodPoints:z.array(z.string()).optional(),contradictions:z.array(z.string()).optional(),interestingPoints:z.array(z.string()).optional(),detailedReport:z.string().optional(),
+  corePersonality:z.string().optional(),developmentalRoots:z.string().optional(),emotionalStructure:z.string().optional(),defenseAndStress:z.string().optional(),relationshipPattern:z.string().optional(),attachmentPattern:z.string().optional(),romanceStyle:z.string().optional(),attractionCriteria:z.string().optional(),moralAndExtremeChoices:z.string().optional(),selfDeception:z.string().optional(),wantsVsNeeds:z.string().optional(),statedVsEnacted:z.string().optional(),strengthsAndRisks:z.array(z.string()).optional(),charmPoints:z.array(z.string()).optional(),hiddenTraits:z.array(z.string()).optional(),
+  relationshipManual:z.object({gettingClose:z.array(z.string()),avoid:z.array(z.string()),affectionSignals:z.array(z.string())}).optional(),
 });
 
 export const characterPassportSchema=z.object({schemaVersion:z.literal('character-passport/1.0'),characterId:z.string().uuid(),shareCode:z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),basicProfile:publicBasicProfileSchema,traits:characterDraftSchema.shape.traits,relationshipTraits:characterDraftSchema.shape.relationshipTraits,confirmedFacts:characterDraftSchema.shape.confirmedFacts,aiInferences:characterDraftSchema.shape.aiInferences,interview:z.object({version:z.literal('interview/1.0'),completedCount:z.number().int().min(0).max(20),answers:z.array(interviewAnswerSchema)}),analysis:finalAnalysisSchema,engineVersions:z.object({parser:z.string(),interview:z.string(),analysis:z.string()})});
