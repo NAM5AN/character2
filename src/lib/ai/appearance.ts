@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { askOpenAIJson } from '@/lib/ai/openai';
+import { generateValidatedJson } from '@/lib/ai/json';
 
 export type AppearanceImageInput = {
   name: string;
@@ -35,12 +35,14 @@ const APPEARANCE_SYSTEM = `당신은 자캐커뮤니티의 캐릭터 외관 자�
 
 export async function analyzeAppearanceImages(images: AppearanceImageInput[]) {
   if (!images.length) return '';
-  const result = await askOpenAIJson({
-    instructions: APPEARANCE_SYSTEM,
+  const result = await generateValidatedJson({
+    model: process.env.APPEARANCE_MODEL || 'anthropic/claude-sonnet-5',
+    system: APPEARANCE_SYSTEM,
     schema: appearanceAnalysisSchema,
     maxOutputTokens: 1800,
+    maxAttempts: 2,
     images: images.map(image => image.dataUrl),
-    input: `첨부 외관 자료 ${images.length}장을 순서대로 읽어주세요.\n이미지 순서와 파일명: ${images.map((image,index)=>`${index+1}. ${image.name}`).join(' / ')}\n\n이 결과는 이후 캐릭터 분석에서 보조 근거로 쓰입니다. 외관 관찰 자체와 심리 추론을 섞지 마세요.`,
+    prompt: `첨부 외관 자료 ${images.length}장을 순서대로 읽어주세요.\n이미지 순서와 파일명: ${images.map((image,index)=>`${index+1}. ${image.name}`).join(' / ')}\n\n이 결과는 이후 캐릭터 분석에서 보조 근거로 쓰입니다. 외관 관찰 자체와 심리 추론을 섞지 마세요.`,
   });
 
   const lines = [
