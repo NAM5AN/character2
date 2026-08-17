@@ -2,16 +2,18 @@
 
 import { useEffect } from 'react';
 
-const LEVELS = [
-  { value: 0, label: '이쪽이다' },
-  { value: 25, label: '약간 이쪽인 편' },
-  { value: 50, label: '보통이다' },
-  { value: 75, label: '약간 저쪽인 편' },
-  { value: 100, label: '저쪽이다' },
-] as const;
+const LEVEL_VALUES = [0, 25, 50, 75, 100] as const;
 
 function nearestLevel(value:number){
-  return LEVELS.reduce((best,item)=>Math.abs(item.value-value)<Math.abs(best.value-value)?item:best,LEVELS[0]);
+  return LEVEL_VALUES.reduce((best,item)=>Math.abs(item-value)<Math.abs(best-value)?item:best,LEVEL_VALUES[0]);
+}
+
+function levelLabel(index:number,left:string,right:string){
+  if(index===0)return left;
+  if(index===1)return `‘${left}’에 조금 더 가까움`;
+  if(index===2)return '두 경우가 비슷함';
+  if(index===3)return `‘${right}’에 조금 더 가까움`;
+  return right;
 }
 
 export function BipolarFiveLevelUi(){
@@ -24,8 +26,8 @@ export function BipolarFiveLevelUi(){
         control.dataset.fiveLevelReady='1';
 
         const labels=control.querySelectorAll<HTMLElement>('.bipolar-labels strong');
-        const left=labels[0]?.textContent?.trim()||'왼쪽';
-        const right=labels[1]?.textContent?.trim()||'오른쪽';
+        const left=labels[0]?.textContent?.trim()||'첫 번째 선택';
+        const right=labels[1]?.textContent?.trim()||'두 번째 선택';
 
         const scale=document.createElement('div');
         scale.className='five-level-scale';
@@ -33,7 +35,7 @@ export function BipolarFiveLevelUi(){
         scale.setAttribute('aria-label',`${left}와 ${right} 사이의 5단계 선택`);
 
         const sync=()=>{
-          const active=nearestLevel(Number(range.value||50)).value;
+          const active=nearestLevel(Number(range.value||50));
           scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach(button=>{
             const checked=Number(button.dataset.value)===active && control.dataset.fiveLevelTouched==='1';
             button.classList.toggle('selected',checked);
@@ -41,19 +43,28 @@ export function BipolarFiveLevelUi(){
           });
         };
 
-        LEVELS.forEach((level,index)=>{
+        LEVEL_VALUES.forEach((value,index)=>{
+          const label=levelLabel(index,left,right);
           const button=document.createElement('button');
           button.type='button';
           button.className=`five-level-choice level-${index+1}`;
-          button.dataset.value=String(level.value);
+          button.dataset.value=String(value);
           button.setAttribute('role','radio');
           button.setAttribute('aria-checked','false');
-          button.setAttribute('aria-label',index===0?`${left} 쪽이다`:index===1?`${left} 쪽인 편`:index===2?'보통이다':index===3?`${right} 쪽인 편`:`${right} 쪽이다`);
-          button.innerHTML=`<span class="five-level-circle" aria-hidden="true"></span><span class="five-level-label">${level.label}</span>`;
+          button.setAttribute('aria-label',label);
+
+          const circle=document.createElement('span');
+          circle.className='five-level-circle';
+          circle.setAttribute('aria-hidden','true');
+          const caption=document.createElement('span');
+          caption.className='five-level-label';
+          caption.textContent=label;
+          button.append(circle,caption);
+
           button.addEventListener('click',()=>{
             control.dataset.fiveLevelTouched='1';
             try{range.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{range.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
-            range.value=String(level.value);
+            range.value=String(value);
             range.dispatchEvent(new Event('input',{bubbles:true}));
             range.dispatchEvent(new Event('change',{bubbles:true}));
             sync();
@@ -106,6 +117,7 @@ export function BipolarFiveLevelUi(){
       border-radius:50%;
       background:var(--paper);
       display:block;
+      flex:0 0 auto;
       transition:transform .14s ease,background .14s ease,border-color .14s ease,box-shadow .14s ease;
     }
     .five-level-choice.level-2 .five-level-circle,
@@ -119,11 +131,12 @@ export function BipolarFiveLevelUi(){
     }
     .five-level-label {
       font-size:12px;
-      line-height:1.35;
+      line-height:1.4;
       font-weight:800;
       text-align:center;
       color:var(--muted);
       word-break:keep-all;
+      max-width:190px;
     }
     .five-level-choice.selected .five-level-label { color:var(--ink); }
     .five-level-choice:focus-visible { outline:2px solid var(--ink);outline-offset:6px;border-radius:8px; }
@@ -132,7 +145,7 @@ export function BipolarFiveLevelUi(){
       .five-level-circle { width:46px;height:46px;border-width:2px; }
       .five-level-choice.level-2 .five-level-circle,.five-level-choice.level-4 .five-level-circle { width:39px;height:39px;margin-top:3px; }
       .five-level-choice.level-3 .five-level-circle { width:32px;height:32px;margin-top:7px; }
-      .five-level-label { font-size:10px; }
+      .five-level-label { font-size:10px;line-height:1.35; }
     }
   `}</style>;
 }
