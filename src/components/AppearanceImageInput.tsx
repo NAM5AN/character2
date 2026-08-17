@@ -75,6 +75,7 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
   const [images,setImages]=useState<AppearanceImagePayload[]>(()=>currentImages);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  const blocked=disabled||busy||images.length>=MAX_IMAGES;
 
   useEffect(()=>{
     const clear=()=>{setImages([]);setError('')};
@@ -102,17 +103,17 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
 
   function removeAt(index:number){commit(images.filter((_,i)=>i!==index))}
 
-  return <div className="field appearance-field">
+  return <div className="field">
     <label className="label" htmlFor={inputId}>외관 자료 <span className="muted">(선택)</span></label>
     <div>
-      <label className={`btn soft ${disabled||busy||images.length>=MAX_IMAGES?'disabled':''}`} htmlFor={inputId} style={{display:'inline-flex',alignItems:'center',gap:8}}>
+      <label className="btn soft" htmlFor={inputId} aria-disabled={blocked} style={{display:'inline-flex',alignItems:'center',gap:8,opacity:blocked?.45:1,pointerEvents:blocked?'none':'auto'}}>
         {busy?'이미지 준비 중…':`이미지 첨부 ${images.length}/${MAX_IMAGES}`}
       </label>
-      <input id={inputId} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" disabled={disabled||busy||images.length>=MAX_IMAGES} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}}/>
+      <input id={inputId} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" disabled={blocked} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}}/>
     </div>
-    {images.length>0&&<div className="appearance-grid">{images.map((image,index)=><div className="appearance-thumb" key={`${image.name}-${index}`}>
-      <img src={image.dataUrl} alt={`외관 자료 ${index+1}`}/>
-      <button type="button" className="appearance-remove" aria-label={`${index+1}번째 이미지 삭제`} disabled={disabled||busy} onClick={()=>removeAt(index)}>×</button>
+    {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
+      <img src={image.dataUrl} alt={`외관 자료 ${index+1}`} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+      <button type="button" aria-label={`${index+1}번째 이미지 삭제`} disabled={disabled||busy} onClick={()=>removeAt(index)} style={{position:'absolute',top:6,right:6,width:28,height:28,borderRadius:999,border:'1px solid rgba(0,0,0,.2)',background:'rgba(255,255,255,.92)',fontWeight:900,fontSize:18,lineHeight:1}}>×</button>
     </div>)}</div>}
     {error&&<p className="error" style={{margin:0}}>{error}</p>}
   </div>;
