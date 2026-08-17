@@ -100,6 +100,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [stageReady,setStageReady]=useState(0);
   const [prefetchBusy,setPrefetchBusy]=useState(false);
   const [prefetchError,setPrefetchError]=useState('');
+  const [ownerName,setOwnerName]=useState(preview.ownerName||'');
+  const [ownerNameSaved,setOwnerNameSaved]=useState(Boolean(preview.ownerName));
+  const [identityBusy,setIdentityBusy]=useState(false);
+  const [identityError,setIdentityError]=useState('');
   const codeRef=useRef('');
   const tokenRef=useRef('');
   const stageReadyRef=useRef(0);
@@ -122,6 +126,26 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     if(creatorEditToken)return creatorEditToken;
     if(typeof window==='undefined')return '';
     return localStorage.getItem(`chara_edit_${preview.shareCode}`)||'';
+  }
+
+  async function saveOwnerIdentity(){
+    const token=editToken();
+    const normalized=ownerName.replace(/\s+/g,' ').trim();
+    if(!token){setIdentityError('이 캐릭터를 만든 브라우저에서만 오너명을 저장하거나 변경할 수 있어요.');return}
+    if(!normalized){setIdentityError('오너명을 입력해주세요.');return}
+    setIdentityBusy(true);setIdentityError('');
+    try{
+      const r=await fetch(`/api/characters/${preview.shareCode}/identity`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({editToken:token,ownerName:normalized})});
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok){
+        const info=apiErrorInfo(body,r.status);
+        setIdentityError(info.code==='EDIT_TOKEN_INVALID'?'이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.':`저장하지 못했어요. (${info.code})`);
+        return;
+      }
+      setOwnerName(typeof body.ownerName==='string'?body.ownerName:normalized);
+      setOwnerNameSaved(true);
+    }catch{setIdentityError('저장 요청 중 오류가 발생했어요.')}
+    finally{setIdentityBusy(false)}
   }
 
   function mergeDetail(incoming:DetailPayload){
@@ -156,9 +180,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         return;
       }
       mergeDetail(body.detail);
-
-      // 2페이지 생성이 끝나면 사용자가 아직 1페이지를 읽는 중이어도
-      // 곧바로 마지막 페이지까지 이어서 선생성합니다.
       if(stage===2&&stageReadyRef.current<3)void requestStage(3);
     }catch(cause){
       const details=cause instanceof Error?cause.message:String(cause);
@@ -245,11 +266,29 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const nextStage=reportPage===1?2:reportPage===2?3:3;
   const nextPageReady=reportPage===3||stageReady>=nextStage;
   const isPagedReport=Boolean(detail?.analysis.characterOverview);
+  const canEditIdentity=Boolean(creatorEditToken);
 
   return <>
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 만들고, 읽는 동안 남은 페이지도 순서대로 미리 준비합니다." submitLabel="코드 확인하고 상세 생성" />
 
-    <div className="result-hero"><div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div><div><div className="label">공유 코드</div><div className="share-code">{preview.shareCode}</div><button className="btn soft" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(preview.shareCode)}>코드 복사</button></div></div>
+    <div className="result-hero">
+      <div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div>
+      <div style={{width:'min(360px,100%)'}}>
+        <div className="label">캐릭터 저장</div>
+        {canEditIdentity?<>
+          <div style={{fontWeight:900,fontSize:18,marginTop:8}}>{preview.name}</div>
+          <div className="field" style={{margin:'12px 0 0'}}><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} placeholder="예: 수정" disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
+          <button className="btn soft" style={{marginTop:2}} disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'이 이름으로 저장'}</button>
+          {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}
+        </>:<>
+          <div style={{fontWeight:900,fontSize:18,marginTop:8}}>{preview.name}</div>
+          {preview.ownerName&&<div style={{marginTop:8}}>오너명 · <strong>{preview.ownerName}</strong></div>}
+        </>}
+        <div style={{marginTop:14,padding:'14px 15px',borderRadius:12,background:'var(--accent-soft)',lineHeight:1.65,fontSize:14}}>
+          캐릭터 이름과 오너명으로 저장해두면 이 리포트를 나중에 다시 꺼내볼 수 있어요. 추후 <strong>2인·다인 페어 궁합</strong>, <strong>5~20인 이상 단체 조합</strong>처럼 여러 캐릭터의 리포트 정보를 함께 활용하는 기능으로 확장할 계획이며, 지금 저장한 캐릭터 정보도 그대로 사용할 수 있게 준비 중이에요.
+        </div>
+      </div>
+    </div>
 
     <div style={{marginTop:34}}><div className="eyebrow">Quick interpretation</div><h2 style={{marginTop:10}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 생성됩니다.'}</p></div>
     <div className="result-grid" style={{marginTop:20}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
