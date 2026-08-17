@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 
+// 질문/답변 화자 일치 검증은 질문 생성 API에서 처리하고, 이 컴포넌트는 화면 문구만 다듬습니다.
 export function AnalyzeReviewUiPolish(){
   useEffect(()=>{
     const apply=()=>{
