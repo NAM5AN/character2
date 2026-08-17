@@ -46,8 +46,8 @@ function apiErrorInfo(body:unknown,status:number){
   return {code,details};
 }
 
-function formatError(message:string,code:string,details=''){
-  return `${message}\n오류 코드: ${code}${details?`\n상세: ${details}`:''}`;
+function formatError(message:string,_code:string,_details=''){
+  return message;
 }
 
 function estimatedProgress(elapsed:number){
@@ -61,7 +61,7 @@ function progressStage(progress:number,name:string){
   if(progress<22)return `${name}의 기본 흐름을 살펴보고 있어요`;
   if(progress<60)return `${name}의 관계 패턴을 읽고 있어요`;
   if(progress<82)return `${name}의 감정과 갈등을 함께 정리하고 있어요`;
-  return `${name}의 첫 리포트를 쓰고 있어요`;
+  return '리포트를 작성하는 중이에요';
 }
 
 function remainingLabel(elapsed:number){
@@ -83,8 +83,7 @@ function ListSection({title,items}:{title:string;items?:string[]}){
 function NarrativeSection({title,text,index}:{title:string;text?:string;index:number}){
   if(!text?.trim())return null;
   return <section className="card" style={{marginTop:index===0?20:18,padding:'32px'}}>
-    <div className="eyebrow">Detailed reading {String(index+1).padStart(2,'0')}</div>
-    <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>{title}</h2>
+    <h2 style={{fontSize:'clamp(27px,4vw,40px)',margin:'0 0 20px'}}>{title}</h2>
     <div style={{fontSize:16.5}}><ParagraphText text={text}/></div>
   </section>;
 }
@@ -139,7 +138,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       const body=await r.json().catch(()=>({}));
       if(!r.ok){
         const info=apiErrorInfo(body,r.status);
-        setIdentityError(info.code==='EDIT_TOKEN_INVALID'?'이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.':`저장하지 못했어요. (${info.code})`);
+        setIdentityError(info.code==='EDIT_TOKEN_INVALID'?'이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.':'저장하지 못했어요. 잠시 후 다시 시도해주세요.');
         return;
       }
       setOwnerName(typeof body.ownerName==='string'?body.ownerName:normalized);
@@ -176,14 +175,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       const body=await r.json().catch(()=>({}));
       if(!r.ok){
         const apiError=apiErrorInfo(body,r.status);
-        setPrefetchError(formatError('다음 페이지를 미리 준비하지 못했어요.',apiError.code,apiError.details));
+        setPrefetchError(formatError('다음 페이지를 준비하지 못했어요.',apiError.code,apiError.details));
         return;
       }
       mergeDetail(body.detail);
       if(stage===2&&stageReadyRef.current<3)void requestStage(3);
-    }catch(cause){
-      const details=cause instanceof Error?cause.message:String(cause);
-      setPrefetchError(formatError('다음 페이지 준비 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
+    }catch{
+      setPrefetchError('다음 페이지를 준비하지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{
       inFlightStagesRef.current.delete(stage);
       setPrefetchBusy(inFlightStagesRef.current.size>0);
@@ -204,13 +202,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         const apiError=apiErrorInfo(body,r.status);
         if(r.status===401){localStorage.removeItem('chara_ai_access_code');setUnlockOpen(true)}
         if(apiError.code==='DETAIL_OWNER_SOURCE_REQUIRED'){
-          setError(formatError('상세 리포트가 아직 생성되지 않았어요. 최초 1회는 이 캐릭터를 만든 브라우저에서 상세보기를 열어야 해요.',apiError.code,apiError.details));
+          setError('상세 리포트가 아직 준비되지 않았어요. 처음 한 번은 이 캐릭터를 만든 브라우저에서 열어주세요.');
         }else if(apiError.code==='EDIT_TOKEN_INVALID'){
-          setError(formatError('이 브라우저의 캐릭터 생성 권한을 확인하지 못했어요. 최초 상세 생성은 캐릭터를 만든 브라우저에서 진행해주세요.',apiError.code,apiError.details));
+          setError('이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.');
         }else if(apiError.code==='CODE_INVALID'){
-          setError(formatError('이용 코드를 다시 확인해주세요.',apiError.code,apiError.details));
+          setError('현재 이용 코드와 일치하지 않아요. 포스타입에서 최신 코드를 확인해주세요.');
         }else{
-          setError(formatError('상세 리포트를 불러오지 못했어요.',apiError.code,apiError.details));
+          setError('상세 리포트를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
         }
         return;
       }
@@ -226,9 +224,8 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         if(ready<2)void requestStage(2);
         else if(ready<3)void requestStage(3);
       }
-    }catch(cause){
-      const details=cause instanceof Error?cause.message:String(cause);
-      setError(formatError('상세 리포트 요청 중 오류가 발생했어요.','CLIENT_REQUEST_FAILED',details));
+    }catch{
+      setError('상세 리포트를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{setBusy(false)}
   }
 
@@ -269,45 +266,59 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const canEditIdentity=Boolean(creatorEditToken);
 
   return <>
-    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} eyebrow="Detailed report" title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요. 먼저 첫 페이지를 정리하고, 읽는 동안 남은 페이지도 순서대로 준비합니다." submitLabel="코드 확인하고 상세 리포트 보기" />
+    <style>{`
+      .report-summary-head{align-items:start;gap:28px}
+      .report-summary-copy{min-width:0}
+      .save-character-panel{width:min(520px,100%);border:1px solid var(--line);border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.46)}
+      .save-character-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:10px}
+      .save-character-row .field{margin:0}
+      .save-character-note{margin:11px 0 0;font-size:13px;line-height:1.6;color:var(--muted)}
+      .full-preview-sections{display:grid;gap:12px;position:relative}
+      @media(max-width:640px){
+        .report-summary-head{display:block}
+        .save-character-panel{margin-top:20px;padding:16px}
+        .save-character-row{grid-template-columns:1fr}
+        .save-character-row .btn{width:100%}
+        .full-preview-section.preview-index-0,.full-preview-section.preview-index-1{display:none}
+        .full-preview-cta{top:50% !important}
+      }
+    `}</style>
 
-    <div className="result-hero">
-      <div><div className="eyebrow">Analysis complete</div><h1 style={{fontSize:'clamp(46px,7vw,80px)',marginBottom:12}}>{preview.name}</h1><p className="hero-copy" style={{fontSize:17}}>{preview.oneLineSummary}</p></div>
-      <div style={{width:'min(360px,100%)'}}>
+    <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요." submitLabel="코드 확인하고 상세 리포트 보기" />
+
+    <div className="result-hero report-summary-head">
+      <div className="report-summary-copy"><p className="hero-copy" style={{fontSize:17,marginTop:0}}>{preview.oneLineSummary}</p></div>
+      <div className="save-character-panel">
         <div className="label">캐릭터 저장</div>
         {canEditIdentity?<>
-          <div style={{fontWeight:900,fontSize:18,marginTop:8}}>{preview.name}</div>
-          <div className="field" style={{margin:'12px 0 0'}}><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} placeholder="예: 수정" disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
-          <button className="btn soft" style={{marginTop:2}} disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'이 이름으로 저장'}</button>
+          <div className="save-character-row">
+            <div className="field"><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
+            <button className="btn soft" disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'저장'}</button>
+          </div>
           {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}
-        </>:<>
-          <div style={{fontWeight:900,fontSize:18,marginTop:8}}>{preview.name}</div>
-          {preview.ownerName&&<div style={{marginTop:8}}>오너명 · <strong>{preview.ownerName}</strong></div>}
-        </>}
-        <div style={{marginTop:14,padding:'14px 15px',borderRadius:12,background:'var(--accent-soft)',lineHeight:1.65,fontSize:14}}>
-          캐릭터 이름과 오너명으로 저장해두면 이 리포트를 나중에 다시 꺼내볼 수 있어요. 추후 <strong>2인·다인 페어 궁합</strong>, <strong>5~20인 이상 단체 조합</strong>처럼 여러 캐릭터의 리포트 정보를 함께 활용하는 기능으로 확장할 계획이며, 지금 저장한 캐릭터 정보도 그대로 사용할 수 있게 준비 중이에요.
-        </div>
+        </>:preview.ownerName?<div style={{marginTop:9,fontSize:14}}>오너명 · <strong>{preview.ownerName}</strong></div>:null}
+        <p className="save-character-note">오너명을 함께 저장해두면 나중에 리포트를 다시 꺼내볼 수 있고, 추후 2인·다인 페어 궁합이나 5~20인 이상 단체 조합 기능에도 지금 저장한 캐릭터 정보를 그대로 활용할 수 있어요.</p>
       </div>
     </div>
 
-    <div style={{marginTop:34}}><div className="eyebrow">Quick interpretation</div><h2 style={{marginTop:10}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 정리됩니다.'}</p></div>
+    <div style={{marginTop:34}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 정리됩니다.'}</p></div>
     <div className="result-grid" style={{marginTop:20}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
 
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
-      <div className="eyebrow">Full report preview</div><h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:10}}>여기서 한 단계 더 들어가면</h2>
+      <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:0}}>여기서 한 단계 더 들어가면</h2>
       <p style={{lineHeight:1.75,maxWidth:760,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
       <div className="tags" style={{marginBottom:18}}>{['이런 캐릭터예요','이렇게 작동해요','이렇게 관계를 맺어요','이런 애착이 있어요','이렇게 갈등해요','이런 매력이 있어요','통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
 
       <div style={{position:'relative'}}>
-        <div aria-hidden="true" style={{display:'grid',gap:12,position:'relative'}}>
-          {previewSections.map(([title,t],index)=><div key={title} style={{border:'1px solid var(--line)',borderRadius:16,padding:'22px 24px',background:'white',minHeight:230,position:'relative',overflow:'hidden'}}>
+        <div aria-hidden="true" className="full-preview-sections">
+          {previewSections.map(([title,t],index)=><div className={`full-preview-section preview-index-${index}`} key={title} style={{border:'1px solid var(--line)',borderRadius:16,padding:'22px 24px',background:'white',minHeight:230,position:'relative',overflow:'hidden'}}>
             <strong>{title}</strong>
             <div style={{marginTop:12,filter:`blur(${previewBlur[index]}px)`,opacity:previewOpacity[index],userSelect:'none'}}><ParagraphText text={t}/></div>
             <div style={{position:'absolute',inset:0,background:`rgba(255,253,248,${previewWhite[index]})`,pointerEvents:'none'}}/>
           </div>)}
           <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
         </div>
-        <button className="btn primary" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'첫 페이지 정리 중…':'더 자세히 보기'}</button>
+        <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
       </div>
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
@@ -322,20 +333,16 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <span className="muted">{elapsedSeconds}초</span>
           <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
-        <p className="muted" style={{margin:'8px 0 0',lineHeight:1.5}}>첫 페이지가 나오면 바로 읽을 수 있고, 나머지 페이지는 이어서 순서대로 정리해요.</p>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
       <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <div className="eyebrow">Unlocked · Detailed report</div><h2 style={{marginTop:10}}>상세 캐릭터 리포트</h2><p className="muted" style={{lineHeight:1.7,maxWidth:760}}>총 3페이지예요. 첫 페이지를 읽는 동안 2페이지와 3페이지도 순서대로 정리해둡니다.</p>
+      <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
 
       {isPagedReport ? <>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:14,marginTop:20,flexWrap:'wrap'}}>
-          <strong>페이지 {reportPage} / 3</strong>
-          {reportPage<3&&<span className="muted" style={{fontSize:13}}>{stageReady>=nextStage?'다음 페이지 준비 완료':prefetchBusy?'다음 페이지 준비 중…':'다음 페이지 대기 중'}</span>}
-        </div>
+        <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
           <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={detail.analysis.characterOverview}/>
@@ -384,14 +391,14 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           <ListSection title="직접 쓰이지 않은 숨은 특성" items={detail.analysis.hiddenTraits}/>
         </div>
         {detail.analysis.relationshipManual&&<section className="card" style={{marginTop:22,padding:'30px'}}>
-          <div className="eyebrow">Character manual</div><h2 style={{fontSize:'clamp(26px,4vw,38px)',marginTop:10}}>캐릭터 사용 설명서</h2>
+          <h2 style={{fontSize:'clamp(26px,4vw,38px)',marginTop:0}}>캐릭터 사용 설명서</h2>
           <div className="result-grid" style={{marginTop:18}}>
             <section className="result-block"><h3>친해지는 방법</h3><BulletList items={detail.analysis.relationshipManual.gettingClose}/></section>
             <section className="result-block"><h3>특히 하면 안 되는 것</h3><BulletList items={detail.analysis.relationshipManual.avoid}/></section>
             <section className="result-block"><h3>좋아하고 신뢰한다는 신호</h3><BulletList items={detail.analysis.relationshipManual.affectionSignals}/></section>
           </div>
         </section>}
-        {detail.analysis.detailedReport&&<section className="card" style={{marginTop:22,padding:'32px'}}><div className="eyebrow">Deep report</div><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:10}}>통합 상세 해석</h2><div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div></section>}
+        {detail.analysis.detailedReport&&<section className="card" style={{marginTop:22,padding:'32px'}}><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:0}}>통합 상세 해석</h2><div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div></section>}
       </>}
 
       {isPagedReport?<div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>
@@ -401,7 +408,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         </div>
         <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0,marginLeft:'auto'}}>
           {reportPage>1&&<button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>changeReportPage((reportPage-1) as 1|2)}>← 이전 페이지</button>}
-          {reportPage<3&&<button className="btn primary" style={{whiteSpace:'nowrap'}} disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>{nextPageReady?'다음 페이지 →':'다음 페이지 준비 중…'}</button>}
+          {reportPage<3&&<button className="btn primary" style={{whiteSpace:'nowrap'}} disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>다음 페이지 →</button>}
         </div>
       </div>:<div className="actions" style={{marginTop:24,flexWrap:'nowrap',overflowX:'auto'}}>
         <button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button>
