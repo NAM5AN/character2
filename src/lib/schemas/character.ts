@@ -58,7 +58,15 @@ export const characterEvidencePackSchema=z.object({
   uncertainties:z.array(evidenceTextSchema).max(10).default([]),
 });
 
-export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:z.record(z.string(),z.unknown()).optional().default({}),evidencePack:z.record(z.string(),z.unknown()).optional().default({})}).passthrough();
+const summaryAnalysisRawSummarySchema=z.object({
+  outerSelf:z.unknown(),
+  innerSelf:z.unknown(),
+  conflictStyle:z.unknown(),
+  affectionStyle:z.unknown(),
+  misunderstoodPoint:z.unknown(),
+  hiddenPattern:z.unknown(),
+});
+export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:summaryAnalysisRawSummarySchema,evidencePack:z.record(z.string(),z.unknown()).optional().default({})}).passthrough();
 export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,evidencePack:characterEvidencePackSchema});
 
 // Paid detail 6.4+: seven large narrative sections only.
