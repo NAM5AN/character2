@@ -66,7 +66,7 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   relationship_matrix: '같은 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]이고 responseConfig.rows에는 2~4개의 관계 상대, columns에는 2~4개의 짧은 반응을 넣으세요.',
   inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 responseConfig.prompt2에 두 번째 항목을 넣으세요.',
   temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
-  condition_followup: '기본 상황에서 한 번 고른 뒤 조건 하나만 바뀌었을 때 다시 고르게 합니다. options는 두 질문에서 공통으로 쓸 3~5개 반응이며 responseConfig.prompt2에 바뀐 조건을 포함한 두 번째 질문을 넣으세요.',
+  condition_followup: '기본 상황에서 한 번 고른 뒤, 같은 상황에 조건 하나만 더해졌을 때 다시 고르게 합니다. 핵심 제약: 바뀐 조건은 전제를 뒤집지 말고 같은 판단 축을 유지하는 변주여야 합니다(예: 상대가 더 급해짐·대가를 제시함·부탁이 더 커짐·지켜보는 사람이 생김·관계가 더 가깝거나 먼 상대임 등 강도나 조건의 변화). 기본 상황에서 성립하던 선택이 바뀐 조건에서 무의미해지거나 자기모순이 되면 실패입니다. 특히 "도와주려는" 전제를 "거절당함"처럼 뒤집어서 보기 대부분이 헛돌게 만들지 마세요. options는 3~5개의 공통 반응이며 기본 상황과 바뀐 조건 둘 다에서 각각 자연스럽고 서로 구별되게 성립해야 합니다. 기본 질문은 특정 행동을 미리 전제하지 말고("~하려 할 때"처럼 이미 그 행동을 하는 것으로 못박지 말고) 열린 상황으로 두세요. responseConfig.prompt2에는 바뀐 조건을 포함한 두 번째 질문 문장을 넣으세요.',
   owner_meta: '캐릭터를 오래 본 오너만 답하기 좋은 메타 질문을 만드세요. options는 3~5개 후보이며 allowCustom=true입니다.',
 };
 
