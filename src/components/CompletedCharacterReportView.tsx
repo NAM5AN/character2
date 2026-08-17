@@ -12,6 +12,7 @@ export type CompletedDetailPayload={
   cached?:boolean;
   stageReady?:number;
   complete?:boolean;
+  canResume?:boolean;
 };
 
 function paragraphChunks(text:string){
@@ -49,7 +50,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   const stageReady=Math.max(1,Math.min(3,savedDetail.stageReady||3));
 
   useEffect(()=>{
-    if(!isPaged||stageReady>=3)return;
+    if(!savedDetail.canResume||!isPaged||stageReady>=3)return;
     const nextStage=(stageReady+1) as 2|3;
     if(resumeAttempts.current.has(nextStage))return;
     resumeAttempts.current.add(nextStage);
@@ -63,11 +64,12 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         setSavedDetail(current=>({
           ...current,
           ...body.detail,
+          canResume:true,
           analysis:{...current.analysis,...body.detail.analysis},
         }));
       }catch{}
     })();
-  },[isPaged,preview.shareCode,stageReady]);
+  },[isPaged,preview.shareCode,savedDetail.canResume,stageReady]);
 
   function changePage(next:1|2|3){
     if(next>stageReady)return;

@@ -18,35 +18,25 @@ async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   return parsed.success?parsed.data:null;
 }
 
-async function loadSavedDetail(rawCode:string,detailViewToken:string):Promise<CompletedDetailPayload|null>{
+async function loadSavedDetail(rawCode:string):Promise<CompletedDetailPayload|null>{
   const code=normalizeShareCode(rawCode);
-  if(!isShareCode(code)||!detailViewToken)return null;
+  if(!isShareCode(code))return null;
   const supabase=getSupabaseServer();
-  const {data,error}=await supabase.rpc('character2_get_entitled_detail_bundle',{
-    p_share_code:code,
-    p_detail_view_token:detailViewToken,
-    p_edit_token:'',
-  });
+  const {data,error}=await supabase.rpc('character2_get_saved_detail_public',{p_share_code:code});
   if(error||!data||typeof data!=='object'||Array.isArray(data))return null;
   const record=data as Record<string,unknown>;
-  const analysis=finalAnalysisSchema.safeParse(record.detail);
+  const analysis=finalAnalysisSchema.safeParse(record.analysis);
   if(!analysis.success)return null;
-  const rawDetail=record.detail&&typeof record.detail==='object'&&!Array.isArray(record.detail)
-    ?record.detail as Record<string,unknown>
-    :{};
-  const explicitStage=Number(rawDetail.detailStage);
-  const inferredStage=typeof rawDetail.integratedReport==='string'&&rawDetail.integratedReport.trim()?3:
-    typeof rawDetail.relationshipStyle==='string'&&rawDetail.relationshipStyle.trim()?2:
-    typeof rawDetail.characterOverview==='string'&&rawDetail.characterOverview.trim()?1:
-    typeof rawDetail.detailedReport==='string'&&rawDetail.detailedReport.trim()?3:1;
-  const stageReady=Math.max(1,Math.min(3,explicitStage||inferredStage));
+  const rawStage=Number(record.stageReady)||1;
+  const stageReady=Math.max(1,Math.min(3,rawStage));
+  const complete=record.complete===true||record.complete==='true'||stageReady>=3;
   return {
     analysis:analysis.data,
     confirmedFactCount:Number(record.confirmedFactCount)||0,
     inferenceCount:Number(record.inferenceCount)||0,
     cached:true,
     stageReady,
-    complete:stageReady>=3,
+    complete,
   };
 }
 
@@ -54,13 +44,14 @@ export default async function CharacterPage({params}:{params:Promise<{shareCode:
   const {shareCode}=await params;
   const normalized=normalizeShareCode(shareCode);
   const cookieStore=await cookies();
-  const detailViewToken=isShareCode(normalized)
-    ?cookieStore.get(detailViewCookieName(normalized))?.value?.trim()||''
-    :'';
+  const canResume=isShareCode(normalized)&&Boolean(
+    cookieStore.get(detailViewCookieName(normalized))?.value?.trim(),
+  );
   const [preview,savedDetail]=await Promise.all([
     loadPreview(normalized),
-    loadSavedDetail(normalized,detailViewToken),
+    loadSavedDetail(normalized),
   ]);
   if(!preview)notFound();
-  return <main className="container page"><CharacterReportClient preview={preview} completedDetail={savedDetail}/></main>;
+  const completedDetail=savedDetail?{...savedDetail,canResume}:null;
+  return <main className="container page"><CharacterReportClient preview={preview} completedDetail={completedDetail}/></main>;
 }
