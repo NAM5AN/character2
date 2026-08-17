@@ -25,6 +25,16 @@ button { cursor: pointer; }
 .nav-link { padding: 10px 14px; border-radius: 999px; color: var(--muted); }
 .nav-link:hover { background: #fff9; color: var(--ink); }
 .hero { padding: 110px 0 88px; display: grid; grid-template-columns: 1.3fr .7fr; gap: 64px; align-items:end; }
+.home-screen { min-height:calc(100svh - 72px); display:grid; grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr); gap:54px; align-items:center; padding:42px 0 52px; }
+.home-intro { min-width:0; }
+.home-intro h1 { font-size:clamp(54px,5.3vw,80px); margin:0 0 22px; max-width:640px; }
+.home-intro .hero-copy { max-width:610px; margin:0; }
+.home-intro .actions { margin-top:24px; }
+.home-lookup { padding:32px; box-shadow:0 18px 44px rgba(34,31,25,.09); }
+.home-lookup h2 { font-size:clamp(30px,3vw,40px); line-height:1.12; margin:0 0 12px; }
+.home-lookup > div > p { margin:0 0 20px; line-height:1.65; }
+.home-lookup .field { margin:14px 0; }
+.home-lookup .btn.primary { margin-top:2px; }
 .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 h1 { font-size: clamp(44px, 7vw, 86px); line-height: .98; letter-spacing: -.075em; margin: 14px 0 24px; }
 h2 { font-size: clamp(28px,4vw,46px); letter-spacing: -.05em; margin: 0 0 18px; }
@@ -129,6 +139,12 @@ textarea[placeholder^="예:"]::placeholder { color: transparent; }
 .result-hero + div > p.muted,
 .result-grid + .card > .eyebrow {
   display: none !important;
+}
+
+@media (max-width: 900px) {
+  .home-screen { min-height:auto; grid-template-columns:1fr; gap:28px; padding:54px 0 72px; }
+  .home-intro h1 { font-size:clamp(48px,10vw,72px); }
+  .home-lookup { padding:28px; }
 }
 
 @media (max-width: 760px) {
