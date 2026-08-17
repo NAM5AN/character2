@@ -11,18 +11,15 @@ type Props = {
   submitLabel?: string;
 };
 
-function apiErrorText(body:unknown,status:number,fallback:string){
-  const record=body&&typeof body==='object'?body as Record<string,unknown>:{};
-  const code=typeof record.error==='string'&&record.error.trim()?record.error.trim():`HTTP_${status}`;
-  const details=typeof record.details==='string'&&record.details.trim()?record.details.trim():'';
-  return `${fallback}\n오류 코드: ${code}${details?`\n상세: ${details}`:''}`;
+function apiErrorText(_body:unknown,_status:number,fallback:string){
+  return fallback;
 }
 
 export function AccessCodeModal({
   open,
   onClose,
   onValidated,
-  eyebrow = 'Detailed report',
+  eyebrow = '',
   title = '상세 이용 코드가 필요해요',
   description = '포스타입 유료 영역에서 최신 코드를 확인한 뒤 입력해주세요. 한 번 입력한 코드는 이 브라우저에 저장됩니다.',
   submitLabel = '확인하고 계속',
@@ -47,14 +44,13 @@ export function AccessCodeModal({
       localStorage.setItem('chara_ai_access_code',normalized);
       onClose();
       await onValidated(normalized);
-    }catch(cause){
-      const details=cause instanceof Error?cause.message:String(cause);
-      setError(`요청 중 오류가 발생했어요.\n오류 코드: CLIENT_REQUEST_FAILED${details?`\n상세: ${details}`:''}`);
+    }catch{
+      setError('이용 코드를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{setBusy(false)}
   }
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
     <div className="modal" role="dialog" aria-modal="true" aria-busy={busy}>
-      <div className="eyebrow">{eyebrow}</div><h3>{title}</h3>
+      {eyebrow?<div className="eyebrow">{eyebrow}</div>:null}<h3>{title}</h3>
       <p>{description}</p>
       <div className="notice" style={{margin:'14px 0',lineHeight:1.7}}>
         <strong>
