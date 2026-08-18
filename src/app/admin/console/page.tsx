@@ -238,6 +238,7 @@ export default function AdminConsolePage() {
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AdminCharacter | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resetting, setResetting] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
 
   // Owner settings: current 결제코드(이용코드) + Postype URL.
@@ -378,6 +379,28 @@ export default function AdminConsolePage() {
       setPendingDelete(null);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function resetReport(c: AdminCharacter, target: 'summary' | 'answers') {
+    const label = target === 'summary' ? '상세 리포트를 삭제하고 요약까지 되돌릴까요?' : '요약·상세 리포트를 모두 삭제하고 질문응답 상태로 되돌릴까요?';
+    if (!window.confirm(`${c.name}\n\n${label}\n(되돌릴 수 없어요)`)) return;
+    setResetting(c.shareCode + ':' + target);
+    setErrorText('');
+    try {
+      const res = await fetch(`/api/admin/data/${c.shareCode}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target }),
+      });
+      if (res.status === 401) { setStatus('denied'); return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErrorText(body?.error || 'RESET_FAILED');
+        return;
+      }
+      await load();
+    } finally {
+      setResetting('');
     }
   }
 
@@ -582,7 +605,22 @@ export default function AdminConsolePage() {
                 })}
               </div>
 
-              <div className="actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+              <div style={{ marginTop: 20, padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--paper)' }}>
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>테스트용 되돌리기</div>
+                <p className="muted" style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.6 }}>
+                  리포트를 지우고 이전 상태로 되돌립니다. 되돌린 뒤 오너 브라우저에서 다시 열면 새 프롬프트로 재생성돼요.
+                </p>
+                <div className="actions" style={{ marginTop: 0 }}>
+                  <button className="btn" disabled={!!resetting} onClick={() => void resetReport(detailChar, 'summary')}>
+                    {resetting === detailChar.shareCode + ':summary' ? '되돌리는 중…' : '상세 삭제 → 요약까지'}
+                  </button>
+                  <button className="btn" disabled={!!resetting} onClick={() => void resetReport(detailChar, 'answers')}>
+                    {resetting === detailChar.shareCode + ':answers' ? '되돌리는 중…' : '요약·상세 삭제 → 질문응답까지'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="actions" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
                 <button className="btn danger" onClick={() => setPendingDelete(detailChar)}>이 캐릭터 삭제</button>
               </div>
             </div>
