@@ -16,11 +16,13 @@ const requestSchema = z.object({
   batchSize: z.number().int().min(1).max(5).optional().default(1),
 });
 
+// inner(내면·심리)와 conflict(임계점·가치관)는 깊은 해석의 재료가 가장 많이 나오는 축이라
+// 비중을 높인다. 합이 20을 넘겨도 되며(소프트 가이드), 서버는 참고용으로만 넘긴다.
 const CATEGORY_TARGETS = {
   core: 3,
-  relationship: 3,
-  conflict: 3,
-  inner: 3,
+  relationship: 4,
+  conflict: 5,
+  inner: 6,
   validation: 2,
 } as const;
 
