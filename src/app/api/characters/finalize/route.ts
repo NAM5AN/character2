@@ -49,7 +49,7 @@ const summaryDossierSchema=z.object({
   intimacyLogic:z.string(),
   conflictLogic:z.string(),
   selfNarrative:z.string(),
-  validatedInsights:z.array(summaryInsightSchema).min(5).max(9),
+  validatedInsights:z.array(summaryInsightSchema).min(4).max(9),
   tensions:z.array(summaryInsightSchema).max(4).default([]),
   uncertainties:z.array(z.string()).max(6).default([]),
 });
@@ -211,6 +211,7 @@ function summaryQualityPass(insight:z.infer<typeof summaryInsightSchema>){
 
 async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
   let last='';
+  let lastModel:SummaryDossier|null=null;
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 분석에서 엄격한 품질 기준을 통과한 insight가 부족했습니다. 프로필·오너 검수·문답에서 서로 독립적인 단서를 다시 연결하고, 단순 재서술이 아닌 메커니즘 수준의 해석을 만들어주세요. 점검: ${last}`;
     const model=await askClaudeJson({
@@ -222,11 +223,16 @@ async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
       allowFallback:true,
       input:`${input}${retry}`,
     });
+    lastModel=model;
     const passed=model.validatedInsights.filter(summaryQualityPass);
-    if(passed.length>=4){
+    if(passed.length>=3){
       return {...model,validatedInsights:passed,tensions:model.tensions.filter(summaryQualityPass)};
     }
     last=`품질 기준 통과 insight ${passed.length}개`;
+  }
+  // 두 번 시도해도 통과분이 3개 미만이면 재시도로 또 큰 프롬프트를 보내지 말고 마지막 결과를 그대로 사용한다.
+  if(lastModel&&lastModel.validatedInsights.length>=1){
+    return {...lastModel,tensions:lastModel.tensions.filter(summaryQualityPass)};
   }
   throw new Error(`SUMMARY_PSYCHOLOGY_FAILED: ${last||'충분한 해석을 만들지 못함'}`);
 }

@@ -70,7 +70,7 @@ const psychologicalModelSchema = z.object({
   intimacyLogic: z.string(),
   conflictLogic: z.string(),
   selfNarrative: z.string(),
-  validatedInsights: z.array(validatedInsightSchema).min(6),
+  validatedInsights: z.array(validatedInsightSchema).min(4),
   tensions: z.array(validatedInsightSchema).default([]),
   uncertainties: z.array(z.string()).default([]),
 });
@@ -367,13 +367,17 @@ async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|Unkno
   });
   const artifact=uiArtifactReason(allPsychText(model));
   if(artifact)throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${artifact}`);
-  const quality=validatedInsightReason(model);
-  if(quality)throw new Error(`DETAIL_PSYCHOLOGY_FAILED: ${quality}`);
-  return model;
+  // 품질 통과 insight가 넉넉하면 통과분만 쓰고, 조금 모자라도 스키마를 통과한 해석이 있으면
+  // 재시도(큰 프롬프트 재전송)하지 말고 있는 것으로 진행한다.
+  const passed=model.validatedInsights.filter(qualityPass);
+  const usable=passed.length>=4?passed:model.validatedInsights;
+  if(usable.length===0)throw new Error('DETAIL_PSYCHOLOGY_FAILED: 사용할 수 있는 해석이 없음');
+  return {...model,validatedInsights:usable};
 }
 
 function buildReportDossier(model:PsychologicalModel):ReportDossier{
-  const validatedInsights=model.validatedInsights.filter(qualityPass);
+  // buildPsychologicalModel에서 이미 사용할 insight를 골라두므로 여기서 다시 걸러 버리지 않는다.
+  const validatedInsights=model.validatedInsights;
   const tensions=model.tensions.filter(qualityPass);
   return reportDossierSchema.parse({
     coreEngine:model.coreEngine,
