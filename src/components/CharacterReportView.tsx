@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
+import { ShareCardModal, cardExcerpt, type ShareCardMode } from '@/components/ShareCardModal';
 import { useRotatingFlavor } from '@/lib/loading-flavor';
 import { applyName } from '@/lib/josa';
 
@@ -85,6 +86,7 @@ function NarrativeSection({title,text,index}:{title:string;text?:string;index:nu
 
 export function CharacterReportView({preview,creatorEditToken}:{preview:CharacterReportPreview;creatorEditToken?:string}){
   const [unlockOpen,setUnlockOpen]=useState(false);
+  const [shareMode,setShareMode]=useState<ShareCardMode|null>(null);
   const [detail,setDetail]=useState<DetailPayload|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -300,6 +302,14 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요." submitLabel="코드 확인하고 상세 리포트 보기" />
 
+    {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
+      mode:'detail',name:preview.name,oneLineSummary:preview.oneLineSummary,
+      excerpt:cardExcerpt(detail?.analysis.integratedReport||detail?.analysis.charmAndContradictions||detail?.analysis.characterOverview),
+    }:{
+      mode:'summary',name:preview.name,oneLineSummary:preview.oneLineSummary,
+      aspects:summaryCards.map(([label])=>label).slice(0,4),
+    }} />}
+
     <h1 style={{fontSize:'clamp(38px,5.5vw,64px)',letterSpacing:'-.04em',lineHeight:1.02,margin:'0 0 22px'}}>{preview.name}</h1>
 
     <div className="result-hero report-summary-head">
@@ -314,6 +324,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}
         </>:preview.ownerName?<div style={{marginTop:9,fontSize:14}}>오너명 · <strong>{preview.ownerName}</strong></div>:null}
         <p className="save-character-note">오너명을 함께 저장해두면 나중에 리포트를 다시 꺼내볼 수 있고, 추후 2인·다인 페어 궁합이나 5~20인 이상 단체 조합 기능에도 지금 저장한 캐릭터 정보를 그대로 활용할 수 있어요.</p>
+        <button className="btn soft" style={{marginTop:12,width:'100%'}} onClick={()=>setShareMode('summary')}>요약 리포트 공유 카드 만들기</button>
       </div>
     </div>
 
@@ -355,7 +366,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
-      <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <h2 style={{marginTop:0,marginBottom:0}}>상세 캐릭터 리포트</h2>
+        <button className="btn soft" style={{whiteSpace:'nowrap'}} onClick={()=>setShareMode('detail')}>상세 리포트 공유 카드</button>
+      </div>
 
       {isPagedReport ? <>
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
