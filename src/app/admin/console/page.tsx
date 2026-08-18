@@ -41,6 +41,13 @@ type AdminCharacter = {
   detailGptOutTok: number | string | null;
 };
 
+type AdminSettings = {
+  postypeUrl: string;
+  accessCode: string;
+  codeVersion: number;
+  hasHash: boolean;
+};
+
 // gpt-5.6-luna 단가 (Vercel 게이트웨이 = OpenAI, 마크업 없음). 단가 바뀌면 여기만 고치면 됨.
 const GPT_RATE = { input: 0.20, output: 1.20 }; // $/1M tokens
 function gptCost(inTok: number | string | null, outTok: number | string | null): number {
@@ -218,6 +225,64 @@ export default function AdminConsolePage() {
   const [deleting, setDeleting] = useState(false);
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
 
+  // Owner settings: current 결제코드(이용코드) + Postype URL.
+  const [settings, setSettings] = useState<AdminSettings | null>(null);
+  const [codeInput, setCodeInput] = useState('');
+  const [postypeInput, setPostypeInput] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/config', { cache: 'no-store' });
+      if (!res.ok) return;
+      const body = await res.json().catch(() => ({}));
+      if (body?.settings) {
+        setSettings(body.settings);
+        setPostypeInput(body.settings.postypeUrl || '');
+      }
+    } catch { /* non-fatal */ }
+  }, []);
+
+  useEffect(() => { void loadSettings(); }, [loadSettings]);
+
+  async function saveSettings(openPostype: boolean) {
+    setSavingSettings(true);
+    setSettingsMsg('');
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ accessCode: codeInput.trim(), postypeUrl: postypeInput.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) { setStatus('denied'); return; }
+      if (!res.ok) {
+        setSettingsMsg(body?.error === 'ACCESS_CODE_TOO_SHORT' ? '코드는 4자 이상이어야 해요.' : `저장 실패: ${body?.error || 'UNKNOWN'}`);
+        return;
+      }
+      const next: AdminSettings = body.settings;
+      const changed = !!codeInput.trim() && next.accessCode !== settings?.accessCode;
+      setSettings(next);
+      setPostypeInput(next.postypeUrl || '');
+      setCodeInput('');
+      setSettingsMsg(changed ? `저장됨 · 코드 버전 ${next.codeVersion} · 포스타입 글도 새 코드로 바꿔주세요` : '저장됨');
+      // 확인 시 포스타입 링크를 새 탭으로 띄워 글 수정을 잊지 않게 한다.
+      if (openPostype && next.postypeUrl) window.open(next.postypeUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      setSettingsMsg('네트워크 오류');
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function copyCode() {
+    const code = settings?.accessCode || '';
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  }
+
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/data', { cache: 'no-store' });
@@ -333,6 +398,65 @@ export default function AdminConsolePage() {
         <div className="actions" style={{ marginTop: 4 }}>
           <button className="btn" onClick={() => void load()}>새로고침</button>
           <button className="btn soft" onClick={() => void logout()}>로그아웃</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 22, marginTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 18 }}>결제코드 (이용코드)</strong>
+          <span className="muted" style={{ fontSize: 12 }}>코드 버전 {settings?.codeVersion ?? '—'}</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+          <span className="muted" style={{ fontSize: 13 }}>현재 코드</span>
+          {settings?.accessCode ? (
+            <>
+              <code style={{ fontSize: 20, fontWeight: 800, letterSpacing: '.06em', padding: '4px 12px', borderRadius: 10, background: 'var(--accent-soft)' }}>
+                {settings.accessCode}
+              </code>
+              <button className="btn soft" style={{ padding: '6px 12px' }} onClick={() => void copyCode()}>{copied ? '복사됨' : '복사'}</button>
+            </>
+          ) : (
+            <span className="muted" style={{ fontSize: 13 }}>
+              {settings ? '이전에 설정된 코드라 평문 기록이 없어요. 아래에서 새 코드를 지정하면 이후로는 여기에 표시됩니다.' : '불러오는 중…'}
+            </span>
+          )}
+        </div>
+
+        <div className="stack" style={{ gap: 12, marginTop: 16 }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">새 코드로 변경 (비우면 코드 유지, 4자 이상)</label>
+            <input
+              className="input"
+              value={codeInput}
+              onChange={e => setCodeInput(e.target.value)}
+              placeholder="새 결제코드 입력"
+              style={{ maxWidth: 320 }}
+            />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">포스타입 유료글 주소</label>
+            <input
+              className="input"
+              value={postypeInput}
+              onChange={e => setPostypeInput(e.target.value)}
+              placeholder="https://posty.pe/..."
+              style={{ maxWidth: 460 }}
+            />
+          </div>
+        </div>
+
+        <div className="actions" style={{ marginTop: 16, alignItems: 'center' }}>
+          <button className="btn primary" onClick={() => void saveSettings(true)} disabled={savingSettings}>
+            {savingSettings ? '저장 중…' : '확인 · 저장 후 포스타입 열기'}
+          </button>
+          <button className="btn soft" onClick={() => void saveSettings(false)} disabled={savingSettings}>
+            저장만
+          </button>
+          {settings?.postypeUrl && (
+            <a className="btn" href={settings.postypeUrl} target="_blank" rel="noopener noreferrer">포스타입 글 열기</a>
+          )}
+          {settingsMsg && <span className="muted" style={{ fontSize: 13 }}>{settingsMsg}</span>}
         </div>
       </div>
 
