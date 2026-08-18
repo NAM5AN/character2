@@ -35,7 +35,24 @@ type AdminCharacter = {
   detailGeneratedAt: string | null;
   summaryCostUsd: number | string | null;
   detailCostUsd: number | string | null;
+  summaryGptInTok: number | string | null;
+  summaryGptOutTok: number | string | null;
+  detailGptInTok: number | string | null;
+  detailGptOutTok: number | string | null;
 };
+
+// gpt-5.6-luna 단가 (Vercel 게이트웨이 = OpenAI, 마크업 없음). 단가 바뀌면 여기만 고치면 됨.
+const GPT_RATE = { input: 0.20, output: 1.20 }; // $/1M tokens
+function gptCost(inTok: number | string | null, outTok: number | string | null): number {
+  return (Number(inTok || 0) * GPT_RATE.input + Number(outTok || 0) * GPT_RATE.output) / 1_000_000;
+}
+// 요약/상세 총 비용 = Claude(실측) + gpt(추정).
+function summaryTotalCost(c: AdminCharacter): number {
+  return Number(c.summaryCostUsd || 0) + gptCost(c.summaryGptInTok, c.summaryGptOutTok);
+}
+function detailTotalCost(c: AdminCharacter): number {
+  return Number(c.detailCostUsd || 0) + gptCost(c.detailGptInTok, c.detailGptOutTok);
+}
 
 // 생성된 리포트(요약 + 상세)의 총 글자수.
 function reportChars(c: AdminCharacter): number {
@@ -356,8 +373,9 @@ export default function AdminConsolePage() {
                 </p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                   <span className="tag" style={{ fontSize: 12 }}>리포트 {reportChars(c).toLocaleString()}자</span>
-                  <span className="tag" style={{ fontSize: 12 }}>요약 비용 {fmtCost(c.summaryCostUsd)}</span>
-                  <span className="tag" style={{ fontSize: 12 }}>상세 비용 {fmtCost(c.detailCostUsd)}</span>
+                  <span className="tag" style={{ fontSize: 12 }}>요약 {fmtCost(summaryTotalCost(c))}</span>
+                  <span className="tag" style={{ fontSize: 12 }}>상세 {fmtCost(detailTotalCost(c))}</span>
+                  <span className="tag" style={{ fontSize: 12, fontWeight: 800 }}>합계 {fmtCost(summaryTotalCost(c) + detailTotalCost(c))}</span>
                 </div>
               </button>
               <div className="actions" style={{ marginTop: 0 }}>
