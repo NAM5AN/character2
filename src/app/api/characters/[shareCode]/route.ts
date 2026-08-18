@@ -21,11 +21,26 @@ import { detailViewCookieName, detailViewCookieOptions } from '@/lib/detail-acce
 const detailBundleSchema=z.object({
   seed:z.unknown().nullable().optional(),
   detail:z.unknown().nullable().optional(),
+  precomputedDossier:z.unknown().nullable().optional(),
+  precomputedAt:z.string().nullable().optional(),
   legacyAnalysis:z.unknown().nullable().optional(),
   publicProfileText:z.string().optional().default(''),
   confirmedFactCount:z.coerce.number().int().nonnegative().default(0),
   inferenceCount:z.coerce.number().int().nonnegative().default(0),
 });
+
+const PRECOMPUTE_FRESH_MS=24*60*60*1000;
+// 결제 전에 미리 계산해둔 dossier가 (a) 존재하고 (b) 현재 프롬프트/스킬 버전과 같고 (c) 하루 안에 계산됐으면 재사용한다.
+// 하나라도 어긋나면 무시하고 stage 1이 심리모델을 정상 생성한다.
+function usablePrecomputedDossier(bundle:z.infer<typeof detailBundleSchema>):unknown{
+  const pc=bundle.precomputedDossier;
+  if(!pc||typeof pc!=='object'||Array.isArray(pc))return undefined;
+  const tag=(pc as Record<string,unknown>)._v;
+  if(tag!==`${DETAIL_REPORT_VERSION}|${CHARACTER_DEEP_ANALYSIS_SKILL_VERSION}`)return undefined;
+  const at=typeof bundle.precomputedAt==='string'?Date.parse(bundle.precomputedAt):NaN;
+  if(!Number.isFinite(at)||Date.now()-at>=PRECOMPUTE_FRESH_MS)return undefined;
+  return pc;
+}
 
 function record(value:unknown):Record<string,unknown>{return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};}
 
@@ -158,7 +173,8 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
         privateSource=source;
       }
 
-      const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource));
+      const precomputed=usablePrecomputedDossier(bundle);
+      const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource,precomputed));
       const storedAnalysis:Record<string,unknown>={...generated.analysis,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:1,detailComplete:false,_detailDossier:generated.dossier};
       await saveDetail(storedAnalysis);
       const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);

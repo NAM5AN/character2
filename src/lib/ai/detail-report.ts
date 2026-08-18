@@ -434,11 +434,24 @@ function validateVisibleText(text:string,sources?:string[]){
   if(sources&&hasLongVerbatimOverlap(text,sources))throw new Error('AI_JSON_SCHEMA_FAILED: 원자료의 긴 문장이 그대로 복사됨');
 }
 
-export async function generatePaidDetailStage1(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown):Promise<{analysis:FinalAnalysis;dossier:ReportDossier}>{
+// 심리모델→dossier까지만 만든다(글쓰기 없음). 결제 전 미리 계산(precompute)에 쓰인다.
+export async function buildDetailDossier(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown):Promise<ReportDossier>{
+  const seed=detailSeedSchema.parse(seedInput);
+  const {packet}=buildSourcePacket(seed,publicProfileText,privateSourceInput);
+  const psyche=await buildPsychologicalModel(seed,packet);
+  return buildReportDossier(psyche);
+}
+
+export async function generatePaidDetailStage1(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown,precomputedDossier?:unknown):Promise<{analysis:FinalAnalysis;dossier:ReportDossier}>{
   const seed=detailSeedSchema.parse(seedInput);
   const {packet,sources}=buildSourcePacket(seed,publicProfileText,privateSourceInput);
-  const psyche=await buildPsychologicalModel(seed,packet);
-  const dossier=buildReportDossier(psyche);
+  // 미리 계산해둔 dossier가 있으면 심리모델(가장 무거운 호출)을 건너뛴다. 없거나 형식이 안 맞으면 정상 생성.
+  let dossier:ReportDossier|null=null;
+  if(precomputedDossier){
+    const parsed=reportDossierSchema.safeParse(precomputedDossier);
+    if(parsed.success)dossier=parsed.data;
+  }
+  if(!dossier)dossier=buildReportDossier(await buildPsychologicalModel(seed,packet));
   const stage=await writeStage1(seed,dossier);
   validateVisibleText(`${stage.characterOverview} ${stage.innerMechanics}`,sources);
   const analysis=finalAnalysisSchema.parse({oneLineSummary:seed.oneLineSummary,summary:seed.summary,...stage});
