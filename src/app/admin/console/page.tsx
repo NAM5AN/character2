@@ -33,7 +33,31 @@ type AdminCharacter = {
   answers: Answer[];
   detailReport: Record<string, unknown> | null;
   detailGeneratedAt: string | null;
+  summaryCostUsd: number | string | null;
+  detailCostUsd: number | string | null;
 };
+
+// 생성된 리포트(요약 + 상세)의 총 글자수.
+function reportChars(c: AdminCharacter): number {
+  let n = (c.oneLineSummary || '').length;
+  if (c.summary) {
+    for (const k of ['outerSelf', 'innerSelf', 'conflictStyle', 'affectionStyle', 'misunderstoodPoint', 'hiddenPattern'] as const) {
+      n += (c.summary[k] || '').length;
+    }
+  }
+  if (c.detailReport) {
+    for (const v of Object.values(c.detailReport)) {
+      if (typeof v === 'string') n += v.length;
+    }
+  }
+  return n;
+}
+
+function fmtCost(value: number | string | null): string {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '$0';
+  return `$${n.toFixed(n < 0.1 ? 4 : n < 1 ? 3 : 2)}`;
+}
 
 const SUMMARY_LABELS: [keyof NonNullable<Summary>, string][] = [
   ['outerSelf', '겉모습 · 타인이 보는 인상'],
@@ -330,6 +354,11 @@ export default function AdminConsolePage() {
                   {c.analysisConfidence != null && ` · 신뢰도 ${c.analysisConfidence}`}
                   {c.detailReport ? ' · 상세리포트 있음' : ' · 상세리포트 없음'}
                 </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  <span className="tag" style={{ fontSize: 12 }}>리포트 {reportChars(c).toLocaleString()}자</span>
+                  <span className="tag" style={{ fontSize: 12 }}>요약 비용 {fmtCost(c.summaryCostUsd)}</span>
+                  <span className="tag" style={{ fontSize: 12 }}>상세 비용 {fmtCost(c.detailCostUsd)}</span>
+                </div>
               </button>
               <div className="actions" style={{ marginTop: 0 }}>
                 <button className="btn" onClick={() => openDetail(c)}>자세히</button>
