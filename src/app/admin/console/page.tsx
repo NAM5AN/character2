@@ -627,21 +627,21 @@ export default function AdminConsolePage() {
               </div>
 
               <div style={{ marginTop: 20, padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--paper)' }}>
-                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>테스트용 되돌리기</div>
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>테스트용 재생성</div>
                 <p className="muted" style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.6 }}>
-                  리포트를 지우고 이전 상태로 되돌립니다. 되돌린 뒤 오너 브라우저에서 다시 열면 새 프롬프트로 재생성돼요.
+                  저장된 20개 답변으로 리포트를 현재 프롬프트로 다시 만듭니다. 답변을 다시 입력할 필요 없이 생성 과정을 빠르게 테스트할 수 있어요.
                 </p>
                 <div className="actions" style={{ marginTop: 0, flexWrap: 'wrap' }}>
-                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'summary')}>
-                    {resetting === detailChar.shareCode + ':summary' ? '되돌리는 중…' : '상세 삭제 → 요약까지'}
-                  </button>
-                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'answers')}>
-                    {resetting === detailChar.shareCode + ':answers' ? '되돌리는 중…' : '요약·상세 삭제 → 질문응답까지'}
-                  </button>
                   <button className="btn primary" disabled={!!resetting || !!regenBusy} onClick={() => void regenerateSummary(detailChar)}>
-                    {regenBusy === detailChar.shareCode ? '요약 생성 중…' : '요약 리포트 재생성'}
+                    {regenBusy === detailChar.shareCode ? '요약 생성 중…' : '요약 리포트 재생성 (답변 20개로)'}
+                  </button>
+                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'summary')}>
+                    {resetting === detailChar.shareCode + ':summary' ? '지우는 중…' : '상세만 삭제 (요약 유지 → 상세 재생성용)'}
                   </button>
                 </div>
+                <p className="muted" style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.6 }}>
+                  · 요약 재생성: 상세도 함께 초기화돼요. · 상세만 삭제 후 오너 브라우저에서 다시 열면 상세가 새 프롬프트로 생성돼요.
+                </p>
               </div>
 
               <div className="actions" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
