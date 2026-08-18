@@ -90,7 +90,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   function changePage(next:1|2|3){
     if(next>stageReady)return;
     setReportPage(next);
-    requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'}));
+    document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'});
   }
 
   return <>
