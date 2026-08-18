@@ -176,5 +176,13 @@
 
   #paid-detail-report.report-compact .card:has(> div > div > p:nth-of-type(3) > strong:first-child)::after {
     content: '나머지 소주제는 제목만 표시 중이에요. ‘전체 내용 펼치기’에서 모두 볼 수 있어요.';
+    display: block;
+    margin-top: 22px;
+    padding: 11px 13px;
+    border-radius: 12px;
+    background: var(--report-point-soft);
+    color: #51627f;
+    font-size: 12px;
+    line-height: 1.55;
   }
 }
