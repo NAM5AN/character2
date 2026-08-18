@@ -5,12 +5,12 @@
 
 /* 큰 카테고리와 그 안의 문장형 소주제가 한 덩어리로 보이지 않도록 계층을 분리한다. */
 #paid-detail-report .card:has(> div > div > p > strong:first-child) {
-  padding: 34px !important;
+  padding: 30px !important;
 }
 
 #paid-detail-report .card:has(> div > div > p > strong:first-child) > h2 {
-  margin-bottom: 4px !important;
-  padding-bottom: 20px;
+  margin-bottom: 0 !important;
+  padding-bottom: 16px;
   border-bottom: 2px solid var(--ink);
 }
 
@@ -20,12 +20,13 @@
 
 #paid-detail-report .card > div > div > p:has(> strong:first-child) {
   counter-increment: report-topic;
-  max-width: 820px;
+  width: 100%;
+  max-width: none;
   margin: 0 !important;
-  padding: 28px 0 2px;
+  padding: 20px 0 0;
   color: #3f4248 !important;
   font-size: 16px;
-  line-height: 1.92 !important;
+  line-height: 1.78 !important;
   letter-spacing: -.012em;
   word-break: keep-all;
   overflow-wrap: anywhere;
@@ -33,19 +34,20 @@
 }
 
 #paid-detail-report .card > div > div > p:has(> strong:first-child) + p:has(> strong:first-child) {
-  margin-top: 28px !important;
+  margin-top: 18px !important;
+  padding-top: 20px;
   border-top: 1px solid var(--line);
 }
 
 #paid-detail-report .card > div > div > p > strong:first-child {
   position: relative;
   display: block;
-  min-height: 26px;
-  margin: 0 0 13px;
+  min-height: 24px;
+  margin: 0 0 10px;
   padding-left: 46px;
   color: var(--ink) !important;
   font-size: 18px;
-  line-height: 1.5;
+  line-height: 1.45;
   letter-spacing: -.025em;
   text-wrap: balance;
 }
@@ -69,22 +71,29 @@
 
 @media (max-width: 760px) {
   #paid-detail-report .card:has(> div > div > p > strong:first-child) {
-    padding: 24px 20px !important;
+    padding: 22px 18px !important;
+  }
+
+  #paid-detail-report .card:has(> div > div > p > strong:first-child) > h2 {
+    padding-bottom: 14px;
   }
 
   #paid-detail-report .card > div > div > p:has(> strong:first-child) {
-    padding-top: 24px;
+    padding-top: 18px;
     font-size: 15.5px;
-    line-height: 1.88 !important;
+    line-height: 1.72 !important;
     word-break: normal;
   }
 
   #paid-detail-report .card > div > div > p:has(> strong:first-child) + p:has(> strong:first-child) {
-    margin-top: 22px !important;
+    margin-top: 16px !important;
+    padding-top: 18px;
   }
 
   #paid-detail-report .card > div > div > p > strong:first-child {
+    margin-bottom: 9px;
     padding-left: 42px;
     font-size: 17px;
+    line-height: 1.42;
   }
 }
