@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ReportReadingMode } from '@/components/ReportReadingMode';
 import './globals.css';
 import './report-pagination.css';
+import './report-readability.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
@@ -65,6 +67,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
         </header>
         {children}
+        <ReportReadingMode />
         <footer className="footer"><div className="container">CHARA LAB · Character Passport v1</div></footer>
       </body>
     </html>
