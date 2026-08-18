@@ -303,11 +303,25 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요." submitLabel="코드 확인하고 상세 리포트 보기" />
 
     {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
-      mode:'detail',name:preview.name,oneLineSummary:preview.oneLineSummary,
-      excerpt:cardExcerpt(detail?.analysis.integratedReport||detail?.analysis.charmAndContradictions||detail?.analysis.characterOverview),
+      mode:'detail',name:preview.name,tagline:preview.oneLineSummary,
+      sections:(([
+        ['본질',detail?.analysis.characterOverview],
+        ['작동 방식',detail?.analysis.innerMechanics],
+        ['관계',detail?.analysis.relationshipStyle],
+        ['애착',detail?.analysis.attachmentStyle],
+        ['갈등',detail?.analysis.conflictStyleDetailed],
+        ['매력·반전',detail?.analysis.charmAndContradictions],
+      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }:{
-      mode:'summary',name:preview.name,oneLineSummary:preview.oneLineSummary,
-      aspects:summaryCards.map(([label])=>label).slice(0,4),
+      mode:'summary',name:preview.name,tagline:preview.oneLineSummary,
+      sections:(([
+        ['겉모습',preview.summary.outerSelf],
+        ['속마음',preview.summary.innerSelf],
+        ['관계·애정',preview.summary.affectionStyle],
+        ['감정 스위치',preview.summary.conflictStyle],
+        ['오해 포인트',preview.summary.misunderstoodPoint],
+        ['숨은 반전',preview.summary.hiddenPattern],
+      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }} />}
 
     <h1 style={{fontSize:'clamp(38px,5.5vw,64px)',letterSpacing:'-.04em',lineHeight:1.02,margin:'0 0 22px'}}>{preview.name}</h1>

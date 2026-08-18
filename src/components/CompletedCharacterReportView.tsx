@@ -155,11 +155,25 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     </div>
 
     {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
-      mode:'detail',name:preview.name,oneLineSummary:preview.oneLineSummary,
-      excerpt:cardExcerpt(analysis.integratedReport||analysis.charmAndContradictions||analysis.characterOverview||analysis.detailedReport),
+      mode:'detail',name:preview.name,tagline:preview.oneLineSummary,
+      sections:(([
+        ['본질',analysis.characterOverview],
+        ['작동 방식',analysis.innerMechanics],
+        ['관계',analysis.relationshipStyle],
+        ['애착',analysis.attachmentStyle],
+        ['갈등',analysis.conflictStyleDetailed],
+        ['매력·반전',analysis.charmAndContradictions],
+      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }:{
-      mode:'summary',name:preview.name,oneLineSummary:preview.oneLineSummary,
-      aspects:summaryCards.map(([label])=>label).slice(0,4),
+      mode:'summary',name:preview.name,tagline:preview.oneLineSummary,
+      sections:(([
+        ['겉모습',summary?.outerSelf],
+        ['속마음',summary?.innerSelf],
+        ['관계·애정',summary?.affectionStyle],
+        ['감정 스위치',summary?.conflictStyle],
+        ['오해 포인트',summary?.misunderstoodPoint],
+        ['숨은 반전',summary?.hiddenPattern],
+      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }} />}
   </>;
 }

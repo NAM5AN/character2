@@ -2,45 +2,52 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// 공유용 카드. AI/서버 없이 브라우저에서만 처리한다.
-// 사진은 업로드 즉시 다운스케일해서(거대한 data URL을 state에 넣지 않음) 아이폰 대용량 사진에도 안전.
-// 얼굴은 1:1 정사각형 크롭(드래그 이동 + 줌). 카드 이미지는 canvas로 합성해 공유/저장.
+// 공유용 "캐릭터 도감" 카드. AI/서버 없이 브라우저에서만 처리.
+// 사진은 업로드 즉시 다운스케일(거대한 data URL을 state에 넣지 않음)해 아이폰 대용량 사진에도 안전.
+// 얼굴은 1:1 크롭(드래그 + 줌). 헤더 + 작은 얼굴 + 라벨 패널 여러 개로 정보를 촘촘히 담는다.
 
 export type ShareCardMode = 'summary' | 'detail';
+export type CardSection = { label: string; text: string };
 
 export type ShareCardData = {
   mode: ShareCardMode;
   name: string;
-  oneLineSummary: string;
-  excerpt?: string;   // 상세 카드용 짧은 심층 발췌
-  aspects?: string[]; // 요약 카드용 관점 라벨
+  tagline: string;         // 한 줄 요약
+  sections: CardSection[]; // 라벨 + 짧은 문장 패널들
 };
 
 const CARD_W = 1080;
-const CARD_H = 1560;
-const FACE = 820;
-const FACE_X = (CARD_W - FACE) / 2;
-const FACE_Y = 96;
+const CARD_H = 1130;
+const M = 40;
+const HEADER_H = 168;
+const PHOTO = 316;
+const GAP = 22;
+const ROW_H = 150;
 const FONT = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
 
 type Theme = {
   bgTop: string; bgBottom: string; ink: string; sub: string;
-  badgeBg: string; badgeInk: string; accent: string; badgeText: string; frame: string;
+  accent: string; onAccent: string; headerBg: string; headerInk: string;
+  panelBg: string; badgeText: string;
 };
 
 const THEMES: Record<ShareCardMode, Theme> = {
   summary: {
-    bgTop: '#FFF7EC', bgBottom: '#FCE7C6', ink: '#2A2420', sub: '#6B5B45',
-    badgeBg: '#E79A3C', badgeInk: '#FFFFFF', accent: '#C9812B', badgeText: '요약 리포트', frame: 'rgba(42,36,32,.10)',
+    bgTop: '#FFF7EC', bgBottom: '#FBE4C0', ink: '#332A20', sub: '#8A755A',
+    accent: '#D98A34', onAccent: '#FFFFFF', headerBg: '#E7963A', headerInk: '#FFFFFF',
+    panelBg: 'rgba(255,255,255,.66)', badgeText: '요약 리포트',
   },
   detail: {
-    bgTop: '#191C33', bgBottom: '#322A5C', ink: '#F6F1E6', sub: '#C9BCE6',
-    badgeBg: '#D8B24E', badgeInk: '#1A1730', accent: '#E7CE86', badgeText: '심층 리포트', frame: 'rgba(255,255,255,.14)',
+    bgTop: '#181B31', bgBottom: '#322A5C', ink: '#F4EFE4', sub: '#BCADDD',
+    accent: '#D8B24E', onAccent: '#241C40', headerBg: '#2E2658', headerInk: '#EAD79A',
+    panelBg: 'rgba(255,255,255,.07)', badgeText: '심층 리포트',
   },
 };
 
-// 상세 리포트 본문에서 카드용 짧은 발췌를 뽑는다. 굵은 안내문(**...**)은 제거하고 첫 문장만.
-export function cardExcerpt(text?: string, maxLen = 96): string {
+function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+
+// 리포트 본문에서 카드용 짧은 문장을 뽑는다. 굵은 안내문(**...**)은 제거하고 첫 문장만.
+export function cardExcerpt(text?: string, maxLen = 52): string {
   if (!text) return '';
   let t = text.replace(/\*\*(.+?)\*\*/g, '').replace(/\s+/g, ' ').trim();
   if (!t) t = text.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
@@ -49,8 +56,6 @@ export function cardExcerpt(text?: string, maxLen = 96): string {
   if (s.length > maxLen) s = s.slice(0, maxLen - 1).trim() + '…';
   return s;
 }
-
-function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);
@@ -101,9 +106,8 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   }
   if (lines.length < maxLines && cur) lines.push(cur);
   if (lines.length === maxLines) {
-    // 마지막 줄이 잘렸으면 말줄임.
     let last = lines[maxLines - 1];
-    const consumed = lines.join('').length;
+    const consumed = lines.join('').replace(/\s/g, '').length;
     if (consumed < clean.replace(/\s/g, '').length) {
       while (last && ctx.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
       lines[maxLines - 1] = last + '…';
@@ -154,91 +158,94 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
 
-    // 배경 그라디언트.
+    // 배경.
     const g = ctx.createLinearGradient(0, 0, 0, CARD_H);
     g.addColorStop(0, theme.bgTop); g.addColorStop(1, theme.bgBottom);
     ctx.fillStyle = g; ctx.fillRect(0, 0, CARD_W, CARD_H);
 
-    // 얼굴 (없으면 모노그램).
+    const labelTab = (x: number, y: number, label: string) => {
+      ctx.font = `800 25px ${FONT}`;
+      const w = ctx.measureText(label).width + 30;
+      ctx.fillStyle = theme.accent;
+      roundRect(ctx, x, y, w, 42, 12); ctx.fill();
+      ctx.fillStyle = theme.onAccent;
+      ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillText(label, x + 15, y + 22);
+      ctx.textBaseline = 'alphabetic';
+    };
+
+    const panel = (x: number, y: number, w: number, h: number, label: string, text: string, bodyLines = 2, bodyFont = 27) => {
+      ctx.fillStyle = theme.panelBg;
+      roundRect(ctx, x, y, w, h, 22); ctx.fill();
+      labelTab(x + 18, y + 16, label);
+      ctx.fillStyle = theme.ink;
+      ctx.font = `500 ${bodyFont}px ${FONT}`;
+      ctx.textAlign = 'left';
+      const lines = wrapLines(ctx, text, w - 40, bodyLines);
+      let ty = y + 16 + 42 + 38;
+      for (const ln of lines) { ctx.fillText(ln, x + 20, ty); ty += bodyFont + 9; }
+    };
+
+    // 헤더 밴드.
+    ctx.fillStyle = theme.headerBg;
+    ctx.fillRect(0, 0, CARD_W, HEADER_H);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = theme.headerInk;
+    ctx.font = `800 62px ${FONT}`;
+    ctx.fillText((data.name || '').slice(0, 14), M, 94);
+    ctx.font = `700 26px ${FONT}`;
+    ctx.globalAlpha = 0.92;
+    ctx.fillText(`캐릭터 심리 도감 · ${theme.badgeText}`, M, 136);
+    ctx.globalAlpha = 1;
+    // 로고 사각형.
+    const ls = 88;
+    ctx.fillStyle = data.mode === 'detail' ? 'rgba(234,215,154,.16)' : 'rgba(255,255,255,.24)';
+    roundRect(ctx, CARD_W - M - ls, (HEADER_H - ls) / 2, ls, ls, 18); ctx.fill();
+    ctx.fillStyle = theme.headerInk;
+    ctx.font = `800 46px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText('C', CARD_W - M - ls / 2, HEADER_H / 2 + 17);
+    ctx.textAlign = 'left';
+
+    // 얼굴 (작게, 왼쪽).
+    const py = HEADER_H + GAP;
     const img = imgRef.current;
     if (img && hasImage) {
-      renderFace(ctx, FACE_X, FACE_Y, FACE, img, img.width, img.height, zoom, nOff.x, nOff.y, 40);
+      renderFace(ctx, M, py, PHOTO, img, img.width, img.height, zoom, nOff.x, nOff.y, 26);
     } else {
-      ctx.save();
-      roundRect(ctx, FACE_X, FACE_Y, FACE, FACE, 40);
-      ctx.clip();
-      ctx.fillStyle = data.mode === 'detail' ? 'rgba(255,255,255,.06)' : 'rgba(42,36,32,.05)';
-      ctx.fillRect(FACE_X, FACE_Y, FACE, FACE);
-      ctx.fillStyle = theme.accent;
-      ctx.font = `800 360px ${FONT}`;
+      ctx.save(); roundRect(ctx, M, py, PHOTO, PHOTO, 26); ctx.clip();
+      ctx.fillStyle = theme.panelBg; ctx.fillRect(M, py, PHOTO, PHOTO);
+      ctx.fillStyle = theme.accent; ctx.font = `800 190px ${FONT}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText((data.name || '?').slice(0, 1), CARD_W / 2, FACE_Y + FACE / 2 + 12);
+      ctx.fillText((data.name || '?').slice(0, 1), M + PHOTO / 2, py + PHOTO / 2 + 8);
       ctx.restore();
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     }
-    // 얼굴 테두리.
-    ctx.strokeStyle = theme.frame; ctx.lineWidth = 3;
-    roundRect(ctx, FACE_X, FACE_Y, FACE, FACE, 40); ctx.stroke();
+    ctx.strokeStyle = theme.accent; ctx.lineWidth = 4; ctx.globalAlpha = 0.7;
+    roundRect(ctx, M, py, PHOTO, PHOTO, 26); ctx.stroke(); ctx.globalAlpha = 1;
 
-    let y = FACE_Y + FACE + 74;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    // 한 줄 요약 패널 (얼굴 오른쪽).
+    const tx = M + PHOTO + GAP;
+    const tw = CARD_W - tx - M;
+    panel(tx, py, tw, PHOTO, '한 줄 요약', data.tagline || '', 5, 33);
 
-    // 뱃지.
-    ctx.font = `800 30px ${FONT}`;
-    const bt = theme.badgeText;
-    const bw = ctx.measureText(bt).width + 44;
-    ctx.fillStyle = theme.badgeBg;
-    roundRect(ctx, FACE_X, y - 34, bw, 50, 25); ctx.fill();
-    ctx.fillStyle = theme.badgeInk;
-    ctx.fillText(bt, FACE_X + 22, y);
-    y += 62;
+    // 섹션 패널 그리드 (2열).
+    const gy = py + PHOTO + GAP;
+    const colW = (CARD_W - M * 2 - GAP) / 2;
+    const secs = data.sections.slice(0, 6);
+    secs.forEach((s, i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      panel(M + col * (colW + GAP), gy + row * (ROW_H + 18), colW, ROW_H, s.label, s.text);
+    });
+    const rows = Math.ceil(secs.length / 2);
+    const gridBottom = gy + (rows > 0 ? rows * (ROW_H + 18) - 18 : 0);
 
-    // 이름.
-    ctx.fillStyle = theme.ink;
-    ctx.font = `800 76px ${FONT}`;
-    const nameLine = wrapLines(ctx, data.name || '', CARD_W - FACE_X * 2, 1)[0] || '';
-    ctx.fillText(nameLine, FACE_X, y);
-    y += 30;
-
-    // 한 줄 요약.
-    ctx.fillStyle = theme.ink;
-    ctx.font = `600 38px ${FONT}`;
-    const oneLines = wrapLines(ctx, data.oneLineSummary || '', CARD_W - FACE_X * 2, 3);
-    for (const line of oneLines) { y += 52; ctx.fillText(line, FACE_X, y); }
-
-    // 모드별 추가 내용.
-    if (data.mode === 'detail' && data.excerpt) {
-      y += 40;
-      ctx.fillStyle = theme.accent;
-      ctx.font = `700 26px ${FONT}`;
-      ctx.fillText('심층 해석', FACE_X, y);
-      y += 12;
-      ctx.fillStyle = theme.sub;
-      ctx.font = `400 32px ${FONT}`;
-      const ex = wrapLines(ctx, data.excerpt, CARD_W - FACE_X * 2, 2);
-      for (const line of ex) { y += 44; ctx.fillText(line, FACE_X, y); }
-    } else if (data.mode === 'summary' && data.aspects && data.aspects.length) {
-      y += 44;
-      ctx.font = `700 28px ${FONT}`;
-      let cx = FACE_X;
-      const chipH = 52, gap = 14, maxRight = CARD_W - FACE_X;
-      for (const a of data.aspects) {
-        const cw = ctx.measureText(a).width + 40;
-        if (cx + cw > maxRight) { cx = FACE_X; y += chipH + gap; }
-        ctx.fillStyle = 'rgba(201,129,43,.14)';
-        roundRect(ctx, cx, y, cw, chipH, 26); ctx.fill();
-        ctx.fillStyle = theme.accent;
-        ctx.fillText(a, cx + 20, y + 35);
-        cx += cw + gap;
-      }
-      y += chipH;
-    }
-
-    // 푸터 브랜드.
+    // 푸터.
     ctx.fillStyle = theme.sub;
-    ctx.font = `700 26px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.font = `600 24px ${FONT}`;
+    ctx.fillText('이미지를 길게 눌러 저장 · CHARA LAB', CARD_W / 2, Math.min(CARD_H - 34, gridBottom + 52));
     ctx.textAlign = 'left';
-    ctx.fillText('CHARA LAB · 캐릭터 심리 분석', FACE_X, CARD_H - 46);
   }, [theme, hasImage, zoom, nOff, data]);
 
   const drawCrop = useCallback(() => {
@@ -251,7 +258,6 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
     ctx.fillStyle = '#00000010'; ctx.fillRect(0, 0, S, S);
     const img = imgRef.current;
     if (img && hasImage) renderFace(ctx, 0, 0, S, img, img.width, img.height, zoom, nOff.x, nOff.y, 12);
-    // 안내 격자.
     ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
     for (let i = 1; i < 3; i++) {
       ctx.beginPath(); ctx.moveTo((S / 3) * i, 0); ctx.lineTo((S / 3) * i, S); ctx.stroke();
@@ -295,6 +301,13 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
     return await new Promise(res => canvas.toBlob(b => res(b), 'image/png', 0.95));
   }
 
+  function downloadBlob(blob: Blob, name: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   async function share() {
     setBusy(true); setError('');
     try {
@@ -303,7 +316,7 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
       const file = new File([blob], `${data.name || 'character'}_${data.mode}_card.png`, { type: 'image/png' });
       const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
       if (nav.canShare && nav.canShare({ files: [file] }) && typeof navigator.share === 'function') {
-        try { await navigator.share({ files: [file], title: `${data.name} 캐릭터 카드`, text: data.oneLineSummary }); return; }
+        try { await navigator.share({ files: [file], title: `${data.name} 캐릭터 카드`, text: data.tagline }); return; }
         catch { /* 취소/실패 시 저장으로 폴백 */ }
       }
       downloadBlob(blob, file.name);
@@ -321,13 +334,6 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
     } finally { setBusy(false); }
   }
 
-  function downloadBlob(blob: Blob, name: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     if (open) window.addEventListener('keydown', onKey);
@@ -338,7 +344,7 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" style={{ width: 'min(680px, 100%)', maxHeight: '92vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ width: 'min(720px, 100%)', maxHeight: '92vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <h3 style={{ margin: 0 }}>{data.mode === 'detail' ? '심층 리포트 공유 카드' : '요약 리포트 공유 카드'}</h3>
           <button className="btn" style={{ padding: '8px 12px' }} onClick={onClose} aria-label="닫기">✕</button>
@@ -346,7 +352,6 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
         <p className="muted" style={{ marginTop: 8 }}>사진을 넣고 얼굴이 가운데 오도록 옮기거나 확대한 뒤, 공유하거나 저장하세요. 사진은 이 카드에만 쓰이고 서버에 올라가지 않아요.</p>
 
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 12 }}>
-          {/* 크롭 + 컨트롤 */}
           <div style={{ flex: '1 1 240px', minWidth: 240 }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: 300, aspectRatio: '1 / 1', margin: '0 auto' }}>
               <canvas
@@ -366,10 +371,9 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
             </label>
           </div>
 
-          {/* 카드 미리보기 */}
-          <div style={{ flex: '1 1 220px', minWidth: 200, display: 'flex', justifyContent: 'center' }}>
+          <div style={{ flex: '1 1 260px', minWidth: 240, display: 'flex', justifyContent: 'center' }}>
             <canvas ref={cardRef} width={CARD_W} height={CARD_H}
-              style={{ width: '100%', maxWidth: 260, height: 'auto', borderRadius: 16, boxShadow: '0 10px 30px rgba(0,0,0,.18)', display: 'block' }} />
+              style={{ width: '100%', maxWidth: 320, height: 'auto', borderRadius: 16, boxShadow: '0 10px 30px rgba(0,0,0,.18)', display: 'block' }} />
           </div>
         </div>
 
