@@ -3,41 +3,6 @@
   --report-point-soft: #eef4ff;
 }
 
-.report-reading-controls-slot {
-  margin: 14px 0 24px;
-}
-
-.report-reading-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .58);
-}
-
-.report-reading-description {
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.report-reading-toggle {
-  flex: 0 0 auto;
-  border-color: var(--report-point);
-  color: var(--report-point);
-  background: white;
-  padding: 9px 13px;
-}
-
-.report-reading-toggle:hover,
-.report-reading-toggle[aria-pressed="true"] {
-  background: var(--report-point);
-  color: white;
-}
-
 /* 큰 카테고리와 그 안의 문장형 소주제가 한 덩어리로 보이지 않도록 계층을 분리한다. */
 #paid-detail-report .card:has(> div > div > p > strong:first-child) {
   padding: 34px !important;
@@ -102,44 +67,7 @@
   letter-spacing: .04em;
 }
 
-/* 기본은 훑어보기 모드. 앞의 핵심 소주제는 본문까지, 이후 소주제는 제목만 보여준다. */
-#paid-detail-report.report-compact .card > div > div > p:nth-of-type(n + 4):has(> strong:first-child) {
-  padding-top: 20px;
-  color: transparent !important;
-  font-size: 0 !important;
-  line-height: 1 !important;
-}
-
-#paid-detail-report.report-compact .card > div > div > p:nth-of-type(n + 4) > strong:first-child {
-  margin-bottom: 0;
-  color: var(--muted) !important;
-  font-size: 15px;
-  line-height: 1.45;
-}
-
-#paid-detail-report.report-compact .card:has(> div > div > p:nth-of-type(4) > strong:first-child)::after {
-  content: '나머지 소주제는 제목만 표시 중이에요. 위의 ‘전체 내용 펼치기’를 누르면 모두 읽을 수 있어요.';
-  display: block;
-  margin-top: 24px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--report-point-soft);
-  color: #51627f;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
 @media (max-width: 760px) {
-  .report-reading-controls {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .report-reading-toggle {
-    width: 100%;
-  }
-
   #paid-detail-report .card:has(> div > div > p > strong:first-child) {
     padding: 24px 20px !important;
   }
@@ -158,31 +86,5 @@
   #paid-detail-report .card > div > div > p > strong:first-child {
     padding-left: 42px;
     font-size: 17px;
-  }
-
-  #paid-detail-report.report-compact .card > div > div > p:nth-of-type(n + 3):has(> strong:first-child) {
-    padding-top: 18px;
-    color: transparent !important;
-    font-size: 0 !important;
-    line-height: 1 !important;
-  }
-
-  #paid-detail-report.report-compact .card > div > div > p:nth-of-type(n + 3) > strong:first-child {
-    margin-bottom: 0;
-    color: var(--muted) !important;
-    font-size: 14px;
-    line-height: 1.45;
-  }
-
-  #paid-detail-report.report-compact .card:has(> div > div > p:nth-of-type(3) > strong:first-child)::after {
-    content: '나머지 소주제는 제목만 표시 중이에요. ‘전체 내용 펼치기’에서 모두 볼 수 있어요.';
-    display: block;
-    margin-top: 22px;
-    padding: 11px 13px;
-    border-radius: 12px;
-    background: var(--report-point-soft);
-    color: #51627f;
-    font-size: 12px;
-    line-height: 1.55;
   }
 }
