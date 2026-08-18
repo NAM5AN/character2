@@ -49,6 +49,21 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   const analysis=savedDetail.analysis;
   const isPaged=Boolean(analysis.characterOverview?.trim());
   const stageReady=Math.max(1,Math.min(3,savedDetail.stageReady||3));
+  const summary=preview.summary;
+  const richSummary=Boolean(summary?.misunderstoodPoint?.trim()&&summary?.hiddenPattern?.trim());
+  const summaryCards:[string,string][]=richSummary?[
+    ['겉으로 보이는 모습',summary?.outerSelf||''],
+    ['실제 내면',summary?.innerSelf||''],
+    ['감정이 흔들리는 순간',summary?.conflictStyle||''],
+    ['관계에서 반복되는 패턴',summary?.affectionStyle||''],
+    ['쉽게 오해받는 부분',summary?.misunderstoodPoint||''],
+    ['의외로 눈에 띄는 지점',summary?.hiddenPattern||''],
+  ]:[
+    ['겉으로 보이는 모습',summary?.outerSelf||''],
+    ['실제 내면',summary?.innerSelf||''],
+    ['갈등 방식',summary?.conflictStyle||''],
+    ['애정 표현',summary?.affectionStyle||''],
+  ];
 
   useEffect(()=>{
     if(!savedDetail.canResume||!isPaged||stageReady>=3)return;
@@ -79,11 +94,15 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   }
 
   return <>
-    <div className="page-head" style={{marginBottom:24}}>
+    <div className="page-head" style={{marginBottom:20}}>
       <h1 style={{fontSize:'clamp(42px,6vw,72px)',marginBottom:0}}>{preview.name} 정밀 분석</h1>
     </div>
 
-    <div id="paid-detail-report">
+    {preview.oneLineSummary&&<p className="hero-copy" style={{fontSize:17,margin:'0 0 8px',maxWidth:860}}>{preview.oneLineSummary}</p>}
+    <div style={{marginTop:22}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2></div>
+    <div className="result-grid" style={{marginTop:18}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
+
+    <div id="paid-detail-report" style={{marginTop:38}}>
       <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
 
       {isPaged?<>
