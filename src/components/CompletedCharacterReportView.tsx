@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
-import { ShareCardModal, cardExcerpt, type ShareCardMode } from '@/components/ShareCardModal';
 import { applyName } from '@/lib/josa';
 
 export type CompletedDetailPayload={
@@ -45,7 +44,6 @@ function LegacySection({title,text}:{title:string;text?:string}){
 
 export function CompletedCharacterReportView({preview,detail}:{preview:CharacterReportPreview;detail:CompletedDetailPayload}){
   const [reportPage,setReportPage]=useState<1|2|3>(1);
-  const [shareMode,setShareMode]=useState<ShareCardMode|null>(null);
   const [savedDetail,setSavedDetail]=useState(detail);
   const resumeAttempts=useRef(new Set<number>());
   const analysis=savedDetail.analysis;
@@ -101,17 +99,11 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     </div>
 
     {preview.oneLineSummary&&<p className="hero-copy" style={{fontSize:17,margin:'0 0 8px',maxWidth:860}}>{preview.oneLineSummary}</p>}
-    <div style={{marginTop:22,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-      <h2 style={{marginTop:0,marginBottom:0}}>유형별 캐릭터 해석</h2>
-      <button className="btn soft" style={{whiteSpace:'nowrap'}} onClick={()=>setShareMode('summary')}>요약 리포트 공유 카드</button>
-    </div>
+    <div style={{marginTop:22}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2></div>
     <div className="result-grid" style={{marginTop:18}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
 
     <div id="paid-detail-report" style={{marginTop:38,scrollMarginTop:90}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-        <h2 style={{marginTop:0,marginBottom:0}}>상세 캐릭터 리포트</h2>
-        {isPaged&&<button className="btn soft" style={{whiteSpace:'nowrap'}} onClick={()=>setShareMode('detail')}>상세 리포트 공유 카드</button>}
-      </div>
+      <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
 
       {isPaged?<>
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
@@ -153,27 +145,5 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         <div className="actions" style={{marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
       </>}
     </div>
-
-    {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
-      mode:'detail',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
-      sections:(([
-        ['본질',analysis.characterOverview],
-        ['작동 방식',analysis.innerMechanics],
-        ['관계',analysis.relationshipStyle],
-        ['애착',analysis.attachmentStyle],
-        ['갈등',analysis.conflictStyleDetailed],
-        ['매력·반전',analysis.charmAndContradictions],
-      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
-    }:{
-      mode:'summary',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
-      sections:(([
-        ['겉모습',summary?.outerSelf],
-        ['속마음',summary?.innerSelf],
-        ['관계·애정',summary?.affectionStyle],
-        ['감정 스위치',summary?.conflictStyle],
-        ['오해 포인트',summary?.misunderstoodPoint],
-        ['숨은 반전',summary?.hiddenPattern],
-      ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
-    }} />}
   </>;
 }
