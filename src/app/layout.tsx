@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
+import './report-pagination.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
