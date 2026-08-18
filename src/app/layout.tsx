@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ReportReadingMode } from '@/components/ReportReadingMode';
 import './globals.css';
 import './report-pagination.css';
 import './report-readability.css';
@@ -67,7 +66,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
         </header>
         {children}
-        <ReportReadingMode />
         <footer className="footer"><div className="container">CHARA LAB · Character Passport v1</div></footer>
       </body>
     </html>
