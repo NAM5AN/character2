@@ -130,7 +130,10 @@ export function aiGatewayUsageOptions(){
   if(!context)return undefined;
   const user=context.sessionId||context.shareCode;
   const tags=['character2',`stage:${context.stage}`,...(context.shareCode?[`share:${context.shareCode}`]:[])];
-  return {gateway:{...(user?{user}:{}),tags}};
+  // caching:'auto' — 게이트웨이가 Anthropic에 자동으로 cache_control 마커를 붙인다.
+  // 상세 리포트처럼 큰 스킬 프롬프트를 연속 재전송/재시도하는 호출에서 입력 토큰 비용을 크게 줄인다.
+  // OpenAI는 이미 암묵적 캐싱이라 무효과, 잘못된 값도 요청을 실패시키지 않는다.
+  return {gateway:{caching:'auto' as const,...(user?{user}:{}),tags}};
 }
 
 export async function attachAiUsageSession(sessionId:string|undefined,shareCode:string){
