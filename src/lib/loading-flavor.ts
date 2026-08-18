@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { applyName } from '@/lib/josa';
 
 // 심즈 로딩 문구 스타일: 상담(인터뷰) 자리에서 캐릭터가 벌일 법한 짓 "~하는 중".
 // 뜬금없어도 '그 자리에서 일어날 수 있는' 것이면 OK. 각 문구에 어울리는 성격 태그를 달아두고,
@@ -134,19 +135,6 @@ export function pickFlavors(text: string): string[] {
     out.push(flavor.t);
   }
   return out.length ? out : FLAVOR_POOL.filter(f => f.g.includes('any')).map(f => f.t);
-}
-
-// 이름 끝 받침 여부에 맞춰 조사(이/가·은/는·을/를·과/와)를 골라 치환한다.
-export function applyName(template: string, name: string): string {
-  const last = name.length ? name.charCodeAt(name.length - 1) : 0;
-  const isHangul = last >= 0xAC00 && last <= 0xD7A3;
-  const hasBatchim = isHangul && ((last - 0xAC00) % 28 !== 0);
-  return template
-    .replace(/\{name\}가/g, `${name}${hasBatchim ? '이' : '가'}`)
-    .replace(/\{name\}는/g, `${name}${hasBatchim ? '은' : '는'}`)
-    .replace(/\{name\}을/g, `${name}${hasBatchim ? '을' : '를'}`)
-    .replace(/\{name\}와/g, `${name}${hasBatchim ? '과' : '와'}`)
-    .replace(/\{name\}/g, name);
 }
 
 // 캐릭터 분석 텍스트로 어울리는 문구 세트를 골라, 생성 중일 때 2.6초마다 순환시켜 반환한다.

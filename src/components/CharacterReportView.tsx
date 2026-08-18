@@ -5,6 +5,7 @@ import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
 import { useRotatingFlavor } from '@/lib/loading-flavor';
+import { applyName } from '@/lib/josa';
 
 type DetailPayload={
   analysis:FinalAnalysis;
@@ -285,6 +286,8 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요." submitLabel="코드 확인하고 상세 리포트 보기" />
 
+    <h1 style={{fontSize:'clamp(38px,5.5vw,64px)',letterSpacing:'-.04em',lineHeight:1.02,margin:'0 0 22px'}}>{preview.name}</h1>
+
     <div className="result-hero report-summary-head">
       <div className="report-summary-copy"><p className="hero-copy" style={{fontSize:17,marginTop:0}}>{preview.oneLineSummary}</p></div>
       <div className="save-character-panel">
@@ -344,16 +347,16 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={detail.analysis.characterOverview}/>
-          <NarrativeSection index={1} title={`${preview.name}는 이렇게 작동해요`} text={detail.analysis.innerMechanics}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={detail.analysis.characterOverview}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={detail.analysis.innerMechanics}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={`${preview.name}는 이렇게 관계를 맺어요`} text={detail.analysis.relationshipStyle}/>
-          <NarrativeSection index={3} title={`${preview.name}는 이런 애착이 있어요`} text={detail.analysis.attachmentStyle}/>
-          <NarrativeSection index={4} title={`${preview.name}는 이렇게 갈등해요`} text={detail.analysis.conflictStyleDetailed}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={detail.analysis.relationshipStyle}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={detail.analysis.attachmentStyle}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={detail.analysis.conflictStyleDetailed}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={`${preview.name}에겐 이런 매력이 있어요`} text={detail.analysis.charmAndContradictions}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={detail.analysis.charmAndContradictions}/>
           <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport}/>
         </>}
 

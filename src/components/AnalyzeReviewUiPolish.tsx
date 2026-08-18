@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { applyName } from '@/lib/josa';
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 
@@ -43,7 +44,7 @@ export function AnalyzeReviewUiPolish(){
       const headingMatch=text.match(/^(.*?)(?:을|를) 이렇게 이해했어요\.$/u);
       if(heading&&headingMatch){
         currentName=headingMatch[1].trim()||currentName;
-        const desired=`${currentName}를 좀 더 이해해볼게요.`;
+        const desired=applyName('{name}를 좀 더 이해해볼게요.',currentName);
         if(heading.textContent!==desired)heading.textContent=desired;
       }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
+import { applyName } from '@/lib/josa';
 
 export type CompletedDetailPayload={
   analysis:FinalAnalysis;
@@ -89,16 +90,16 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={`${preview.name}는 이런 캐릭터예요`} text={analysis.characterOverview}/>
-          <NarrativeSection index={1} title={`${preview.name}는 이렇게 작동해요`} text={analysis.innerMechanics}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={analysis.characterOverview}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={analysis.innerMechanics}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={`${preview.name}는 이렇게 관계를 맺어요`} text={analysis.relationshipStyle}/>
-          <NarrativeSection index={3} title={`${preview.name}는 이런 애착이 있어요`} text={analysis.attachmentStyle}/>
-          <NarrativeSection index={4} title={`${preview.name}는 이렇게 갈등해요`} text={analysis.conflictStyleDetailed}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={analysis.relationshipStyle}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={analysis.attachmentStyle}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={analysis.conflictStyleDetailed}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={`${preview.name}에겐 이런 매력이 있어요`} text={analysis.charmAndContradictions}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={analysis.charmAndContradictions}/>
           <NarrativeSection index={6} title="통합 리포트" text={analysis.integratedReport}/>
         </>}
 

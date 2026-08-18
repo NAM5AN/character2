@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
+import { applyName } from '@/lib/josa';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -125,12 +126,12 @@ function asRecord(value: unknown): UnknownRecord | null {
 }
 
 function sectionTitle(field: ReportField, name: string) {
-  if (field === 'characterOverview') return `${name}는 이런 캐릭터예요`;
-  if (field === 'innerMechanics') return `${name}는 이렇게 작동해요`;
-  if (field === 'relationshipStyle') return `${name}는 이렇게 관계를 맺어요`;
-  if (field === 'attachmentStyle') return `${name}는 이런 애착이 있어요`;
-  if (field === 'conflictStyleDetailed') return `${name}는 이렇게 갈등해요`;
-  if (field === 'charmAndContradictions') return `${name}에겐 이런 매력이 있어요`;
+  if (field === 'characterOverview') return applyName('{name}는 이런 캐릭터예요', name);
+  if (field === 'innerMechanics') return applyName('{name}는 이렇게 작동해요', name);
+  if (field === 'relationshipStyle') return applyName('{name}는 이렇게 관계를 맺어요', name);
+  if (field === 'attachmentStyle') return applyName('{name}는 이런 애착이 있어요', name);
+  if (field === 'conflictStyleDetailed') return applyName('{name}는 이렇게 갈등해요', name);
+  if (field === 'charmAndContradictions') return applyName('{name}에겐 이런 매력이 있어요', name);
   return '통합 리포트';
 }
 
