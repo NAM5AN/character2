@@ -239,6 +239,7 @@ export default function AdminConsolePage() {
   const [pendingDelete, setPendingDelete] = useState<AdminCharacter | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [resetting, setResetting] = useState('');
+  const [regenBusy, setRegenBusy] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
 
   // Owner settings: current 결제코드(이용코드) + Postype URL.
@@ -401,6 +402,26 @@ export default function AdminConsolePage() {
       await load();
     } finally {
       setResetting('');
+    }
+  }
+
+  async function regenerateSummary(c: AdminCharacter) {
+    if (!window.confirm(`${c.name}\n\n저장된 데이터로 요약 리포트를 현재 프롬프트로 다시 생성할까요?\n(상세 리포트는 함께 초기화됩니다. 30초~1분 소요)`)) return;
+    setRegenBusy(c.shareCode);
+    setErrorText('');
+    try {
+      const res = await fetch(`/api/admin/data/${c.shareCode}/regenerate-summary`, { method: 'POST' });
+      if (res.status === 401) { setStatus('denied'); return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErrorText(body?.error || 'REGEN_FAILED');
+        return;
+      }
+      await load();
+    } catch {
+      setErrorText('NETWORK');
+    } finally {
+      setRegenBusy('');
     }
   }
 
@@ -610,12 +631,15 @@ export default function AdminConsolePage() {
                 <p className="muted" style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.6 }}>
                   리포트를 지우고 이전 상태로 되돌립니다. 되돌린 뒤 오너 브라우저에서 다시 열면 새 프롬프트로 재생성돼요.
                 </p>
-                <div className="actions" style={{ marginTop: 0 }}>
-                  <button className="btn" disabled={!!resetting} onClick={() => void resetReport(detailChar, 'summary')}>
+                <div className="actions" style={{ marginTop: 0, flexWrap: 'wrap' }}>
+                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'summary')}>
                     {resetting === detailChar.shareCode + ':summary' ? '되돌리는 중…' : '상세 삭제 → 요약까지'}
                   </button>
-                  <button className="btn" disabled={!!resetting} onClick={() => void resetReport(detailChar, 'answers')}>
+                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'answers')}>
                     {resetting === detailChar.shareCode + ':answers' ? '되돌리는 중…' : '요약·상세 삭제 → 질문응답까지'}
+                  </button>
+                  <button className="btn primary" disabled={!!resetting || !!regenBusy} onClick={() => void regenerateSummary(detailChar)}>
+                    {regenBusy === detailChar.shareCode ? '요약 생성 중…' : '요약 리포트 재생성'}
                   </button>
                 </div>
               </div>
