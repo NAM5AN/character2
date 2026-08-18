@@ -354,9 +354,9 @@ async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|Unkno
   const model=await askClaudeJson({
     system:PSYCHE_SYSTEM,
     schema:psychologicalModelSchema,
-    maxAttempts:1,
+    maxAttempts:2,
     input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 여섯 분석 축을 모두 다루되, 하나의 충분히 깊은 insight가 여러 축을 연결해도 됩니다. 축별 개수를 맞추기 위해 약한 가설을 억지로 만들지 마세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
-    allowFallback:false,
+    allowFallback:true,
     model:'anthropic/claude-sonnet-5',
   });
   const artifact=uiArtifactReason(allPsychText(model));
@@ -392,8 +392,8 @@ async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
   return askClaudeJson({
     system:REPORT_SYSTEM,
     schema:stage1Schema,
-    maxAttempts:1,
-    allowFallback:false,
+    maxAttempts:2,
+    allowFallback:true,
     input:`${commonWriterInput(seed,dossier)}\n\n이번에는 첫 페이지의 아래 2개 필드만 작성하세요.\n\ncharacterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\ninnerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리`,
   });
 }
@@ -402,8 +402,8 @@ async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
   return askClaudeJson({
     system:REPORT_SYSTEM,
     schema:stage2Schema,
-    maxAttempts:1,
-    allowFallback:false,
+    maxAttempts:2,
+    allowFallback:true,
     input:`${commonWriterInput(seed,dossier)}\n\n이번에는 두 번째 페이지의 아래 3개 필드만 작성하세요.\n\nrelationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\nattachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\nconflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유`,
   });
 }
@@ -412,8 +412,8 @@ async function writeStage3(seed:DetailSeed,dossier:ReportDossier){
   return askClaudeJson({
     system:REPORT_SYSTEM,
     schema:stage3Schema,
-    maxAttempts:1,
-    allowFallback:false,
+    maxAttempts:2,
+    allowFallback:true,
     input:`${commonWriterInput(seed,dossier)}\n\n이번에는 마지막 페이지의 아래 2개 필드만 작성하세요.\n\ncharmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\nintegratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.`,
   });
 }
