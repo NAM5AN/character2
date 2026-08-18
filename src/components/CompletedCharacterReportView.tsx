@@ -90,7 +90,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   function changePage(next:1|2|3){
     if(next>stageReady)return;
     setReportPage(next);
-    requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'auto'}));
+    requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'}));
   }
 
   return <>
@@ -102,7 +102,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     <div style={{marginTop:22}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2></div>
     <div className="result-grid" style={{marginTop:18}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
 
-    <div id="paid-detail-report" style={{marginTop:38}}>
+    <div id="paid-detail-report" style={{marginTop:38,scrollMarginTop:90}}>
       <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
 
       {isPaged?<>
