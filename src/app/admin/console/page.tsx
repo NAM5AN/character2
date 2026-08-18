@@ -90,10 +90,12 @@ function reportChars(c: AdminCharacter): number {
   return n;
 }
 
-function fmtCost(value: number | string | null): string {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return '$0';
-  return `$${n.toFixed(n < 0.1 ? 4 : n < 1 ? 3 : 2)}`;
+// 환율(원/달러). 원가는 달러로 집계·저장되고, 표시만 원화로 환산한다. 환율은 여기 한 곳만 바꾸면 됨.
+const USD_TO_KRW = 1400;
+function fmtCost(usd: number | string | null): string {
+  const n = Number(usd);
+  if (!Number.isFinite(n) || n <= 0) return '0원';
+  return `${Math.round(n * USD_TO_KRW).toLocaleString('ko-KR')}원`;
 }
 
 const SUMMARY_LABELS: [keyof NonNullable<Summary>, string][] = [
