@@ -2,9 +2,37 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
 
+const siteUrl = 'https://character2-eight.vercel.app';
+const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
+const metadataDescription = '프로필과 20문항으로 만드는 공유 가능한 Character Passport';
+const metadataThumbnail = '/metadata-thumbnail.png';
+
 export const metadata: Metadata = {
-  title: 'CHARA LAB — 캐릭터 정밀 분석',
-  description: '프로필과 20문항으로 만드는 공유 가능한 Character Passport',
+  metadataBase: new URL(siteUrl),
+  title: metadataTitle,
+  description: metadataDescription,
+  openGraph: {
+    type: 'website',
+    locale: 'ko_KR',
+    url: '/',
+    siteName: 'CHARA LAB',
+    title: metadataTitle,
+    description: metadataDescription,
+    images: [
+      {
+        url: metadataThumbnail,
+        width: 1672,
+        height: 941,
+        alt: 'CHARA LAB 캐릭터 분석 메타데이터 썸네일',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: metadataTitle,
+    description: metadataDescription,
+    images: [metadataThumbnail],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
