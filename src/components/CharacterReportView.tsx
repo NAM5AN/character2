@@ -303,7 +303,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     <AccessCodeModal open={unlockOpen} onClose={()=>setUnlockOpen(false)} onValidated={loadDetail} title="상세 리포트 열기" description="포스타입에서 결제 후 최신 이용 코드를 확인해 입력해주세요." submitLabel="코드 확인하고 상세 리포트 보기" />
 
     {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
-      mode:'detail',name:preview.name,tagline:preview.oneLineSummary,
+      mode:'detail',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
       sections:(([
         ['본질',detail?.analysis.characterOverview],
         ['작동 방식',detail?.analysis.innerMechanics],
@@ -313,7 +313,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         ['매력·반전',detail?.analysis.charmAndContradictions],
       ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }:{
-      mode:'summary',name:preview.name,tagline:preview.oneLineSummary,
+      mode:'summary',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
       sections:(([
         ['겉모습',preview.summary.outerSelf],
         ['속마음',preview.summary.innerSelf],

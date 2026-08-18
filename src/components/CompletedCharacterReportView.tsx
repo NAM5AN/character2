@@ -155,7 +155,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     </div>
 
     {shareMode&&<ShareCardModal open onClose={()=>setShareMode(null)} data={shareMode==='detail'?{
-      mode:'detail',name:preview.name,tagline:preview.oneLineSummary,
+      mode:'detail',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
       sections:(([
         ['본질',analysis.characterOverview],
         ['작동 방식',analysis.innerMechanics],
@@ -165,7 +165,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         ['매력·반전',analysis.charmAndContradictions],
       ] as [string,string|undefined][]).filter(([,t])=>!!t&&t.trim()!=='').map(([label,t])=>({label,text:cardExcerpt(t)}))),
     }:{
-      mode:'summary',name:preview.name,tagline:preview.oneLineSummary,
+      mode:'summary',name:preview.name,shareCode:preview.shareCode,tagline:preview.oneLineSummary,
       sections:(([
         ['겉모습',summary?.outerSelf],
         ['속마음',summary?.innerSelf],

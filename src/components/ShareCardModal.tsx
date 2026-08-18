@@ -12,17 +12,20 @@ export type CardSection = { label: string; text: string };
 export type ShareCardData = {
   mode: ShareCardMode;
   name: string;
-  tagline: string;         // 한 줄 요약
-  sections: CardSection[]; // 라벨 + 짧은 문장 패널들
+  shareCode: string;
+  tagline: string;         // 폴백 한 줄 요약
+  sections: CardSection[]; // 폴백 라벨 + 문장 (카드 문구 생성 전/실패 시)
 };
 
+type CardCopy = { nickname?: string; tagline: string; sections: CardSection[] };
+
 const CARD_W = 1080;
-const CARD_H = 1130;
-const M = 40;
-const HEADER_H = 168;
-const PHOTO = 316;
+const CARD_H = 1620; // 2:3
+const M = 44;
+const HEADER_H = 172;
+const PHOTO = 344;
 const GAP = 22;
-const ROW_H = 150;
+const ROW_H = 208;
 const FONT = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
 
 type Theme = {
@@ -150,8 +153,28 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
   const [nOff, setNOff] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copy, setCopy] = useState<CardCopy | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const theme = THEMES[data.mode];
+
+  // 카드에 실제로 그릴 문구: 생성된 장난스러운 카피가 있으면 그걸, 없으면 리포트 원문 기반 폴백.
+  const eff: CardCopy = copy ?? { tagline: data.tagline, sections: data.sections };
+
+  const fetchCopy = useCallback(async (refresh: boolean) => {
+    setCopyBusy(true); setError('');
+    try {
+      const r = await fetch(`/api/characters/${data.shareCode}/card-copy`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode: data.mode, refresh }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok && body?.copy?.sections?.length) setCopy(body.copy as CardCopy);
+      else if (refresh) setError('문구를 다시 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } catch {
+      if (refresh) setError('문구를 다시 만들지 못했어요.');
+    } finally { setCopyBusy(false); }
+  }, [data.shareCode, data.mode]);
 
   const drawCard = useCallback(() => {
     const canvas = cardRef.current;
@@ -212,41 +235,53 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
     const py = HEADER_H + GAP;
     const img = imgRef.current;
     if (img && hasImage) {
-      renderFace(ctx, M, py, PHOTO, img, img.width, img.height, zoom, nOff.x, nOff.y, 26);
+      renderFace(ctx, M, py, PHOTO, img, img.width, img.height, zoom, nOff.x, nOff.y, 28);
     } else {
-      ctx.save(); roundRect(ctx, M, py, PHOTO, PHOTO, 26); ctx.clip();
+      ctx.save(); roundRect(ctx, M, py, PHOTO, PHOTO, 28); ctx.clip();
       ctx.fillStyle = theme.panelBg; ctx.fillRect(M, py, PHOTO, PHOTO);
-      ctx.fillStyle = theme.accent; ctx.font = `800 190px ${FONT}`;
+      ctx.fillStyle = theme.accent; ctx.font = `800 200px ${FONT}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText((data.name || '?').slice(0, 1), M + PHOTO / 2, py + PHOTO / 2 + 8);
       ctx.restore();
       ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     }
     ctx.strokeStyle = theme.accent; ctx.lineWidth = 4; ctx.globalAlpha = 0.7;
-    roundRect(ctx, M, py, PHOTO, PHOTO, 26); ctx.stroke(); ctx.globalAlpha = 1;
+    roundRect(ctx, M, py, PHOTO, PHOTO, 28); ctx.stroke(); ctx.globalAlpha = 1;
 
     // 한 줄 요약 패널 (얼굴 오른쪽).
     const tx = M + PHOTO + GAP;
     const tw = CARD_W - tx - M;
-    panel(tx, py, tw, PHOTO, '한 줄 요약', data.tagline || '', 5, 33);
+    panel(tx, py, tw, PHOTO, '한 줄 요약', eff.tagline || '', 5, 33);
+
+    // 유형명(닉네임) 밴드 — 중앙.
+    let bandBottom = py + PHOTO;
+    if (eff.nickname) {
+      const ny = py + PHOTO + GAP + 8;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = theme.sub; ctx.font = `700 26px ${FONT}`;
+      ctx.fillText('이 캐릭터는', CARD_W / 2, ny + 6);
+      ctx.fillStyle = theme.accent; ctx.font = `800 56px ${FONT}`;
+      const nick = wrapLines(ctx, `“${eff.nickname}”`, CARD_W - M * 2, 1)[0] || `“${eff.nickname}”`;
+      ctx.fillText(nick, CARD_W / 2, ny + 66);
+      ctx.textAlign = 'left';
+      bandBottom = ny + 92;
+    }
 
     // 섹션 패널 그리드 (2열).
-    const gy = py + PHOTO + GAP;
+    const gy = bandBottom + GAP + 10;
     const colW = (CARD_W - M * 2 - GAP) / 2;
-    const secs = data.sections.slice(0, 6);
-    secs.forEach((s, i) => {
+    const secs = eff.sections.slice(0, 6);
+    secs.forEach((sec, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      panel(M + col * (colW + GAP), gy + row * (ROW_H + 18), colW, ROW_H, s.label, s.text);
+      panel(M + col * (colW + GAP), gy + row * (ROW_H + 20), colW, ROW_H, sec.label, sec.text, 3, 30);
     });
-    const rows = Math.ceil(secs.length / 2);
-    const gridBottom = gy + (rows > 0 ? rows * (ROW_H + 18) - 18 : 0);
 
-    // 푸터.
+    // 푸터 (하단 고정).
     ctx.fillStyle = theme.sub;
-    ctx.textAlign = 'center'; ctx.font = `600 24px ${FONT}`;
-    ctx.fillText('이미지를 길게 눌러 저장 · CHARA LAB', CARD_W / 2, Math.min(CARD_H - 34, gridBottom + 52));
+    ctx.textAlign = 'center'; ctx.font = `600 25px ${FONT}`;
+    ctx.fillText('이미지를 길게 눌러 저장 · CHARA LAB', CARD_W / 2, CARD_H - 46);
     ctx.textAlign = 'left';
-  }, [theme, hasImage, zoom, nOff, data]);
+  }, [theme, hasImage, zoom, nOff, data, eff]);
 
   const drawCrop = useCallback(() => {
     const canvas = cropRef.current;
@@ -266,6 +301,13 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
   }, [hasImage, zoom, nOff]);
 
   useEffect(() => { if (open) { drawCard(); drawCrop(); } }, [open, drawCard, drawCrop]);
+
+  // 모달을 열거나 모드가 바뀌면 카드 문구를 가져온다(캐시 있으면 즉시).
+  useEffect(() => {
+    if (!open) return;
+    setCopy(null);
+    void fetchCopy(false);
+  }, [open, data.mode, data.shareCode, fetchCopy]);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -316,7 +358,7 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
       const file = new File([blob], `${data.name || 'character'}_${data.mode}_card.png`, { type: 'image/png' });
       const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
       if (nav.canShare && nav.canShare({ files: [file] }) && typeof navigator.share === 'function') {
-        try { await navigator.share({ files: [file], title: `${data.name} 캐릭터 카드`, text: data.tagline }); return; }
+        try { await navigator.share({ files: [file], title: `${data.name} 캐릭터 카드`, text: eff.tagline }); return; }
         catch { /* 취소/실패 시 저장으로 폴백 */ }
       }
       downloadBlob(blob, file.name);
@@ -377,9 +419,15 @@ export function ShareCardModal({ open, onClose, data }: { open: boolean; onClose
           </div>
         </div>
 
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn soft" disabled={copyBusy} onClick={() => void fetchCopy(true)}>🎲 문구 다시 뽑기</button>
+          {copyBusy && <span className="muted" style={{ fontSize: 13 }}>✨ 카드 문구 만드는 중…</span>}
+          {!copyBusy && copy && <span className="muted" style={{ fontSize: 13 }}>맘에 안 들면 다시 뽑아보세요</span>}
+        </div>
+
         {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 
-        <div className="actions" style={{ marginTop: 18 }}>
+        <div className="actions" style={{ marginTop: 14 }}>
           <button className="btn primary" disabled={busy} onClick={() => void share()}>{busy ? '처리 중…' : '공유하기'}</button>
           <button className="btn" disabled={busy} onClick={() => void save()}>이미지 저장</button>
         </div>
