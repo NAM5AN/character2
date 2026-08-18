@@ -39,7 +39,20 @@ type AdminCharacter = {
   summaryGptOutTok: number | string | null;
   detailGptInTok: number | string | null;
   detailGptOutTok: number | string | null;
+  summaryGenMs: number | string | null;
+  detailGenMs: number | string | null;
 };
+
+// 생성 소요시간(ms) → 사람이 읽는 문자열. 없으면 '—'.
+function fmtDuration(ms: number | string | null): string {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  const sec = n / 1000;
+  if (sec < 60) return `${sec.toFixed(sec < 10 ? 1 : 0)}초`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}분 ${s}초`;
+}
 
 type AdminSettings = {
   postypeUrl: string;
@@ -500,6 +513,8 @@ export default function AdminConsolePage() {
                   <span className="tag" style={{ fontSize: 12 }}>요약 {fmtCost(summaryTotalCost(c))}</span>
                   <span className="tag" style={{ fontSize: 12 }}>상세 {fmtCost(detailTotalCost(c))}</span>
                   <span className="tag" style={{ fontSize: 12, fontWeight: 800 }}>합계 {fmtCost(summaryTotalCost(c) + detailTotalCost(c))}</span>
+                  <span className="tag" style={{ fontSize: 12 }}>요약 생성 {fmtDuration(c.summaryGenMs)}</span>
+                  <span className="tag" style={{ fontSize: 12 }}>상세 생성 {fmtDuration(c.detailGenMs)}</span>
                 </div>
               </button>
               <div className="actions" style={{ marginTop: 0 }}>

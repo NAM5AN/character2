@@ -161,8 +161,13 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       if(saved!==true)throw new Error('DETAIL_SAVE_FAILED');
     };
 
+    // 상세 리포트 생성 소요시간 측정(관리자용). 코드 입력 후 stage 1 시작 기준. 실패해도 생성엔 영향 없음.
+    const markTimingStart=async()=>{try{await sb.rpc('character2_mark_detail_timing_start',{p_share_code:shareCode})}catch{}};
+    const markTimingDone=async()=>{try{await sb.rpc('character2_mark_detail_timing_done',{p_share_code:shareCode})}catch{}};
+
     if(body.stage===1){
       if(!body.editToken)return respond({error:'DETAIL_OWNER_SOURCE_REQUIRED'},409);
+      await markTimingStart();
       const seedRecord=record(bundle.seed);
       const needsRawSource=seedRecord.version==='detail-seed/2.0';
       let privateSource:unknown=undefined;
@@ -177,6 +182,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource,precomputed));
       const storedAnalysis:Record<string,unknown>={...generated.analysis,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:1,detailComplete:false,_detailDossier:generated.dossier};
       await saveDetail(storedAnalysis);
+      await markTimingDone();
       const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
       return respond({detail:{analysis:publicAnalysis,stageReady:1,complete:false,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
     }
@@ -193,6 +199,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       void ignoredRestDossier;
       const restStored:Record<string,unknown>={...existingBeforeRest,...restPatch,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:3,detailComplete:true};
       await saveDetail(restStored);
+      await markTimingDone();
       const restAnalysis=finalAnalysisSchema.parse(restStored);
       return respond({detail:{analysis:restAnalysis,stageReady:3,complete:true,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
     }
@@ -209,6 +216,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     void ignoredDossier;
     const storedAnalysis:Record<string,unknown>={...existingWithoutDossier,...patch,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:continuationStage,detailComplete:continuationStage===3,...(continuationStage<3?{_detailDossier:dossier}:{})};
     await saveDetail(storedAnalysis);
+    await markTimingDone();
     const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
     return respond({detail:{analysis:publicAnalysis,stageReady:continuationStage,complete:continuationStage===3,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
   }catch(error){
