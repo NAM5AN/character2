@@ -244,6 +244,9 @@ function buildItems(record: UnknownRecord, name: string) {
     const title = sectionTitle(field, name);
     const blocks = splitParagraphs(value);
     blocks.forEach((block, paragraphIndex) => {
+      const existingLead = block.match(/^\*\*(.+?)\*\*/su)?.[1]?.replace(/\s+/gu, ' ').trim() || '';
+      // 작성 단계에서 이미 규칙에 맞는 안내문이 붙었으면 재작성하지 않고 그대로 둔다(추가 호출 절약).
+      if (existingLead && existingLeadLooksLikeGuide(existingLead)) return;
       items.push({
         id: `${field}:${paragraphIndex}`,
         field,
@@ -303,7 +306,13 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
       const body = paragraphBody(block);
       const id = `${field}:${paragraphIndex}`;
       const item = items.find(candidate => candidate.id === id);
-      const lead = leadById.get(id) || (item ? fallbackLead(item) : '이 부분도 조금 더 살펴볼게요.');
+      if (!item) {
+        // 재작성 대상이 아니었던 문단 = 기존 안내문이 이미 규칙에 맞음 → 그대로 유지
+        const existingLead = block.match(/^\*\*(.+?)\*\*/su)?.[1]?.replace(/\s+/gu, ' ').trim();
+        if (existingLead) return `**${existingLead}** ${body}`.trim();
+        return `**${fallbackLead({ id, field, paragraphIndex, sectionTitle: sectionTitle(field, name), body })}** ${body}`.trim();
+      }
+      const lead = leadById.get(id) || fallbackLead(item);
       return `**${lead}** ${body}`.trim();
     }).join('\n\n');
   }
