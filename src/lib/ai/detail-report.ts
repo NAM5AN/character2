@@ -445,6 +445,18 @@ export async function generatePaidDetailStage1(seedInput:unknown,publicProfileTe
   return {analysis,dossier};
 }
 
+// Stage 2와 stage 3은 둘 다 dossier에만 의존하고 서로 의존하지 않으므로 병렬로 생성한다.
+// 프롬프트·엔진·품질은 그대로 두고, "나머지 두 페이지" 대기 시간을 두 호출의 합에서 최댓값으로 줄인다.
+// 각 stage를 따로 저장하면 서로를 덮어쓰는 레이스가 생기므로, 호출부에서 결과를 한 번에 병합 저장한다.
+export async function generatePaidDetailRemaining(seedInput:unknown,dossierInput:unknown):Promise<Partial<FinalAnalysis>>{
+  const seed=detailSeedSchema.parse(seedInput);
+  const dossier=reportDossierSchema.parse(dossierInput);
+  const [stage2,stage3]=await Promise.all([writeStage2(seed,dossier),writeStage3(seed,dossier)]);
+  validateVisibleText(`${stage2.relationshipStyle} ${stage2.attachmentStyle} ${stage2.conflictStyleDetailed}`);
+  validateVisibleText(`${stage3.charmAndContradictions} ${stage3.integratedReport}`);
+  return {...stage2,...stage3};
+}
+
 export async function generatePaidDetailContinuation(seedInput:unknown,dossierInput:unknown,stage:2|3):Promise<Partial<FinalAnalysis>>{
   const seed=detailSeedSchema.parse(seedInput);
   const dossier=reportDossierSchema.parse(dossierInput);

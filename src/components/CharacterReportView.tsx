@@ -156,19 +156,21 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     }:incoming);
   }
 
-  async function requestStage(stage:2|3){
-    if(stageReadyRef.current>=stage||inFlightStagesRef.current.has(stage))return;
+  // 남은 두 페이지(2,3)를 서버에서 병렬 생성해 한 번에 받아온다. 순차 요청(2→3)보다 대기가 짧다.
+  async function requestRemaining(){
+    if(stageReadyRef.current>=3)return;
+    if(inFlightStagesRef.current.has(2)||inFlightStagesRef.current.has(3))return;
     const code=codeRef.current;
     const token=tokenRef.current;
     if(!code||!token)return;
-    inFlightStagesRef.current.add(stage);
+    inFlightStagesRef.current.add(2);inFlightStagesRef.current.add(3);
     setPrefetchBusy(true);
     setPrefetchError('');
     try{
       const r=await fetch(`/api/characters/${preview.shareCode}`,{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({accessCode:code,editToken:token,stage}),
+        body:JSON.stringify({accessCode:code,editToken:token,finishRemaining:true}),
       });
       const body=await r.json().catch(()=>({}));
       if(!r.ok){
@@ -177,11 +179,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         return;
       }
       mergeDetail(body.detail);
-      if(stage===2&&stageReadyRef.current<3)void requestStage(3);
     }catch{
       setPrefetchError('다음 페이지를 준비하지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{
-      inFlightStagesRef.current.delete(stage);
+      inFlightStagesRef.current.delete(2);inFlightStagesRef.current.delete(3);
       setPrefetchBusy(inFlightStagesRef.current.size>0);
     }
   }
@@ -218,10 +219,8 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
 
       const ready=body.detail.stageReady||0;
-      if(token){
-        if(ready<2)void requestStage(2);
-        else if(ready<3)void requestStage(3);
-      }
+      // 첫 페이지를 보여준 직후, 남은 두 페이지를 병렬로 미리 생성한다.
+      if(token&&ready<3)void requestRemaining();
     }catch{
       setError('상세 리포트를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{setBusy(false)}
@@ -232,7 +231,8 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   function changeReportPage(next:1|2|3){
     setReportPage(next);
     requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'}));
-    if(next===2&&stageReadyRef.current<3)void requestStage(3);
+    // 아직 완결 전이라면 남은 페이지를 병렬로 마저 준비한다.
+    if(stageReadyRef.current<3)void requestRemaining();
   }
 
   const richSummary=Boolean(preview.summary.misunderstoodPoint?.trim()&&preview.summary.hiddenPattern?.trim());
@@ -362,7 +362,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
         {prefetchError&&reportPage<3&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>
           {prefetchError}
-          <div style={{marginTop:12}}><button className="btn" onClick={()=>void requestStage(nextStage as 2|3)}>다시 준비하기</button></div>
+          <div style={{marginTop:12}}><button className="btn" onClick={()=>void requestRemaining()}>다시 준비하기</button></div>
         </div>}
       </> : <>
         <div className="result-grid" style={{marginTop:20}}>

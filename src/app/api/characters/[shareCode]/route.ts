@@ -9,6 +9,7 @@ import { assertRateLimit } from '@/lib/rate-limit';
 import {
   DETAIL_REPORT_VERSION,
   generatePaidDetailContinuation,
+  generatePaidDetailRemaining,
   generatePaidDetailStage1,
 } from '@/lib/ai/detail-report';
 import { withAiUsageContext } from '@/lib/ai/usage';
@@ -61,6 +62,8 @@ const detailSchema=z.object({
   accessCode:z.string().min(1).optional(),
   editToken:z.string().min(16).optional(),
   stage:z.coerce.number().int().min(1).max(3).optional().default(1),
+  // dossier가 준비된 뒤 남은 두 페이지(2,3)를 한 요청에서 병렬 생성해 한 번에 저장한다.
+  finishRemaining:z.boolean().optional().default(false),
 });
 
 export async function POST(request:Request,context:{params:Promise<{shareCode:string}>}){
@@ -119,7 +122,9 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       return response;
     };
 
-    if(currentVersion&&parsedExisting?.success&&currentStage>=body.stage){
+    // finishRemaining 요청은 아직 완결(stage 3)되지 않았다면 캐시로 빠지지 말고 남은 페이지를 마저 생성한다.
+    const wantsFinish=body.finishRemaining&&currentStage<3;
+    if(currentVersion&&parsedExisting?.success&&currentStage>=body.stage&&!wantsFinish){
       return respond({detail:{analysis:parsedExisting.data,stageReady:currentStage,complete:currentStage>=3,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:true}});
     }
 
@@ -158,6 +163,22 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       await saveDetail(storedAnalysis);
       const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
       return respond({detail:{analysis:publicAnalysis,stageReady:1,complete:false,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
+    }
+
+    // 남은 두 페이지(2,3)를 병렬로 한 번에 생성. dossier만 있으면 되므로 stage 2 저장을 기다리지 않는다.
+    if(body.finishRemaining){
+      if(!currentVersion||currentStage<1){
+        return respond({error:'DETAIL_STAGE_NOT_READY',details:`먼저 첫 페이지 생성이 필요해요. 현재 준비 단계: ${currentStage}`},409);
+      }
+      const restDossier=rawDetail._detailDossier;
+      if(!restDossier)return respond({error:'DETAIL_DOSSIER_MISSING'},409);
+      const restPatch=await withAiUsageContext({shareCode,stage:'detail_stage_rest'},()=>generatePaidDetailRemaining(bundle.seed,restDossier));
+      const {_detailDossier:ignoredRestDossier,...existingBeforeRest}=rawDetail;
+      void ignoredRestDossier;
+      const restStored:Record<string,unknown>={...existingBeforeRest,...restPatch,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:3,detailComplete:true};
+      await saveDetail(restStored);
+      const restAnalysis=finalAnalysisSchema.parse(restStored);
+      return respond({detail:{analysis:restAnalysis,stageReady:3,complete:true,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
     }
 
     if(!currentVersion||currentStage<body.stage-1){
