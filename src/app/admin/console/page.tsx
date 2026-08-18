@@ -632,15 +632,18 @@ export default function AdminConsolePage() {
                   저장된 20개 답변으로 리포트를 현재 프롬프트로 다시 만듭니다. 답변을 다시 입력할 필요 없이 생성 과정을 빠르게 테스트할 수 있어요.
                 </p>
                 <div className="actions" style={{ marginTop: 0, flexWrap: 'wrap' }}>
-                  <button className="btn primary" disabled={!!resetting || !!regenBusy} onClick={() => void regenerateSummary(detailChar)}>
-                    {regenBusy === detailChar.shareCode ? '요약 생성 중…' : '요약 리포트 재생성 (답변 20개로)'}
+                  <button className="btn primary" disabled={!!resetting || !!regenBusy} onClick={() => window.open(`/analyze?replay=${detailChar.shareCode}`, '_blank', 'noopener')}>
+                    사용자 시점 요약 테스트 (제출부터)
+                  </button>
+                  <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void regenerateSummary(detailChar)}>
+                    {regenBusy === detailChar.shareCode ? '요약 생성 중…' : '요약 재생성 (관리자, 즉시)'}
                   </button>
                   <button className="btn" disabled={!!resetting || !!regenBusy} onClick={() => void resetReport(detailChar, 'summary')}>
-                    {resetting === detailChar.shareCode + ':summary' ? '지우는 중…' : '상세만 삭제 (요약 유지 → 상세 재생성용)'}
+                    {resetting === detailChar.shareCode + ':summary' ? '지우는 중…' : '상세만 삭제 (상세 재생성용)'}
                   </button>
                 </div>
                 <p className="muted" style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.6 }}>
-                  · 요약 재생성: 상세도 함께 초기화돼요. · 상세만 삭제 후 오너 브라우저에서 다시 열면 상세가 새 프롬프트로 생성돼요.
+                  · 사용자 시점: 새 탭에서 저장된 20답변으로 제출→요약 생성을 실제 유저처럼 테스트(테스트용 새 캐릭터가 생기니 확인 후 삭제). · 요약 재생성: 이 캐릭터의 요약을 즉시 다시 만듦(상세도 초기화). · 상세만 삭제 후 오너 브라우저에서 다시 열면 상세가 새로 생성돼요.
                 </p>
               </div>
 

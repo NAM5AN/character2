@@ -9,7 +9,7 @@ import { postJsonStream } from '@/lib/stream-client';
 import { useRotatingFlavor } from '@/lib/loading-flavor';
 import { applyName } from '@/lib/josa';
 
-type Stage='input'|'review'|'interview'|'finalizing'|'done';
+type Stage='input'|'review'|'interview'|'finalizing'|'done'|'replay';
 type FinalizeResult={preview:CharacterReportPreview;shareCode:string;editToken:string};
 type SavedStage='input'|'review'|'interview'|'finalizing';
 type SavedAnalysisSession={version:1;stage:SavedStage;name:string;profileText:string;secretProfileText:string;draft:CharacterDraft|null;answers:InterviewAnswer[];question:InterviewQuestion|null;questionHistory:InterviewQuestion[];activeQuestionIndex:number;selected:string;custom:string;reason:string;multiSelected?:string[];ranking?:string[];sliderValue?:number;matrixAnswers?:Record<string,string>;secondary?:string};
@@ -93,7 +93,24 @@ export function AnalyzeFlow(){
 
   function clearProgressState(){setStage('input');setName('');setProfileText('');setSecretProfileText('');clearAppearanceImages();setDraft(null);setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);resetResponseDraft();setBusy(false);setError('');setResult(null);batchRequests.current.clear()}
 
+  // 관리자 "사용자 시점 요약 테스트": /analyze?replay=<코드> 로 진입하면 저장된 답변을
+  // 불러와 제출 직전 상태로 세팅한다(관리자 쿠키 필요). 저장/이어하기 로직은 건너뛴다.
+  async function loadReplay(shareCode:string){
+    persistenceEnabled.current=false;setBusy(true);setError('');
+    try{
+      const r=await fetch(`/api/admin/data/${shareCode}/replay`,{method:'POST'});
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok){setError(body?.error==='ADMIN_AUTH_INVALID'?'관리자 콘솔에 로그인한 상태에서 실행해주세요.':`불러오지 못했어요: ${body?.error||r.status}`);setStage('input');return}
+      const d=body.draft as CharacterDraft;const a=uniqueAnswersByOrder(body.answers as InterviewAnswer[]);
+      setDraft(d);setAnswers(a);setName(d.basicProfile.name);setProfileText(d.basicProfile.profileText);setSecretProfileText(d.basicProfile.secretProfileText||'');
+      setStage('replay');
+    }catch{setError('불러오는 중 오류가 발생했어요.');setStage('input')}
+    finally{setBusy(false)}
+  }
+
   useEffect(()=>{
+    const replay=typeof window!=='undefined'?new URLSearchParams(window.location.search).get('replay'):null;
+    if(replay&&/^[A-HJ-NP-Z2-9]{8}$/.test(replay)){hydrated.current=true;persistenceEnabled.current=false;void loadReplay(replay);return}
     try{const localRaw=localStorage.getItem(ANALYSIS_SESSION_KEY);const legacyRaw=sessionStorage.getItem(ANALYSIS_SESSION_KEY);const raw=localRaw||legacyRaw;if(raw){const parsed=JSON.parse(raw) as unknown;if(isSavedSession(parsed)&&hasMeaningfulProgress(parsed)){if(!localRaw)localStorage.setItem(ANALYSIS_SESSION_KEY,raw);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);setResumeCandidate(parsed);persistenceEnabled.current=false}else{localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);persistenceEnabled.current=true}}else persistenceEnabled.current=true}catch{localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);persistenceEnabled.current=true}finally{hydrated.current=true}
   },[]);
 
@@ -207,6 +224,14 @@ export function AnalyzeFlow(){
     {stage==='review'&&draft&&<div className="stack" aria-busy={busy}><div className="card"><div className="eyebrow">첫 해석</div><h2 style={{marginTop:10}}>{applyName('{name}을 이렇게 이해했어요.',draft.basicProfile.name)}</h2><div className="two-col"><div><div className="label">분석 정밀도</div><div style={{fontSize:40,fontWeight:900}}>{Math.round(confidence)}%</div></div><div><div className="label">확인된 설정</div><div style={{fontSize:40,fontWeight:900}}>{draft.confirmedFacts.length}</div></div></div><div className="progress" style={{marginTop:16}}><span style={{width:`${confidence}%`}}/></div></div><div className="card"><h3>첫 해석 확인</h3><p className="muted">애매하거나 틀린 해석은 직접 보충하면 이후 질문과 최종 해석에 반영돼요.</p>{draft.aiInferences.map(x=><div className="inference" key={x.id}><div className="inference-top"><p>{x.text}</p><span className="muted">{Math.round(x.confidence)}%</span></div>{x.evidence.length>0&&<div style={{marginTop:10}}><div className="label">근거</div><div className="tags" style={{marginTop:7}}>{x.evidence.map((e,i)=><span className="tag" key={`${x.id}-e-${i}`}>{e}</span>)}</div></div>}<div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginTop:10}}><div className="pills" style={{marginTop:0}}><button disabled={busy} className={`pill ${x.ownerVerdict==='confirmed'?'active':''}`} onClick={()=>verdict(x.id,'confirmed')}>맞음</button><button disabled={busy} className={`pill ${x.ownerVerdict==='ambiguous'?'active':''}`} onClick={()=>verdict(x.id,'ambiguous')}>애매함</button><button disabled={busy} className={`pill ${x.ownerVerdict==='rejected'?'active':''}`} onClick={()=>verdict(x.id,'rejected')}>아님</button></div>{(x.ownerVerdict==='ambiguous'||x.ownerVerdict==='rejected')&&<div style={{flex:'1 1 320px',minWidth:240}}><label className="label">{x.ownerVerdict==='ambiguous'?'어떤 부분이 맞고, 어떤 부분이 다른가요?':'실제로는 어떤가요?'}</label><textarea disabled={busy} className="input" style={{minHeight:84,resize:'vertical',marginTop:7}} maxLength={1200} value={x.ownerFeedback||''} onChange={e=>inferenceFeedback(x.id,e.target.value)} /></div>}</div></div>)}</div>{busy&&<div role="status" aria-live="polite" className="card" style={{background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>첫 5문항을 준비하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{marginBottom:0}}>처음 5개를 한 번에 만든 뒤, 답변하는 동안 다음 5개를 뒤에서 미리 준비합니다.</p></div>}<div className="actions"><button disabled={busy} className="btn primary" onClick={startInterview}>{busy?'첫 5문항 준비 중…':'20문항 인터뷰 시작'}</button><button disabled={busy} className="btn" onClick={()=>setStage('input')}>프로필 다시 입력</button></div></div>}
 
     {stage==='interview'&&question&&<div className="card question-card"><div><div className="q-meta"><span>{question.order} / 20</span>{responseType&&<span>{RESPONSE_TYPE_LABELS[responseType]}</span>}{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{renderResponseControls()}<div className="field"><label className="label">왜 그렇게 답했나요? <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">여기에 적은 이유·맥락은 원문 그대로 다음 질문과 최종 해석에 반영돼요.</span></div></div><div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">다음 질문 묶음 준비를 마치는 중이에요.</p>}<div className="actions" style={{marginTop:16}}>{question.order>1&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&questionHistory.some(item=>item.order===question.order+1)&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!hasCurrentResponse} onClick={answerCurrent}>{busy?'질문 준비 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div></div>}
+
+    {stage==='replay'&&<div className="card" aria-busy={busy}>
+      <div className="eyebrow">사용자 시점 요약 테스트</div>
+      <h2 style={{marginTop:10}}>{applyName('{name}의 저장된 답변으로 요약을 생성해요.',draft?.basicProfile.name||name)}</h2>
+      <p className="muted" style={{lineHeight:1.7}}>저장된 20개 답변이 준비됐어요. 실제 사용자처럼 아래 버튼을 누르면 요약 리포트 생성 과정이 그대로 진행돼요. 제출하면 테스트용 새 캐릭터가 하나 생성되니, 확인 후 관리자에서 삭제하면 됩니다.</p>
+      {error&&<p className="error">{error}</p>}
+      <div className="actions"><button className="btn primary" disabled={busy||!draft||answers.length!==20} onClick={()=>void finalize(answers)}>답변 제출하고 요약 생성 ({answers.length}/20)</button></div>
+    </div>}
 
     {stage==='finalizing'&&<div className="card" style={{textAlign:'center',padding:'64px 24px'}}><div className="loading" style={{fontSize:20,fontWeight:900,justifyContent:'center'}}>캐릭터 요약을 정리하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><div style={{maxWidth:440,margin:'22px auto 0'}}><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16}}><span className="muted" style={{textAlign:'left',lineHeight:1.5,minHeight:'2.6em'}}>{flavorMessage||' '}</span><strong style={{fontSize:20,fontVariantNumeric:'tabular-nums'}}>{finalizeProgress}%</strong></div><div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}><div style={{height:'100%',width:`${finalizeProgress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .6s ease'}}/></div><p className="muted" style={{margin:'10px 0 0',fontSize:12,lineHeight:1.5}}>20문답을 두 단계로 깊게 읽어내는 중이라 1~3분쯤 걸릴 수 있어요. 창을 닫지 말고 기다려 주세요.</p></div>{error&&<p className="error">{error}</p>}</div>}
     {stage==='done'&&result&&<CharacterReportView preview={result.preview} creatorEditToken={result.editToken}/>} 
