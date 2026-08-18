@@ -1,0 +1,30 @@
+@media (max-width: 760px) {
+  /* Keep the detailed-report pager visible instead of placing it off-screen
+     inside the horizontally scrolling utility-action row. */
+  #paid-detail-report > .actions {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    align-items: stretch !important;
+  }
+
+  #paid-detail-report > .actions > div {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  #paid-detail-report > .actions > div:last-child {
+    order: 1;
+    justify-content: flex-end;
+  }
+
+  #paid-detail-report > .actions > div:last-child .btn {
+    flex: 1 1 0;
+    text-align: center;
+  }
+
+  #paid-detail-report > .actions > div:first-child {
+    order: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap !important;
+  }
+}
