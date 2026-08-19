@@ -65,7 +65,7 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   slider: '한 가지 가능성이나 강도를 0~100 점수로 고르게 하세요. options=[]이고 responseConfig.minLabel/maxLabel에 양 끝 상태를 넣으세요. A/B 비교형으로 만들지 마세요.',
   relationship_matrix: '하나의 동일한 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]이고 responseConfig.rows에는 2~4개의 관계 상대/조건을 넣으세요. responseConfig.rowOptions에는 rows의 각 문자열을 키로 사용해 각 상대/조건마다 정확히 4개의 선택지를 따로 만드세요. 네 보기는 반드시 그 행의 상대에게 실제로 할 수 있는 자연스러운 답이어야 하며, 공통 질문이 묻는 행동 종류와 문장 형태를 그대로 따라야 합니다. 질문이 “어떻게 답할까?”라면 네 보기 모두 캐릭터가 그 상대에게 직접 할 대사여야 하고, 질문이 “어떻게 행동할까?”라면 네 보기 모두 캐릭터의 행동이어야 합니다. 상대가 하는 말이나 다른 주체의 행동을 섞지 마세요. 질문 문장 + 해당 row + 각 option을 이어 읽었을 때 어색하거나 전제가 충돌하면 그 보기는 다시 쓰세요. 행마다 관계 특성 때문에 실제로 달라질 수 있는 반응을 구성하고, 모든 행에 같은 네 보기를 그대로 복사하지 마세요. 새 문항에서는 columns=[]로 두세요. 직접 입력 보기는 UI가 별도로 붙이므로 rowOptions 안에 “직접 입력”, “기타” 같은 항목을 넣지 마세요.',
   inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 responseConfig.prompt2에 두 번째 항목을 넣으세요.',
-  temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
+  temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요. 첫 시점에 자연스러운 선택지 정확히 4개를 options에, 두 번째 시점에 자연스러운 별도 선택지 정확히 4개를 responseConfig.options2에 만드세요. 각 목록은 자기 시점의 정보·감정·관계 변화까지 반영해야 하며, 두 시점에 같은 네 보기를 그대로 복사하면 실패입니다. 시간이 지난 뒤에는 이미 알게 된 사실이나 지나간 행동을 다시 처음처럼 묻는 선택지를 넣지 마세요. 두 목록 내부 선택지는 서로 달라야 하고, 직접 입력/기타 항목은 넣지 마세요. 직접 입력은 UI가 각 시점에 별도로 제공합니다.',
   condition_followup: '기본 상황을 제시하고 options(3~5개)로 한 번 고르게 한 뒤, 조건 하나가 바뀐 상황을 responseConfig.prompt2에 두 번째 질문으로 넣고, 그 바뀐 상황에 실제로 어울리는 별도의 선택지를 responseConfig.options2(3~5개)에 넣으세요. options와 options2는 각각 자기 상황에서 자연스럽고 서로 구별되는 반응이어야 하며, 두 목록이 같을 필요는 없습니다. 바뀐 조건 때문에 기본 보기가 어색해지는 상황이라면 options2는 그 조건에 맞는 새 반응들로 다시 구성하고 기본 보기를 그대로 재사용하지 마세요. 두 목록 모두 어느 답이 더 도덕적으로 좋아 보이지 않게 만드세요. 기본 질문은 특정 행동을 미리 전제하지 말고 열린 상황으로 두세요.',
   owner_meta: '캐릭터를 오래 본 오너만 답하기 좋은 메타 질문을 만드세요. options는 3~5개 후보이며 allowCustom=true입니다.',
 };
@@ -165,6 +165,18 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
         }
         if(normalizedSets.length>1&&new Set(normalizedSets).size===1){
           ctx.addIssue({code:'custom',path:['questions',index,'responseConfig','rowOptions'],message:'관계별 반응형에서 모든 상대에게 완전히 같은 보기 4개를 복사하지 마세요.'});
+        }
+      }
+      if(question.responseType==='temporal_compare'){
+        const first=question.options.map(choice=>choice.trim());
+        const second=(question.responseConfig.options2||[]).map(choice=>choice.trim());
+        if(first.length!==4) ctx.addIssue({code:'custom',path:['questions',index,'options'],message:'시간 비교형의 첫 시점 선택지는 정확히 4개여야 합니다.'});
+        if(second.length!==4) ctx.addIssue({code:'custom',path:['questions',index,'responseConfig','options2'],message:'시간 비교형의 두 번째 시점 선택지는 정확히 4개여야 합니다.'});
+        if(new Set(first).size!==first.length) ctx.addIssue({code:'custom',path:['questions',index,'options'],message:'첫 시점 선택지는 서로 달라야 합니다.'});
+        if(new Set(second).size!==second.length) ctx.addIssue({code:'custom',path:['questions',index,'responseConfig','options2'],message:'두 번째 시점 선택지는 서로 달라야 합니다.'});
+        if([...first,...second].some(choice=>/직접\s*입력|기타/u.test(choice))) ctx.addIssue({code:'custom',path:['questions',index],message:'직접 입력/기타 보기는 UI가 별도로 제공하므로 AI 선택지에 넣지 마세요.'});
+        if(first.length===4&&second.length===4&&first.slice().sort().join('\u0001')===second.slice().sort().join('\u0001')){
+          ctx.addIssue({code:'custom',path:['questions',index,'responseConfig','options2'],message:'두 시점에 완전히 같은 보기 4개를 복사하지 마세요. 각 시점에 맞게 다시 구성하세요.'});
         }
       }
       const hook=question.targetHook.trim().toLowerCase();
@@ -304,6 +316,7 @@ ${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근
 ${JSON.stringify(specText)}
 - 각 문항은 자신의 order와 responseType을 정확히 지키세요.
 - relationship_matrix는 공통 질문 하나와 각 row를 함께 읽었을 때 그 row의 네 보기가 모두 직접적인 답이 되어야 합니다. 질문의 주체·시점·행동 종류를 행마다 바꾸지 말고, 각 row의 관계 특성 때문에 달라지는 부분만 보기 내용에 반영하세요.
+- temporal_compare는 첫 시점 options 4개와 두 번째 시점 responseConfig.options2 4개를 각각 따로 만드세요. 두 번째 시점에서 이미 지나간 정보나 행동을 첫 시점처럼 반복하는 보기는 금지하며, 시간 경과로 달라진 맥락에 맞춰 선택지를 새로 구성하세요. 두 목록을 완전히 같게 만들지 마세요.
 - dialogue_choice는 캐릭터 본인의 대사를 묻는 형식과 상대/제3자의 대사를 묻는 형식을 모두 사용할 수 있습니다. responseConfig.prompt2로 화자를 명시하고 question과 options의 화자를 반드시 일치시키세요.
 - 상대 반응형을 만들 때는 캐릭터의 실제 말·행동이 타인에게 어떤 인상이나 긴장을 만드는지 확인할 수 있도록 서로 다른 반응 후보를 두세요. 전부 호의적이거나 전부 적대적인 보기만 두지 마세요.
 - bipolar_scale은 서로 반대되는 A/B 두 문장 사이에서 5단계 중 하나를 클릭하는 유형입니다. 다섯 개의 서로 다른 행동 보기로 만들지 마세요.
