@@ -25,6 +25,12 @@ export default function AnalyzePage(){
       .inference-top > span.muted {
         display: none !important;
       }
+      #personality-tag-picker .personality-chip[data-selected="false"]::before {
+        content: '•' !important;
+        color: #aaa59b;
+        font-size: 10px;
+        font-weight: 900;
+      }
     `}</style>
     <AnalyzeReviewUiPolish/>
     <PersonalityLoadingBridge/>
