@@ -1,0 +1,14 @@
+-- character2_gen_timings (0020) was created without RLS, unlike every other
+-- character2_* table. Supabase's security advisor flags this as ERROR: the
+-- anon/authenticated roles hold table-level grants (INSERT/SELECT/UPDATE/
+-- DELETE/TRUNCATE) inherited from public schema defaults, and with RLS off
+-- those grants are directly enforceable via PostgREST — anyone with the
+-- publishable key could read or wipe this table.
+--
+-- All real access already goes through SECURITY DEFINER functions
+-- (character2_set_summary_timing/character2_mark_detail_timing_*/
+-- character2_admin_list), which bypass RLS by design. So enabling RLS with
+-- no policies here only closes the direct PostgREST hole; it does not change
+-- any application behavior, matching the pattern already used by every
+-- sibling table (e.g. character2_ai_usage_events).
+alter table public.character2_gen_timings enable row level security;
