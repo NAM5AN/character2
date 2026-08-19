@@ -3,8 +3,6 @@ name: Patch temporal repair
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/patch-temporal-repair.yml'
 
 permissions:
   contents: write
