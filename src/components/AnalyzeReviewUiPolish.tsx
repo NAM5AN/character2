@@ -71,6 +71,29 @@ export function AnalyzeReviewUiPolish(){
   useEffect(()=>{
     let currentName='';
 
+    // 성격 칩 UI는 AnalyzeFlow의 React state 바깥에서 동작하므로, 질문 생성 요청 직전에
+    // 로컬에 저장된 최신 오너 선택값을 request draft에 합쳐 보낸다.
+    const originalFetch=window.fetch.bind(window);
+    window.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=typeof input==='string'?input:input instanceof URL?input.toString():input.url;
+      if(url.includes('/api/characters/questions/next')&&typeof init?.body==='string'){
+        try{
+          const payload=JSON.parse(init.body) as Record<string,unknown>;
+          const draft=payload.draft&&typeof payload.draft==='object'?payload.draft as Record<string,unknown>:null;
+          if(draft){
+            const sessionId=typeof draft.usageSessionId==='string'?draft.usageSessionId:'';
+            const current=draft.personalityTags&&typeof draft.personalityTags==='object'?draft.personalityTags as Record<string,unknown>:{};
+            const saved=sessionId?readOwnerSelection(sessionId):null;
+            const ownerSelected=saved??personalityTags(current.ownerSelected);
+            draft.personalityTags={...current,ownerSelected};
+            payload.draft=draft;
+            init={...init,body:JSON.stringify(payload)};
+          }
+        }catch{}
+      }
+      return originalFetch(input,init);
+    }) as typeof window.fetch;
+
     const savedName=()=>{
       const saved=readAnalysisSession();
       return typeof saved?.name==='string'?saved.name.trim():'';
@@ -217,7 +240,7 @@ export function AnalyzeReviewUiPolish(){
     apply();
     const observer=new MutationObserver(apply);
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-    return()=>observer.disconnect();
+    return()=>{observer.disconnect();window.fetch=originalFetch};
   },[]);
 
   return null;
