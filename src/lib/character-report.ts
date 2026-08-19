@@ -14,6 +14,8 @@ export const characterReportPreviewSchema = z.object({
     misunderstoodPoint: z.string().optional(),
     hiddenPattern: z.string().optional(),
   }),
+  // 요약 카드별 키워드 태그(스캔용). 키=요약 필드명, 값=짧은 키워드 배열. 없을 수 있음.
+  summaryTags: z.record(z.string(), z.array(z.string())).optional(),
 });
 
 export type CharacterReportPreview = z.infer<typeof characterReportPreviewSchema>;
@@ -40,5 +42,6 @@ export function buildCharacterReportPreview(passport: CharacterPassport): Charac
     shareCode: passport.shareCode,
     oneLineSummary: analysis.oneLineSummary,
     summary,
+    summaryTags: analysis.summaryTags,
   });
 }

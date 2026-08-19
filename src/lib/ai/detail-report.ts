@@ -5,6 +5,10 @@ import {
   characterEvidencePackSchema,
   finalAnalysisSchema,
   interviewAnswerSchema,
+  desireGapSchema,
+  matchProfileSchema,
+  relationshipManualSchema,
+  pressureStagesSchema,
   type FinalAnalysis,
 } from '@/lib/schemas/character';
 
@@ -118,8 +122,9 @@ type SourcePacket = {
   coverageHints:unknown;
 };
 
-const stage1Schema=z.object({characterOverview:z.string(),innerMechanics:z.string()});
-const stage2Schema=z.object({relationshipStyle:z.string(),attachmentStyle:z.string(),conflictStyleDetailed:z.string()});
+// 구조화 블록 필드는 optional — 모델이 생략해도 산문 리포트는 정상 생성된다(라이브 결제 경로 보호).
+const stage1Schema=z.object({characterOverview:z.string(),innerMechanics:z.string(),desireGap:desireGapSchema.optional()});
+const stage2Schema=z.object({relationshipStyle:z.string(),attachmentStyle:z.string(),conflictStyleDetailed:z.string(),relationshipManual:relationshipManualSchema.optional(),matchProfile:matchProfileSchema.optional(),pressureStages:pressureStagesSchema.optional()});
 const stage3Schema=z.object({charmAndContradictions:z.string(),integratedReport:z.string()});
 
 const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위한 심층 분석가입니다.
@@ -406,7 +411,12 @@ async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
     schema:stage1Schema,
     maxAttempts:2,
     allowFallback:true,
-    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 첫 페이지의 아래 2개 필드만 작성하세요.\n\ncharacterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\ninnerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리`,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 첫 페이지의 아래 2개 필드만 작성하세요.\n\ncharacterOverview — 화면 제목: "${seed.name}는 이런 캐릭터예요"\n반드시 포함:\n- 이 캐릭터가 본질적으로 어떤 사람인지\n- 겉으로 보이는 성격과 실제 내면의 간극\n- 무엇을 얻고 지키기 위해 움직이는지의 큰 방향\n- 자기 자신을 어떻게 인식하는지\n- 타인이 보는 모습과 자기 인식의 차이\n- 표면 설정·자기서술과 실제 반복 행동에서 읽히는 모습의 차이\n- 실제로 명시된 과거 경험·사건·환경이 현재 성격, 가치관, 대인관계, 습관에 남긴 영향\n- 과거 근거가 없을 때는 원인을 창작하지 말고 현재 성격이 유지되는 구조\n- 프로필에 직접 쓰이지 않았지만 여러 단서를 연결하면 자연스럽게 보이는 숨은 특성\n\ninnerMechanics — 화면 제목: "${seed.name}는 이렇게 작동해요"\n반드시 포함:\n- 가장 강한 욕구와 결핍, 무엇을 얻기 위해 행동하는 사람인지\n- 가장 두려워하는 것\n- 본인이 원한다고 느끼는 것과 실제로 필요한 것의 차이\n- 핵심 가치와 절대 놓치고 싶지 않은 내적 상태\n- 분노할 때 실제로 상처받는 지점\n- 슬픔·질투·죄책감·수치심·불안을 처리하고 표현하는 방식\n- 억누르거나 폭발하거나 회피하는 감정 처리 방식\n- 본인조차 인정하기 어려운 감정\n- 공격·회피·농담·합리화·무감각·거리두기·통제·혼자 해결하기 등 방어기제\n- 자기기만: 스스로 믿는 자기상과 행동의 불일치, 인정하기 싫은 욕망, 자기 행동을 정당화하는 논리
+
+추가 구조화 블록 — 위 산문과 별개로 아래 JSON 필드도 함께 출력하세요. 산문과 모순되지 않게, dossier 근거 안에서만 뽑고, 없는 내용을 지어내지 마세요.
+- desireGap: {"wants":[본인이 원한다고 느끼는 것 2~4개],"needs":[겉으로 드러난 것 아래에서 실제로 필요한 것 2~4개]}
+  · 각 항목은 8~26자의 짧은 명사구(문장 아님). wants와 needs는 같은 캐릭터의 표면 욕구와 근원 욕구가 대비되도록 쓰세요.
+  · 근거가 부족하면 억지로 채우지 말고 각 1~2개만 넣으세요.`,
   });
 }
 
@@ -416,7 +426,15 @@ async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
     schema:stage2Schema,
     maxAttempts:2,
     allowFallback:true,
-    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 두 번째 페이지의 아래 3개 필드만 작성하세요.\n\nrelationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\nattachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\nconflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유`,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 두 번째 페이지의 아래 3개 필드만 작성하세요.\n\nrelationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\nattachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\nconflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유
+
+추가 구조화 블록 — 위 세 산문과 별개로 아래 JSON 필드도 함께 출력하세요. 각 산문에서 이미 다룬 내용을 짧은 개조식으로 뽑되, 산문과 모순되지 않게, dossier 근거 안에서만 쓰고 없는 내용을 지어내지 마세요.
+- relationshipManual: {"gettingClose":[친해지는 법 2~4개],"avoid":[특히 하면 안 되는 것 2~4개],"affectionSignals":[좋아하거나 신뢰한다는 신호 2~4개]}
+  · relationshipStyle 산문 안의 사용설명서 내용을 그대로 개조식으로 정리하세요. 각 항목 10~34자.
+- matchProfile: {"best":[잘 맞는 상대의 특징 2~4개],"worst":[최악의 상대의 특징 2~4개]}
+  · attachmentStyle에서 다룬 궁합을 근거로 하세요. 상대의 "성격 라벨"이 아니라 이 캐릭터와의 관계에서 왜 맞고 안 맞는지가 드러나는 특징으로 쓰세요. 각 항목 10~34자.
+- pressureStages: {"normal":한 문장,"pressured":한 문장,"limit":한 문장}
+  · conflictStyleDetailed에서 다룬 "평상시 → 압박받을 때 → 한계에 몰렸을 때"의 성격·행동 변화를 각 한 문장(40~90자)으로 요약하세요.`,
   });
 }
 

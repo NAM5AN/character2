@@ -1,6 +1,7 @@
 :root {
-  --report-point: #2f68d8;
-  --report-point-soft: #eef4ff;
+  /* 따뜻한 종이 팔레트에 맞춘 그래파이트 그레이 포인트(기존 블루 대체). */
+  --report-point: #57544c;
+  --report-point-soft: #edeae2;
 }
 
 /* 큰 카테고리와 그 안의 문장형 소주제가 한 덩어리로 보이지 않도록 계층을 분리한다. */
@@ -21,12 +22,13 @@
 #paid-detail-report .card > div > div > p:has(> strong:first-child) {
   counter-increment: report-topic;
   width: 100%;
-  max-width: none;
+  /* 매우 넓은 화면에서 한 줄이 지나치게 길어지지 않도록 읽기 폭을 제한한다. */
+  max-width: 44em;
   margin: 0 !important;
-  padding: 20px 0 0;
-  color: #3f4248 !important;
+  padding: 22px 0 0;
+  color: #3d4046 !important;
   font-size: 16px;
-  line-height: 1.78 !important;
+  line-height: 1.85 !important;
   letter-spacing: -.012em;
   word-break: keep-all;
   overflow-wrap: anywhere;
@@ -34,21 +36,24 @@
 }
 
 #paid-detail-report .card > div > div > p:has(> strong:first-child) + p:has(> strong:first-child) {
-  margin-top: 18px !important;
-  padding-top: 20px;
+  margin-top: 22px !important;
+  padding-top: 24px;
   border-top: 1px solid var(--line);
 }
 
+/* 문단 첫 안내문 = 길잡이(내비게이션). 본문(짙은 회색)과 색으로 역할을 분리해
+   "소제목만 볼드이고 본문이 균일하다"는 완급 부재를 해소한다. */
 #paid-detail-report .card > div > div > p > strong:first-child {
   position: relative;
   display: block;
   min-height: 24px;
-  margin: 0 0 10px;
-  padding-left: 46px;
+  margin: 0 0 12px;
+  padding-left: 44px;
+  /* 본문(중간 회색)보다 진한 잉크색 + 볼드로 길잡이를 강조(색상 대신 명도로 완급). */
   color: var(--ink) !important;
-  font-size: 18px;
-  line-height: 1.45;
-  letter-spacing: -.025em;
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: -.02em;
   text-wrap: balance;
 }
 
@@ -56,15 +61,14 @@
   content: counter(report-topic, decimal-leading-zero);
   position: absolute;
   left: 0;
-  top: 1px;
+  top: 0;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 24px;
-  border: 1px solid color-mix(in srgb, var(--report-point) 42%, transparent);
+  width: 30px;
+  height: 22px;
   border-radius: 999px;
-  background: var(--report-point-soft);
-  color: var(--report-point);
+  background: var(--report-point);
+  color: #fff;
   font: 800 11px/1 Arial, sans-serif;
   letter-spacing: .04em;
 }
@@ -96,6 +100,149 @@
     font-size: 17px;
     line-height: 1.42;
   }
+}
+
+/* ── 요약 리포트(유형별 캐릭터 해석) 카드 가독성 ──
+   ParagraphText가 문단 첫 문장을 굵게 처리하는데, 짧은 카드에서는 카드 제목과
+   안내문이 둘 다 검은 볼드로 겹쳐 "전부 강조 = 강조 없음" 상태가 된다.
+   여기서는 안내문을 작은 색상 후크(내비게이션)로 강등시키고,
+   제목 → 후크 → 본문의 3단 계층을 만들어 첫인상의 볼드 과부하를 없앤다.
+   ParagraphText가 인라인 스타일을 쓰므로 !important로 덮는다. */
+.summary-type-grid { gap: 18px; }
+
+.summary-type-grid .result-block {
+  padding: 22px 24px 24px;
+  border-radius: 20px;
+}
+
+.summary-type-grid .result-block h3 {
+  margin: 0 0 14px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
+  font-size: 18.5px;
+  letter-spacing: -.03em;
+  line-height: 1.3;
+}
+
+.summary-type-grid .result-block p {
+  margin: 0 !important;
+  font-size: 15px;
+  line-height: 1.9 !important;
+  color: #4a4a46 !important;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.summary-type-grid .result-block p + p { margin-top: 16px !important; }
+
+.summary-type-grid .result-block p > strong:first-child {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--report-point) !important;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+@media (max-width: 760px) {
+  .summary-type-grid .result-block { padding: 20px; }
+}
+
+/* ── 키워드 태그(스캔용 pill) ──
+   섹션/카드 제목 아래에 핵심 키워드 2~3개를 pill로 얹어, 본문을 다 읽지 않아도
+   그 섹션이 무엇을 다루는지 1초 만에 파악하게 한다. */
+.kw-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+
+.kw-tags .kw {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--report-point) 30%, transparent);
+  background: var(--report-point-soft);
+  /* 포인트컬러를 따라가되 어둡게 믹스해 가독성 확보(캐릭터별 테마 시에도 대비 유지). */
+  color: color-mix(in srgb, var(--report-point) 74%, #17140f);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* 요약 카드: 밑줄 친 제목 바로 아래에 붙인다. */
+.summary-type-grid .result-block .kw-tags { margin: -2px 0 14px; }
+
+/* 상세 섹션: 큰 h2 아래, 번호 항목들 위에 놓는다. */
+#paid-detail-report .card > div > .kw-tags { margin: -6px 0 4px; }
+
+/* ── 혼합 레이아웃 구조화 블록 ──
+   산문(인과·메커니즘)은 그대로 두고, 나열·비교·단계처럼 구조가 뚜렷한 부분만
+   전용 레이아웃으로 뽑아 스캔성을 높이고 화면에 리듬을 만든다. */
+.report-block { margin: 26px 0 4px; }
+
+.report-block .block-label {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px; font-weight: 800; letter-spacing: .02em;
+  color: var(--muted);
+}
+.report-block .block-label::before {
+  content: ""; width: 16px; height: 2px; border-radius: 2px; background: var(--report-point);
+}
+
+/* 2단 비교 */
+.report-block .compare-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.report-block .compare-2 .col {
+  border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 16px; background: var(--paper);
+}
+.report-block .compare-2 .col.pos {
+  border-color: color-mix(in srgb, var(--report-point) 36%, transparent);
+  background: var(--report-point-soft);
+}
+.report-block .compare-2 .col h4 { margin: 0 0 10px; font-size: 15px; letter-spacing: -.02em; }
+.report-block .compare-2 ul,
+.report-block .manual-3 ul { margin: 0; padding-left: 18px; line-height: 1.72; color: #3d4046; font-size: 14.5px; }
+.report-block .compare-2 li,
+.report-block .manual-3 li { margin: 0 0 7px; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 3칸 사용설명서 */
+.report-block .manual-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.report-block .manual-3 .bucket {
+  border: 1px solid var(--line); border-radius: 16px; padding: 18px; background: var(--paper);
+}
+.report-block .manual-3 .bucket h4 { margin: 0 0 12px; font-size: 14.5px; display: flex; align-items: center; gap: 7px; }
+.report-block .manual-3 .bucket .ic {
+  display: grid; place-items: center; flex: 0 0 auto;
+  color: var(--report-point); /* 바탕 없이 라인만 — currentColor로 포인트컬러를 따라감 */
+}
+.report-block .manual-3 .bucket .ic svg { width: 18px; height: 18px; display: block; }
+
+/* 진행형 3단계 */
+.report-block .progression {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0;
+  border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+}
+.report-block .progression .step { padding: 18px; background: var(--paper); border-left: 1px solid var(--line); }
+.report-block .progression .step:first-child { border-left: 0; }
+.report-block .progression .step .stage {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 8px; font-size: 12px; font-weight: 800; color: var(--report-point);
+}
+.report-block .progression .step .stage .n {
+  width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--report-point); color: #fff; font-size: 11px;
+}
+.report-block .progression .step p { margin: 0; font-size: 14px; line-height: 1.65; color: #3d4046; }
+
+@media (max-width: 760px) {
+  .report-block .compare-2,
+  .report-block .manual-3,
+  .report-block .progression { grid-template-columns: 1fr; }
+  .report-block .progression .step { border-left: 0; border-top: 1px solid var(--line); }
+  .report-block .progression .step:first-child { border-top: 0; }
 }
 
 /* Keep this stylesheet in the deployment bundle when spacing-only changes are released. */

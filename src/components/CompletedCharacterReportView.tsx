@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { applyName } from '@/lib/josa';
+import { DesireGapBlock, MatchProfileBlock, RelationshipManualBlock, PressureStagesBlock } from '@/components/ReportBlocks';
 
 export type CompletedDetailPayload={
   analysis:FinalAnalysis;
@@ -29,11 +30,17 @@ function ParagraphText({text}:{text:string}){
   })}</div>;
 }
 
-function NarrativeSection({title,text,index}:{title:string;text?:string;index:number}){
+// 섹션/카드 제목 아래 스캔용 키워드 pill. 태그가 없으면 아무것도 렌더하지 않는다.
+function KeywordTags({tags}:{tags?:string[]}){
+  if(!tags?.length)return null;
+  return <div className="kw-tags">{tags.slice(0,4).map((tag,index)=><span className="kw" key={`${index}-${tag}`}>#{tag}</span>)}</div>;
+}
+
+function NarrativeSection({title,text,index,tags,extra}:{title:string;text?:string;index:number;tags?:string[];extra?:ReactNode}){
   if(!text?.trim())return null;
   return <section className="card" style={{marginTop:index===0?20:18,padding:'32px'}}>
     <h2 style={{fontSize:'clamp(27px,4vw,40px)',margin:'0 0 20px'}}>{title}</h2>
-    <div style={{fontSize:16.5}}><ParagraphText text={text}/></div>
+    <div style={{fontSize:16.5}}><KeywordTags tags={tags}/><ParagraphText text={text}/>{extra}</div>
   </section>;
 }
 
@@ -51,18 +58,19 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
   const stageReady=Math.max(1,Math.min(3,savedDetail.stageReady||3));
   const summary=preview.summary;
   const richSummary=Boolean(summary?.misunderstoodPoint?.trim()&&summary?.hiddenPattern?.trim());
-  const summaryCards:[string,string][]=richSummary?[
-    ['겉으로 보이는 모습',summary?.outerSelf||''],
-    ['실제 내면',summary?.innerSelf||''],
-    ['감정이 흔들리는 순간',summary?.conflictStyle||''],
-    ['관계에서 반복되는 패턴',summary?.affectionStyle||''],
-    ['쉽게 오해받는 부분',summary?.misunderstoodPoint||''],
-    ['의외로 눈에 띄는 지점',summary?.hiddenPattern||''],
+  const summaryTags=preview.summaryTags;
+  const summaryCards:[string,string,string][]=richSummary?[
+    ['겉으로 보이는 모습',summary?.outerSelf||'','outerSelf'],
+    ['실제 내면',summary?.innerSelf||'','innerSelf'],
+    ['감정이 흔들리는 순간',summary?.conflictStyle||'','conflictStyle'],
+    ['관계에서 반복되는 패턴',summary?.affectionStyle||'','affectionStyle'],
+    ['쉽게 오해받는 부분',summary?.misunderstoodPoint||'','misunderstoodPoint'],
+    ['의외로 눈에 띄는 지점',summary?.hiddenPattern||'','hiddenPattern'],
   ]:[
-    ['겉으로 보이는 모습',summary?.outerSelf||''],
-    ['실제 내면',summary?.innerSelf||''],
-    ['갈등 방식',summary?.conflictStyle||''],
-    ['애정 표현',summary?.affectionStyle||''],
+    ['겉으로 보이는 모습',summary?.outerSelf||'','outerSelf'],
+    ['실제 내면',summary?.innerSelf||'','innerSelf'],
+    ['갈등 방식',summary?.conflictStyle||'','conflictStyle'],
+    ['애정 표현',summary?.affectionStyle||'','affectionStyle'],
   ];
 
   useEffect(()=>{
@@ -100,7 +108,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
 
     {preview.oneLineSummary&&<p className="hero-copy" style={{fontSize:17,margin:'0 0 8px',maxWidth:860}}>{preview.oneLineSummary}</p>}
     <div style={{marginTop:22}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2></div>
-    <div className="result-grid" style={{marginTop:18}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
+    <div className="result-grid summary-type-grid" style={{marginTop:18}}>{summaryCards.map(([title,text,key])=><section className="result-block" key={title}><h3>{title}</h3><KeywordTags tags={summaryTags?.[key]}/><ParagraphText text={text}/></section>)}</div>
 
     <div id="paid-detail-report" style={{marginTop:38,scrollMarginTop:90}}>
       <h2 style={{marginTop:0}}>상세 캐릭터 리포트</h2>
@@ -109,17 +117,17 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={analysis.characterOverview}/>
-          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={analysis.innerMechanics}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={analysis.characterOverview} tags={analysis.sectionTags?.characterOverview}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={analysis.innerMechanics} tags={analysis.sectionTags?.innerMechanics} extra={<DesireGapBlock data={analysis.desireGap}/>}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={analysis.relationshipStyle}/>
-          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={analysis.attachmentStyle}/>
-          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={analysis.conflictStyleDetailed}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={analysis.relationshipStyle} tags={analysis.sectionTags?.relationshipStyle} extra={<RelationshipManualBlock data={analysis.relationshipManual}/>}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={analysis.attachmentStyle} tags={analysis.sectionTags?.attachmentStyle} extra={<MatchProfileBlock data={analysis.matchProfile}/>}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={analysis.conflictStyleDetailed} tags={analysis.sectionTags?.conflictStyleDetailed} extra={<PressureStagesBlock data={analysis.pressureStages}/>}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={analysis.charmAndContradictions}/>
-          <NarrativeSection index={6} title="통합 리포트" text={analysis.integratedReport}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={analysis.charmAndContradictions} tags={analysis.sectionTags?.charmAndContradictions}/>
+          <NarrativeSection index={6} title="통합 리포트" text={analysis.integratedReport} tags={analysis.sectionTags?.integratedReport}/>
         </>}
 
         <div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>

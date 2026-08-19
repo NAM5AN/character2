@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
 import { useRotatingFlavor } from '@/lib/loading-flavor';
 import { applyName } from '@/lib/josa';
+import { DesireGapBlock, MatchProfileBlock, RelationshipManualBlock, PressureStagesBlock } from '@/components/ReportBlocks';
 
 type DetailPayload={
   analysis:FinalAnalysis;
@@ -39,6 +40,12 @@ function ParagraphText({text}:{text:string}){
 
 function BulletList({items}:{items:string[]}){
   return <ul style={{margin:'0',paddingLeft:22,lineHeight:1.8,color:'#444'}}>{items.map((item,index)=><li key={`${index}-${item.slice(0,18)}`} style={{margin:index===0?0:'9px 0 0'}}>{item}</li>)}</ul>;
+}
+
+// 섹션/카드 제목 아래 스캔용 키워드 pill. 태그가 없으면 아무것도 렌더하지 않는다.
+function KeywordTags({tags}:{tags?:string[]}){
+  if(!tags?.length)return null;
+  return <div className="kw-tags">{tags.slice(0,4).map((tag,index)=><span className="kw" key={`${index}-${tag}`}>#{tag}</span>)}</div>;
 }
 
 function apiErrorInfo(body:unknown,status:number){
@@ -75,11 +82,11 @@ function ListSection({title,items}:{title:string;items?:string[]}){
   return <section className="result-block"><h3>{title}</h3><BulletList items={items}/></section>;
 }
 
-function NarrativeSection({title,text,index}:{title:string;text?:string;index:number}){
+function NarrativeSection({title,text,index,tags,extra}:{title:string;text?:string;index:number;tags?:string[];extra?:ReactNode}){
   if(!text?.trim())return null;
   return <section className="card" style={{marginTop:index===0?20:18,padding:'32px'}}>
     <h2 style={{fontSize:'clamp(27px,4vw,40px)',margin:'0 0 20px'}}>{title}</h2>
-    <div style={{fontSize:16.5}}><ParagraphText text={text}/></div>
+    <div style={{fontSize:16.5}}><KeywordTags tags={tags}/><ParagraphText text={text}/>{extra}</div>
   </section>;
 }
 
@@ -251,17 +258,17 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
   const richSummary=Boolean(preview.summary.misunderstoodPoint?.trim()&&preview.summary.hiddenPattern?.trim());
   const summaryCards=richSummary ? [
-    ['겉으로 보이는 모습',preview.summary.outerSelf],
-    ['실제 내면',preview.summary.innerSelf],
-    ['감정이 흔들리는 순간',preview.summary.conflictStyle],
-    ['관계에서 반복되는 패턴',preview.summary.affectionStyle],
-    ['쉽게 오해받는 부분',preview.summary.misunderstoodPoint!],
-    ['의외로 눈에 띄는 지점',preview.summary.hiddenPattern!],
+    ['겉으로 보이는 모습',preview.summary.outerSelf,'outerSelf'],
+    ['실제 내면',preview.summary.innerSelf,'innerSelf'],
+    ['감정이 흔들리는 순간',preview.summary.conflictStyle,'conflictStyle'],
+    ['관계에서 반복되는 패턴',preview.summary.affectionStyle,'affectionStyle'],
+    ['쉽게 오해받는 부분',preview.summary.misunderstoodPoint!,'misunderstoodPoint'],
+    ['의외로 눈에 띄는 지점',preview.summary.hiddenPattern!,'hiddenPattern'],
   ] as const : [
-    ['겉으로 보이는 모습',preview.summary.outerSelf],
-    ['실제 내면',preview.summary.innerSelf],
-    ['갈등 방식',preview.summary.conflictStyle],
-    ['애정 표현',preview.summary.affectionStyle],
+    ['겉으로 보이는 모습',preview.summary.outerSelf,'outerSelf'],
+    ['실제 내면',preview.summary.innerSelf,'innerSelf'],
+    ['갈등 방식',preview.summary.conflictStyle,'conflictStyle'],
+    ['애정 표현',preview.summary.affectionStyle,'affectionStyle'],
   ] as const;
   const previewSections=[
     ['관계에서 반복되는 패턴',`상대를 얼마나 가까운 사람으로 받아들이는지에 따라 허용하는 거리와 개입의 방식이 어떻게 달라지는지 살펴봅니다. 친밀감이 높아질수록 표현이 직접적으로 바뀌는지, 오히려 관찰과 배려가 늘어나는지, 갈등 뒤에 다시 관계를 회복하려는 방식은 무엇인지까지 여러 장면을 연결해 읽습니다.\n\n단순히 사람을 좋아한다거나 낯을 가린다는 식으로 끝내지 않고, 어느 순간부터 상대를 자기 책임 범위 안에 넣는지, 거절이나 침묵을 어떤 신호로 받아들이는지, 가까워진 뒤에도 끝까지 남는 경계선은 무엇인지를 함께 풀어냅니다.`],
@@ -318,7 +325,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     </div>
 
     <div style={{marginTop:34}}><h2 style={{marginTop:0}}>유형별 캐릭터 해석</h2><p className="muted" style={{lineHeight:1.7,maxWidth:820}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요. 여기서는 핵심 연결만 보여주고, 행동의 이유가 관계·애착·갈등과 한계 상황에서 어떻게 이어지는지는 상세 리포트에서 더 깊게 풀어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 정리됩니다.'}</p></div>
-    <div className="result-grid" style={{marginTop:20}}>{summaryCards.map(([title,text])=><section className="result-block" key={title}><h3>{title}</h3><ParagraphText text={text}/></section>)}</div>
+    <div className="result-grid summary-type-grid" style={{marginTop:20}}>{summaryCards.map(([title,text,key])=><section className="result-block" key={title}><h3>{title}</h3><KeywordTags tags={preview.summaryTags?.[key]}/><ParagraphText text={text}/></section>)}</div>
 
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
       <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:0}}>여기서 한 단계 더 들어가면</h2>
@@ -361,17 +368,17 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={detail.analysis.characterOverview}/>
-          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={detail.analysis.innerMechanics}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={detail.analysis.characterOverview} tags={detail.analysis.sectionTags?.characterOverview}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={detail.analysis.innerMechanics} tags={detail.analysis.sectionTags?.innerMechanics} extra={<DesireGapBlock data={detail.analysis.desireGap}/>}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={detail.analysis.relationshipStyle}/>
-          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={detail.analysis.attachmentStyle}/>
-          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={detail.analysis.conflictStyleDetailed}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={detail.analysis.relationshipStyle} tags={detail.analysis.sectionTags?.relationshipStyle} extra={<RelationshipManualBlock data={detail.analysis.relationshipManual}/>}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={detail.analysis.attachmentStyle} tags={detail.analysis.sectionTags?.attachmentStyle} extra={<MatchProfileBlock data={detail.analysis.matchProfile}/>}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={detail.analysis.conflictStyleDetailed} tags={detail.analysis.sectionTags?.conflictStyleDetailed} extra={<PressureStagesBlock data={detail.analysis.pressureStages}/>}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={detail.analysis.charmAndContradictions}/>
-          <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={detail.analysis.charmAndContradictions} tags={detail.analysis.sectionTags?.charmAndContradictions}/>
+          <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport} tags={detail.analysis.sectionTags?.integratedReport}/>
         </>}
 
         {prefetchError&&reportPage<3&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>
