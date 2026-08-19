@@ -56,6 +56,7 @@ export function AnalyzeFlow(){
   const persistenceEnabled=useRef(false);
   const questionHistoryRef=useRef<InterviewQuestion[]>([]);
   const batchRequests=useRef<Map<number,Promise<InterviewQuestion[]>>>(new Map());
+  const temporalRepairRequests=useRef<Set<string>>(new Set());
 
   useEffect(()=>{questionHistoryRef.current=questionHistory},[questionHistory]);
 
@@ -67,6 +68,13 @@ export function AnalyzeFlow(){
     const saved=answerList.find(answer=>answer.order===q.order);
     const data=responseDataFromAnswer(saved);
     setHistory(history);setQuestion(q);setActiveQuestionIndex(index);resetResponseDraft();setError('');
+    if(responseTypeOf(q)==='temporal_compare'){
+      const config=responseConfigOf(q);const first=q.options.slice(0,4).map(item=>item.trim()).sort();const second=(config.options2||[]).slice(0,4).map(item=>item.trim()).sort();const same=first.length===4&&second.length===4&&first.join('\u0001')===second.join('\u0001');const repairKey=`${draft?.usageSessionId||'session'}:${q.order}`;
+      if((second.length!==4||same)&&draft&&!temporalRepairRequests.current.has(repairKey)){
+        temporalRepairRequests.current.add(repairKey);
+        void (async()=>{try{const r=await fetch('/api/characters/questions/temporal-options',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,question:q})});const body=await r.json().catch(()=>({}));if(!r.ok||!Array.isArray(body.options2)||body.options2.length!==4)return;const patched={...q,responseConfig:{...q.responseConfig,options2:body.options2}} as InterviewQuestion;setQuestion(current=>current?.order===q.order?patched:current);setHistory(questionHistoryRef.current.map(item=>item.order===q.order?patched:item))}catch{}})();
+      }
+    }
     if(saved){
       if(Object.keys(data).length){setSelected(typeof data.selected==='string'?data.selected:'');setCustom(typeof data.custom==='string'?data.custom:'');setMultiSelected(Array.isArray(data.multiSelected)?data.multiSelected:[]);setRanking(Array.isArray(data.ranking)?data.ranking:[]);setSliderValue(typeof data.sliderValue==='number'?data.sliderValue:50);setMatrixAnswers(data.matrixAnswers&&typeof data.matrixAnswers==='object'?data.matrixAnswers:{});setSecondary(typeof data.secondary==='string'?data.secondary:'')}
       else{const matched=q.options.includes(saved.answer);setSelected(matched?saved.answer:'');setCustom(matched?'':saved.answer)}
@@ -89,7 +97,7 @@ export function AnalyzeFlow(){
     if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');else if(saved.stage==='review'&&restoredDraft)setStage('review');else setStage('input');
   }
 
-  function clearProgressState(){setStage('input');setName('');setProfileText('');setSecretProfileText('');clearAppearanceImages();setDraft(null);setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);resetResponseDraft();setBusy(false);setError('');setResult(null);batchRequests.current.clear()}
+  function clearProgressState(){setStage('input');setName('');setProfileText('');setSecretProfileText('');clearAppearanceImages();setDraft(null);setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);resetResponseDraft();setBusy(false);setError('');setResult(null);batchRequests.current.clear();temporalRepairRequests.current.clear()}
 
   async function loadReplay(shareCode:string){
     persistenceEnabled.current=false;setBusy(true);setError('');
@@ -159,7 +167,7 @@ export function AnalyzeFlow(){
     if(order>20){await finalize(currentAnswers);return}const existing=historyBase.find(item=>item.order===order)||questionHistoryRef.current.find(item=>item.order===order);if(existing){const history=mergeQuestionHistory(historyBase,questionHistoryRef.current);applyQuestion(existing,history,currentAnswers);return}setBusy(true);setError('');try{const questions=await requestBatch(order,currentAnswers,historyBase);const history=questionHistoryRef.current;const q=questions.find(item=>item.order===order)||history.find(item=>item.order===order);if(!q){setError('다음 질문 묶음을 불러오지 못했어요. 다시 시도해주세요.');return}applyQuestion(q,history,currentAnswers)}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}
   }
 
-  async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);batchRequests.current.clear();setBusy(true);setError('');try{const first=await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
+  async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);batchRequests.current.clear();temporalRepairRequests.current.clear();setBusy(true);setError('');try{const first=await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
 
   function buildCurrentAnswer(){
     if(!question)return null;const type=responseTypeOf(question);const config=responseConfigOf(question);const customAnswer=custom.trim();const reasonText=reason.trim();let answer='';let answerSource:'choice'|'custom'|'structured'='structured';
