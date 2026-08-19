@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ReportSummaryToggleBridge } from '@/components/ReportSummaryToggleBridge';
 import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshBridge';
+import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import './globals.css';
 import './report-pagination.css';
 import './report-readability.css';
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <ReportSummaryToggleBridge/>
         <AdminTelemetryRefreshBridge/>
+        <ReplayResultUrlBridge/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
