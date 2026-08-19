@@ -11,6 +11,7 @@ import {
   type InterviewAnswer,
 } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
+import { inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
 import { attachAiUsageSession, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
@@ -310,12 +311,19 @@ export async function POST(request:Request){
   try{
     await assertRateLimit('character_finalize',8,60);
     const body=requestSchema.parse(await request.json());
+    const fallbackAdaptive=body.draft.personalityTags.ownerSelected.length?body.draft.personalityTags.ownerSelected:body.draft.personalityTags.aiInitial;
+    try{
+      const interviewAdaptive=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'personality_interview'},()=>inferInterviewAdaptiveTags(body.draft,body.answers));
+      body.draft.personalityTags={...body.draft.personalityTags,interviewAdaptive};
+    }catch{
+      body.draft.personalityTags={...body.draft.personalityTags,interviewAdaptive:fallbackAdaptive};
+    }
     const inferenceReview={
       confirmed:body.draft.aiInferences.filter(x=>x.ownerVerdict==='confirmed').map(x=>({text:x.text,evidence:x.evidence})),
       ambiguous:body.draft.aiInferences.filter(x=>x.ownerVerdict==='ambiguous').map(x=>({text:x.text,evidence:x.evidence,ownerFeedback:x.ownerFeedback?.trim()||''})),
       rejectedCorrections:body.draft.aiInferences.filter(x=>x.ownerVerdict==='rejected'&&x.ownerFeedback?.trim()).map(x=>({ownerCorrection:x.ownerFeedback!.trim()})),
     };
-    const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,analysisConfidence:body.draft.analysisConfidence};
+    const analysisDraft={basicProfile:body.draft.basicProfile,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,personalityTags:body.draft.personalityTags,analysisConfidence:body.draft.analysisConfidence};
     const summaryStartedAt=Date.now();
     const summaryResult=await generateSummaryReport({
       name:body.draft.basicProfile.name,
@@ -330,11 +338,11 @@ export async function POST(request:Request){
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
     const sharedInferences=body.draft.aiInferences.map(x=>({id:x.id,text:x.text,confidence:x.confidence,evidenceIds:[],evidence:[],ownerVerdict:x.ownerVerdict}));
-    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,...(summaryResult.summaryTags?{summaryTags:summaryResult.summaryTags}:{}),...(summaryResult.summaryCardLines?{summaryCardLines:summaryResult.summaryCardLines}:{}),outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.4',analysis:'claude-summary-dossier/4.0'}});
-    const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,evidencePack:summaryResult.evidencePack};
+    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,personalityTags:body.draft.personalityTags,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,...(summaryResult.summaryTags?{summaryTags:summaryResult.summaryTags}:{}),...(summaryResult.summaryCardLines?{summaryCardLines:summaryResult.summaryCardLines}:{}),outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.5-personality',analysis:'claude-summary-dossier/4.0'}});
+    const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,personalityTags:body.draft.personalityTags,evidencePack:summaryResult.evidencePack};
     const appearanceForDetail=body.draft.basicProfile.appearanceNotes?.trim()?`[외관 자료 관찰 메모 — 시각 보조 근거이며 성격·감정·과거를 단독으로 확정하지 말 것]\n${body.draft.basicProfile.appearanceNotes.trim()}`:'';
     const secretProfileText=[body.draft.basicProfile.secretProfileText||'',appearanceForDetail].filter(Boolean).join('\n\n');
-    const privateSource={version:'detail-source/1.0',secretProfileText,ownerReview:inferenceReview,answers:body.answers,confirmedFacts:body.draft.confirmedFacts,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits};
+    const privateSource={version:'detail-source/1.0',secretProfileText,ownerReview:inferenceReview,answers:body.answers,confirmedFacts:body.draft.confirmedFacts,traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,personalityTags:body.draft.personalityTags};
     const {data:saved,error}=await sb.rpc('character2_create_character_preview_v2',{p_character_id:characterId,p_share_code:shareCode,p_name:name,p_schema_version:passport.schemaVersion,p_passport_json:passport,p_analysis_confidence:body.draft.analysisConfidence,p_engine_versions:passport.engineVersions,p_answers:body.answers,p_edit_token_hash:sha256(editToken),p_detail_seed_json:detailSeed,p_source_json:privateSource});
     if(error)throw error;if(saved!==true)throw new Error('CHARACTER_SAVE_FAILED');
     await attachAiUsageSession(body.draft.usageSessionId,shareCode);
