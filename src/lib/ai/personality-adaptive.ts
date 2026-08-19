@@ -23,6 +23,10 @@ export async function inferInterviewAdaptiveTags(
   draft: CharacterDraft,
   answers: InterviewAnswer[],
 ): Promise<PersonalityTagKey[]> {
+  // 요약 로딩 직전에 브라우저가 이미 같은 20문항으로 판별해 보냈다면 재호출하지 않는다.
+  const precomputed = normalizeTags(draft.personalityTags.interviewAdaptive);
+  if (precomputed.length) return precomputed;
+
   const ownerSelected = normalizeTags(draft.personalityTags.ownerSelected);
   const aiInitial = normalizeTags(draft.personalityTags.aiInitial);
   const tagGuide = PERSONALITY_TAG_CATALOG.map(tag => ({
