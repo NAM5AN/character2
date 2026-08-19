@@ -15,15 +15,20 @@ const PERSONALITY_PICKER_ID='personality-tag-picker';
 const PERSONALITY_STYLE_ID='personality-tag-picker-style';
 
 type SavedPersonalitySelection={sessionId:string;tags:PersonalityTagKey[]};
+type SavedDraft={
+  usageSessionId?:unknown;
+  personalityTags?:{
+    aiInitial?:unknown;
+    ownerSelected?:unknown;
+    interviewAdaptive?:unknown;
+    finalAdaptive?:unknown;
+  };
+  [key:string]:unknown;
+};
 type SavedAnalysisSession={
   name?:unknown;
-  draft?:{
-    usageSessionId?:unknown;
-    personalityTags?:{
-      aiInitial?:unknown;
-      ownerSelected?:unknown;
-    };
-  };
+  draft?:SavedDraft;
+  [key:string]:unknown;
 };
 
 function personalityTags(value:unknown):PersonalityTagKey[]{
@@ -40,6 +45,10 @@ function readAnalysisSession():SavedAnalysisSession|null{
   }catch{return null}
 }
 
+function writeAnalysisSession(saved:SavedAnalysisSession){
+  try{localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved))}catch{}
+}
+
 function readOwnerSelection(sessionId:string):PersonalityTagKey[]|null{
   try{
     const raw=localStorage.getItem(PERSONALITY_OWNER_TAG_KEY);
@@ -54,15 +63,24 @@ function saveOwnerSelection(sessionId:string,tags:PersonalityTagKey[]){
   const normalized=personalityTags(tags);
   try{
     localStorage.setItem(PERSONALITY_OWNER_TAG_KEY,JSON.stringify({sessionId,tags:normalized} satisfies SavedPersonalitySelection));
-    const raw=localStorage.getItem(ANALYSIS_SESSION_KEY);
-    if(!raw)return;
-    const parsed=JSON.parse(raw) as Record<string,unknown>;
-    const draft=parsed.draft&&typeof parsed.draft==='object'?parsed.draft as Record<string,unknown>:null;
-    if(!draft)return;
-    const current=draft.personalityTags&&typeof draft.personalityTags==='object'?draft.personalityTags as Record<string,unknown>:{};
+    const parsed=readAnalysisSession();
+    const draft=parsed?.draft;
+    if(!parsed||!draft)return;
+    const current=draft.personalityTags&&typeof draft.personalityTags==='object'?draft.personalityTags:{};
     draft.personalityTags={...current,ownerSelected:normalized};
-    localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(parsed));
+    writeAnalysisSession(parsed);
   }catch{}
+}
+
+function saveAiInitial(sessionId:string,tags:PersonalityTagKey[]){
+  const normalized=personalityTags(tags);
+  if(!normalized.length)return;
+  const parsed=readAnalysisSession();
+  const draft=parsed?.draft;
+  if(!parsed||!draft||draft.usageSessionId!==sessionId)return;
+  const current=draft.personalityTags&&typeof draft.personalityTags==='object'?draft.personalityTags:{};
+  draft.personalityTags={...current,aiInitial:normalized};
+  writeAnalysisSession(parsed);
 }
 
 function personalityGuidance(tags:PersonalityTagKey[]){
@@ -76,9 +94,10 @@ function personalityGuidance(tags:PersonalityTagKey[]){
 export function AnalyzeReviewUiPolish(){
   useEffect(()=>{
     let currentName='';
+    const initialTagRequests=new Set<string>();
 
     // 성격 칩 UI는 AnalyzeFlow의 React state 바깥에서 동작하므로, 질문 생성/최종 분석 요청 직전에
-    // 로컬에 저장된 최신 오너 선택값을 request draft에 합쳐 보낸다.
+    // 로컬에 저장된 최신 오너 선택값과 AI 최초 선택값을 request draft에 합쳐 보낸다.
     const originalFetch=window.fetch.bind(window);
     window.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const url=typeof input==='string'?input:input instanceof URL?input.toString():input.url;
@@ -91,9 +110,12 @@ export function AnalyzeReviewUiPolish(){
           if(draft){
             const sessionId=typeof draft.usageSessionId==='string'?draft.usageSessionId:'';
             const current=draft.personalityTags&&typeof draft.personalityTags==='object'?draft.personalityTags as Record<string,unknown>:{};
+            const persisted=readAnalysisSession()?.draft?.personalityTags;
             const saved=sessionId?readOwnerSelection(sessionId):null;
             const ownerSelected=saved??personalityTags(current.ownerSelected);
-            draft.personalityTags={...current,ownerSelected};
+            const persistedAi=personalityTags(persisted?.aiInitial);
+            const aiInitial=persistedAi.length?persistedAi:personalityTags(current.aiInitial);
+            draft.personalityTags={...current,aiInitial,ownerSelected};
 
             // 질문 생성에만 참고 문구를 일시적으로 traits에 싣는다.
             // finalize에는 이 합성 필드를 넣지 않아 저장된 원본 traits를 오염시키지 않는다.
@@ -148,11 +170,13 @@ export function AnalyzeReviewUiPolish(){
       const draft=saved?.draft;
       const sessionId=typeof draft?.usageSessionId==='string'?draft.usageSessionId:'';
       if(!sessionId)return;
-      const aiInitial=personalityTags(draft?.personalityTags?.aiInitial);
+      let aiInitial=personalityTags(draft?.personalityTags?.aiInitial);
       const stored=readOwnerSelection(sessionId);
       let selected=stored??personalityTags(draft?.personalityTags?.ownerSelected);
-      if(!selected.length&&stored===null)selected=[...aiInitial];
-      saveOwnerSelection(sessionId,selected);
+      if(!selected.length&&stored===null&&aiInitial.length){
+        selected=[...aiInitial];
+        saveOwnerSelection(sessionId,selected);
+      }
 
       ensurePersonalityStyle();
       const section=document.createElement('section');
@@ -166,7 +190,9 @@ export function AnalyzeReviewUiPolish(){
       title.textContent='캐릭터의 성격도 한번 확인해볼까요?';
       const copy=document.createElement('p');
       copy.className='personality-copy';
-      copy.textContent='AI가 프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.';
+      copy.textContent=aiInitial.length
+        ?'AI가 프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.'
+        :'AI가 프로필을 바탕으로 가까운 성향을 고르고 있어요. 잠시 뒤 자동으로 선택돼요.';
       const count=document.createElement('span');
       count.className='personality-count';
       intro.append(title,copy);heading.append(intro,count);
@@ -200,6 +226,39 @@ export function AnalyzeReviewUiPolish(){
       };
       render();
       firstCard.appendChild(section);
+
+      // 기존 parse 모델이 aiInitial을 비워 보낸 경우에만 보정 AI를 한 번 호출한다.
+      // 사용자에게는 같은 첫 해석 화면에서 자동 선택된 칩으로 반영된다.
+      if(!aiInitial.length&&stored===null&&!initialTagRequests.has(sessionId)){
+        initialTagRequests.add(sessionId);
+        void (async()=>{
+          try{
+            const latest=readAnalysisSession();
+            const latestDraft=latest?.draft;
+            if(!latestDraft||latestDraft.usageSessionId!==sessionId)return;
+            const response=await originalFetch('/api/characters/personality/initial',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify({draft:latestDraft}),
+            });
+            const body=await response.json().catch(()=>({}));
+            if(!response.ok)return;
+            const tags=personalityTags(body?.tags);
+            if(!tags.length)return;
+            aiInitial=tags;
+            saveAiInitial(sessionId,tags);
+            // 호출 중 사용자가 직접 칩을 건드리지 않았다면 AI 제안을 그대로 최초 선택으로 사용한다.
+            if(readOwnerSelection(sessionId)===null){
+              selected=[...tags];
+              saveOwnerSelection(sessionId,selected);
+            }else{
+              selected=readOwnerSelection(sessionId)??selected;
+            }
+            copy.textContent='AI가 프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.';
+            render();
+          }catch{}
+        })();
+      }
     };
 
     const setLoadingTextWithDots=(element:HTMLElement,label:string)=>{
@@ -259,7 +318,10 @@ export function AnalyzeReviewUiPolish(){
     apply();
     const observer=new MutationObserver(apply);
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-    return()=>{observer.disconnect();window.fetch=originalFetch};
+    // AnalyzeFlow는 draft를 localStorage에 150ms 지연 저장한다. DOM 변화만 기다리면 첫 진입에서 놓치므로
+    // review 화면에 들어온 직후 짧게 재확인해 첫 렌더에서도 칩을 확실히 붙인다.
+    const retry=window.setInterval(ensurePersonalityPicker,120);
+    return()=>{observer.disconnect();window.clearInterval(retry);window.fetch=originalFetch};
   },[]);
 
   return null;
