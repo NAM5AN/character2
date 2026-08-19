@@ -189,7 +189,7 @@ export function AnalyzeReviewUiPolish(){
       const intro=document.createElement('div');
       const title=document.createElement('p');
       title.className='personality-title';
-      title.textContent='캐릭터의 성격도 한번 확인해볼까요?';
+      title.textContent='캐릭터의 성격도 한번 확인해볼게요.';
       const copy=document.createElement('p');
       copy.className='personality-copy';
       copy.textContent=aiInitial.length
