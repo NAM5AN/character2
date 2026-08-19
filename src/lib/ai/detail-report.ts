@@ -10,6 +10,7 @@ import {
   relationshipManualSchema,
   pressureStagesSchema,
   tagListSchema,
+  tldrLineSchema,
   type FinalAnalysis,
 } from '@/lib/schemas/character';
 
@@ -125,9 +126,9 @@ type SourcePacket = {
 
 // 구조화 블록·태그 필드는 optional — 모델이 생략해도 산문 리포트는 정상 생성된다(라이브 결제 경로 보호).
 // 섹션 태그는 섹션별 평면 키(...Tags)로 받아 스테이지 병합({...기존,...패치}) 시 충돌 없이 합쳐지게 한다.
-const stage1Schema=z.object({characterOverview:z.string(),innerMechanics:z.string(),desireGap:desireGapSchema.optional(),characterOverviewTags:tagListSchema.optional(),innerMechanicsTags:tagListSchema.optional()});
-const stage2Schema=z.object({relationshipStyle:z.string(),attachmentStyle:z.string(),conflictStyleDetailed:z.string(),relationshipManual:relationshipManualSchema.optional(),matchProfile:matchProfileSchema.optional(),pressureStages:pressureStagesSchema.optional(),relationshipStyleTags:tagListSchema.optional(),attachmentStyleTags:tagListSchema.optional(),conflictStyleDetailedTags:tagListSchema.optional()});
-const stage3Schema=z.object({charmAndContradictions:z.string(),integratedReport:z.string(),charmAndContradictionsTags:tagListSchema.optional(),integratedReportTags:tagListSchema.optional()});
+const stage1Schema=z.object({characterOverview:z.string(),innerMechanics:z.string(),desireGap:desireGapSchema.optional(),characterOverviewTags:tagListSchema.optional(),innerMechanicsTags:tagListSchema.optional(),characterOverviewTldr:tldrLineSchema.optional(),innerMechanicsTldr:tldrLineSchema.optional()});
+const stage2Schema=z.object({relationshipStyle:z.string(),attachmentStyle:z.string(),conflictStyleDetailed:z.string(),relationshipManual:relationshipManualSchema.optional(),matchProfile:matchProfileSchema.optional(),pressureStages:pressureStagesSchema.optional(),relationshipStyleTags:tagListSchema.optional(),attachmentStyleTags:tagListSchema.optional(),conflictStyleDetailedTags:tagListSchema.optional(),relationshipStyleTldr:tldrLineSchema.optional(),attachmentStyleTldr:tldrLineSchema.optional(),conflictStyleDetailedTldr:tldrLineSchema.optional()});
+const stage3Schema=z.object({charmAndContradictions:z.string(),integratedReport:z.string(),charmAndContradictionsTags:tagListSchema.optional(),integratedReportTags:tagListSchema.optional(),charmAndContradictionsTldr:tldrLineSchema.optional(),integratedReportTldr:tldrLineSchema.optional()});
 
 const PSYCHE_SYSTEM = `당신은 자캐커뮤니티의 유료 상세 캐해 리포트를 위한 심층 분석가입니다.
 최종 글을 쓰지 마세요. 입력을 항목별로 다시 정리하는 것도 목적이 아닙니다.
@@ -422,7 +423,10 @@ async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
 
 섹션 스캔용 키워드 태그도 함께 출력하세요(각 2~3개, 항목당 2~10자의 짧은 한국어 키워드, 문장/설명/해시태그 기호 금지, 그 섹션 핵심만).
 - characterOverviewTags: characterOverview 섹션의 핵심 키워드
-- innerMechanicsTags: innerMechanics 섹션의 핵심 키워드`,
+- innerMechanicsTags: innerMechanics 섹션의 핵심 키워드
+
+각 섹션의 핵심 한 줄 요약(TL;DR)도 출력하세요(30~70자, 한 문장). 안내문 같은 길잡이가 아니라 그 섹션에서 가장 중요한 "결론"을 먼저 말하는 문장이어야 합니다(예: "겉은 쿨해 보이지만 본질은 방어기제예요"). 자연스러운 해요체.
+- characterOverviewTldr / innerMechanicsTldr`,
   });
 }
 
@@ -443,7 +447,10 @@ async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
   · conflictStyleDetailed에서 다룬 "평상시 → 압박받을 때 → 한계에 몰렸을 때"의 성격·행동 변화를 각 한 문장(40~90자)으로 요약하세요.
 
 섹션 스캔용 키워드 태그도 함께 출력하세요(각 2~3개, 항목당 2~10자의 짧은 한국어 키워드, 문장/설명/해시태그 기호 금지, 그 섹션 핵심만).
-- relationshipStyleTags / attachmentStyleTags / conflictStyleDetailedTags: 각 해당 섹션의 핵심 키워드`,
+- relationshipStyleTags / attachmentStyleTags / conflictStyleDetailedTags: 각 해당 섹션의 핵심 키워드
+
+각 섹션의 핵심 한 줄 요약(TL;DR)도 출력하세요(30~70자, 한 문장, 길잡이가 아니라 그 섹션의 결론을 먼저 말하는 문장, 자연스러운 해요체).
+- relationshipStyleTldr / attachmentStyleTldr / conflictStyleDetailedTldr`,
   });
 }
 
@@ -453,7 +460,7 @@ async function writeStage3(seed:DetailSeed,dossier:ReportDossier){
     schema:stage3Schema,
     maxAttempts:2,
     allowFallback:true,
-    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 마지막 페이지의 아래 2개 필드만 작성하세요.\n\ncharmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\nintegratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.\n\n섹션 스캔용 키워드 태그도 함께 출력하세요(각 2~3개, 항목당 2~10자의 짧은 한국어 키워드, 문장/설명/해시태그 기호 금지, 그 섹션 핵심만).\n- charmAndContradictionsTags / integratedReportTags: 각 해당 섹션의 핵심 키워드`,
+    input:`${commonWriterInput(seed,dossier)}\n\n이번에는 마지막 페이지의 아래 2개 필드만 작성하세요.\n\ncharmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\nintegratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.\n\n섹션 스캔용 키워드 태그도 함께 출력하세요(각 2~3개, 항목당 2~10자의 짧은 한국어 키워드, 문장/설명/해시태그 기호 금지, 그 섹션 핵심만).\n- charmAndContradictionsTags / integratedReportTags: 각 해당 섹션의 핵심 키워드\n\n각 섹션의 핵심 한 줄 요약(TL;DR)도 출력하세요(30~70자, 한 문장, 길잡이가 아니라 그 섹션의 결론을 먼저 말하는 문장, 자연스러운 해요체).\n- charmAndContradictionsTldr / integratedReportTldr`,
   });
 }
 

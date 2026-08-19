@@ -44,6 +44,8 @@ export const analysisTypeSummarySchema=z.object({
 export const keywordTagMapSchema=z.record(z.string(),z.array(z.string().min(1).max(16)).max(4));
 // 상세 섹션 태그는 섹션별 "평면 키"로 저장한다(스테이지 병합 시 nested 맵이 서로를 덮는 충돌을 피함).
 export const tagListSchema=z.array(z.string().min(1).max(16)).max(4);
+// 섹션 핵심 한 줄 요약(TL;DR).
+export const tldrLineSchema=z.string().min(1).max(140);
 
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
@@ -143,6 +145,14 @@ export const finalAnalysisSchema=z.object({
   conflictStyleDetailedTags:tagListSchema.optional(),
   charmAndContradictionsTags:tagListSchema.optional(),
   integratedReportTags:tagListSchema.optional(),
+  // 섹션 핵심 한 줄 요약(TL;DR). 제목·태그 아래 결론을 먼저 보여준다. 섹션별 평면 키(병합 안전).
+  characterOverviewTldr:tldrLineSchema.optional(),
+  innerMechanicsTldr:tldrLineSchema.optional(),
+  relationshipStyleTldr:tldrLineSchema.optional(),
+  attachmentStyleTldr:tldrLineSchema.optional(),
+  conflictStyleDetailedTldr:tldrLineSchema.optional(),
+  charmAndContradictionsTldr:tldrLineSchema.optional(),
+  integratedReportTldr:tldrLineSchema.optional(),
   // 요약 카드별 키워드 태그(outerSelf 등 요약 필드 키).
   summaryTags:keywordTagMapSchema.optional(),
 

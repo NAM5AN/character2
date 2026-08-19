@@ -245,4 +245,59 @@
   .report-block .progression .step:first-child { border-top: 0; }
 }
 
+/* ── 접이식 번호 항목(아코디언) + 핵심 한 줄 요약 ──
+   각 상세 섹션의 긴 산문을 "안내문만 보이는 개요"로 접어 첫인상의 텍스트 벽을 없앤다.
+   제목 → 태그 → 핵심 한 줄(TL;DR) → 접이식 항목(첫 항목만 펼침) → 구조 블록 순. */
+#paid-detail-report .card:has(.topics) > h2 { padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
+
+#paid-detail-report .section-tldr {
+  margin: 14px 0 6px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--report-point);
+  background: var(--report-point-soft);
+  border-radius: 0 10px 10px 0;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 700;
+  color: #33322e;
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+
+#paid-detail-report .topic-toolbar { display: flex; justify-content: flex-end; margin: 8px 0 -4px; }
+#paid-detail-report .topic-toolbar button {
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+  border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 800; cursor: pointer;
+}
+#paid-detail-report .topic-toolbar button:hover { border-color: var(--report-point); color: var(--report-point); }
+
+#paid-detail-report .topics { counter-reset: topic; margin-top: 8px; }
+#paid-detail-report details.topic { border-top: 1px solid var(--line); }
+#paid-detail-report details.topic:first-of-type { border-top: 0; }
+#paid-detail-report details.topic > summary {
+  counter-increment: topic; list-style: none; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 12px; padding: 16px 0;
+  color: var(--ink); font-size: 16.5px; font-weight: 800; line-height: 1.5; letter-spacing: -.02em;
+}
+#paid-detail-report details.topic > summary::-webkit-details-marker { display: none; }
+#paid-detail-report details.topic > summary::before {
+  content: counter(topic, decimal-leading-zero); flex: 0 0 auto;
+  display: grid; place-items: center; width: 30px; height: 22px; margin-top: 1px;
+  border-radius: 999px; background: var(--report-point); color: #fff; font: 800 11px/1 Arial, sans-serif;
+}
+#paid-detail-report details.topic > summary .topic-lead { flex: 1 1 auto; word-break: keep-all; text-wrap: pretty; }
+#paid-detail-report details.topic > summary .chev { flex: 0 0 auto; margin-left: auto; margin-top: 2px; color: var(--muted); transition: transform .18s ease; }
+#paid-detail-report details.topic[open] > summary { color: var(--report-point); }
+#paid-detail-report details.topic[open] > summary .chev { transform: rotate(180deg); }
+#paid-detail-report details.topic > summary:hover { color: var(--report-point); }
+#paid-detail-report details.topic .topic-body {
+  padding: 0 0 18px 42px; margin: 0; color: #3d4046;
+  font-size: 15.5px; line-height: 1.82; max-width: 46em;
+  word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
+}
+@media (max-width: 760px) {
+  #paid-detail-report details.topic .topic-body { padding-left: 0; }
+  #paid-detail-report details.topic > summary { font-size: 15.5px; }
+}
+
 /* Keep this stylesheet in the deployment bundle when spacing-only changes are released. */

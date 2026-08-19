@@ -1,7 +1,57 @@
-import type { ReactNode } from 'react';
+'use client';
+import { useState, type ReactNode } from 'react';
 
 // 혼합 레이아웃용 구조화 블록. 상세 리포트 산문 섹션 사이에 끼워 나열·비교·단계를 시각화한다.
 // 데이터(생성 optional)가 없으면 아무것도 렌더하지 않아 산문만 남는다.
+
+// 상세 섹션 본문을 "접이식 번호 항목"으로 렌더. 문단 첫 굵은 안내문이 헤더(항상 보임),
+// 본문은 접혀 있어 첫인상의 '텍스트 벽'을 없애고 스캔용 개요로 만든다. 첫 항목은 펼친 상태.
+function splitTopics(text: string) {
+  return text.replace(/\r\n?/g, '\n').trim().split(/\n{2,}/)
+    .map(block => block.replace(/[ \t]+/g, ' ').replace(/\n+/g, ' ').trim())
+    .filter(Boolean)
+    .map(chunk => {
+      const m = chunk.match(/^\*\*(.+?)\*\*\s*(.*)$/su);
+      if (m) return { lead: m[1].trim(), body: m[2].trim() };
+      const dot = chunk.search(/[.?!]\s/u);
+      return dot > 0 ? { lead: chunk.slice(0, dot + 1).trim(), body: chunk.slice(dot + 1).trim() } : { lead: chunk, body: '' };
+    });
+}
+
+export function TopicAccordion({ text }: { text?: string }) {
+  const topics = text?.trim() ? splitTopics(text) : [];
+  // open 상태를 React가 제어해 배경 재렌더에도 펼친 항목이 유지되게 한다. 기본은 첫 항목만 펼침.
+  const [open, setOpen] = useState<Record<number, boolean>>({ 0: true });
+  if (!topics.length) return null;
+  const allOpen = topics.every((_, index) => open[index]);
+  const toggleAll = () => {
+    const next = !allOpen;
+    setOpen(Object.fromEntries(topics.map((_, index) => [index, next])));
+  };
+  return <div>
+    {topics.length > 1 && <div className="topic-toolbar"><button type="button" onClick={toggleAll}>{allOpen ? '모두 접기' : '모두 펼치기'}</button></div>}
+    <div className="topics">
+      {topics.map((topic, index) => <details
+        key={`${index}-${topic.lead.slice(0, 12)}`}
+        className="topic"
+        open={Boolean(open[index])}
+        onToggle={event => {
+          const isOpen = event.currentTarget.open;
+          setOpen(prev => prev[index] === isOpen ? prev : { ...prev, [index]: isOpen });
+        }}
+      >
+        <summary><span className="topic-lead">{topic.lead}</span><span className="chev" aria-hidden="true">▾</span></summary>
+        {topic.body && <div className="topic-body">{topic.body}</div>}
+      </details>)}
+    </div>
+  </div>;
+}
+
+// 섹션 핵심을 한 줄로 압축한 요약(TL;DR). 본문을 다 읽지 않아도 결론을 먼저 준다.
+export function SectionTldr({ text }: { text?: string }) {
+  if (!text?.trim()) return null;
+  return <p className="section-tldr">{text.trim()}</p>;
+}
 
 type Compare = { wants: string[]; needs: string[] };
 type MatchProfile = { best: string[]; worst: string[] };

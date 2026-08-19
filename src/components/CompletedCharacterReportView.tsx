@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { applyName } from '@/lib/josa';
-import { DesireGapBlock, MatchProfileBlock, RelationshipManualBlock, PressureStagesBlock } from '@/components/ReportBlocks';
+import { DesireGapBlock, MatchProfileBlock, RelationshipManualBlock, PressureStagesBlock, TopicAccordion, SectionTldr } from '@/components/ReportBlocks';
 
 export type CompletedDetailPayload={
   analysis:FinalAnalysis;
@@ -36,11 +36,11 @@ function KeywordTags({tags}:{tags?:string[]}){
   return <div className="kw-tags">{tags.slice(0,4).map((tag,index)=><span className="kw" key={`${index}-${tag}`}>#{tag}</span>)}</div>;
 }
 
-function NarrativeSection({title,text,index,tags,extra}:{title:string;text?:string;index:number;tags?:string[];extra?:ReactNode}){
+function NarrativeSection({title,text,index,tags,tldr,extra}:{title:string;text?:string;index:number;tags?:string[];tldr?:string;extra?:ReactNode}){
   if(!text?.trim())return null;
   return <section className="card" style={{marginTop:index===0?20:18,padding:'32px'}}>
-    <h2 style={{fontSize:'clamp(27px,4vw,40px)',margin:'0 0 20px'}}>{title}</h2>
-    <div style={{fontSize:16.5}}><KeywordTags tags={tags}/><ParagraphText text={text}/>{extra}</div>
+    <h2 style={{fontSize:'clamp(27px,4vw,40px)',margin:'0 0 16px'}}>{title}</h2>
+    <div style={{fontSize:16.5}}><KeywordTags tags={tags}/><SectionTldr text={tldr}/><TopicAccordion text={text}/>{extra}</div>
   </section>;
 }
 
@@ -117,17 +117,17 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={analysis.characterOverview} tags={analysis.characterOverviewTags??analysis.sectionTags?.characterOverview}/>
-          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={analysis.innerMechanics} tags={analysis.innerMechanicsTags??analysis.sectionTags?.innerMechanics} extra={<DesireGapBlock data={analysis.desireGap}/>}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={analysis.characterOverview} tags={analysis.characterOverviewTags??analysis.sectionTags?.characterOverview} tldr={analysis.characterOverviewTldr}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={analysis.innerMechanics} tags={analysis.innerMechanicsTags??analysis.sectionTags?.innerMechanics} tldr={analysis.innerMechanicsTldr} extra={<DesireGapBlock data={analysis.desireGap}/>}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={analysis.relationshipStyle} tags={analysis.relationshipStyleTags??analysis.sectionTags?.relationshipStyle} extra={<RelationshipManualBlock data={analysis.relationshipManual}/>}/>
-          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={analysis.attachmentStyle} tags={analysis.attachmentStyleTags??analysis.sectionTags?.attachmentStyle} extra={<MatchProfileBlock data={analysis.matchProfile}/>}/>
-          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={analysis.conflictStyleDetailed} tags={analysis.conflictStyleDetailedTags??analysis.sectionTags?.conflictStyleDetailed} extra={<PressureStagesBlock data={analysis.pressureStages}/>}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={analysis.relationshipStyle} tags={analysis.relationshipStyleTags??analysis.sectionTags?.relationshipStyle} tldr={analysis.relationshipStyleTldr} extra={<RelationshipManualBlock data={analysis.relationshipManual}/>}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={analysis.attachmentStyle} tags={analysis.attachmentStyleTags??analysis.sectionTags?.attachmentStyle} tldr={analysis.attachmentStyleTldr} extra={<MatchProfileBlock data={analysis.matchProfile}/>}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={analysis.conflictStyleDetailed} tags={analysis.conflictStyleDetailedTags??analysis.sectionTags?.conflictStyleDetailed} tldr={analysis.conflictStyleDetailedTldr} extra={<PressureStagesBlock data={analysis.pressureStages}/>}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={analysis.charmAndContradictions} tags={analysis.charmAndContradictionsTags??analysis.sectionTags?.charmAndContradictions}/>
-          <NarrativeSection index={6} title="통합 리포트" text={analysis.integratedReport} tags={analysis.integratedReportTags??analysis.sectionTags?.integratedReport}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={analysis.charmAndContradictions} tags={analysis.charmAndContradictionsTags??analysis.sectionTags?.charmAndContradictions} tldr={analysis.charmAndContradictionsTldr}/>
+          <NarrativeSection index={6} title="통합 리포트" text={analysis.integratedReport} tags={analysis.integratedReportTags??analysis.sectionTags?.integratedReport} tldr={analysis.integratedReportTldr}/>
         </>}
 
         <div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>
