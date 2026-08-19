@@ -82,9 +82,19 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [error,setError]=useState('');
   const [progress,setProgress]=useState(0);
   const [elapsedSeconds,setElapsedSeconds]=useState(0);
-  // 캐릭터 성격에 맞는 로딩 문구를 상세 리포트 생성 중에도 순환 표시 (AI 미사용).
+  // 상세 리포트 생성 로딩은 저장된 최종 성격 태그를 가장 먼저 사용한다.
+  // 구버전 캐릭터는 interview → owner → initial 순서로 폴백하고, 태그 자체가 없을 때만 텍스트 키워드 감지를 쓴다.
   const flavorSignal=[preview.oneLineSummary,preview.summary?.outerSelf,preview.summary?.innerSelf,preview.summary?.conflictStyle,preview.summary?.affectionStyle,preview.summary?.misunderstoodPoint,preview.summary?.hiddenPattern].filter(Boolean).join(' ');
-  const flavorMessage=useRotatingFlavor(flavorSignal,preview.name,busy);
+  const reportFlavorTags=preview.personalityTags?.finalAdaptive?.length
+    ? preview.personalityTags.finalAdaptive
+    : preview.personalityTags?.interviewAdaptive?.length
+      ? preview.personalityTags.interviewAdaptive
+      : preview.personalityTags?.ownerSelected?.length
+        ? preview.personalityTags.ownerSelected
+        : preview.personalityTags?.aiInitial?.length
+          ? preview.personalityTags.aiInitial
+          : undefined;
+  const flavorMessage=useRotatingFlavor(flavorSignal,preview.name,busy,reportFlavorTags);
   const [reportPage,setReportPage]=useState<1|2|3>(1);
   const [stageReady,setStageReady]=useState(0);
   const [prefetchBusy,setPrefetchBusy]=useState(false);
