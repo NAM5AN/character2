@@ -77,12 +77,14 @@ export function AnalyzeReviewUiPolish(){
   useEffect(()=>{
     let currentName='';
 
-    // 성격 칩 UI는 AnalyzeFlow의 React state 바깥에서 동작하므로, 질문 생성 요청 직전에
+    // 성격 칩 UI는 AnalyzeFlow의 React state 바깥에서 동작하므로, 질문 생성/최종 분석 요청 직전에
     // 로컬에 저장된 최신 오너 선택값을 request draft에 합쳐 보낸다.
     const originalFetch=window.fetch.bind(window);
     window.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const url=typeof input==='string'?input:input instanceof URL?input.toString():input.url;
-      if(url.includes('/api/characters/questions/next')&&typeof init?.body==='string'){
+      const isQuestionRequest=url.includes('/api/characters/questions/next');
+      const isFinalizeRequest=url.includes('/api/characters/finalize');
+      if((isQuestionRequest||isFinalizeRequest)&&typeof init?.body==='string'){
         try{
           const payload=JSON.parse(init.body) as Record<string,unknown>;
           const draft=payload.draft&&typeof payload.draft==='object'?payload.draft as Record<string,unknown>:null;
@@ -93,12 +95,14 @@ export function AnalyzeReviewUiPolish(){
             const ownerSelected=saved??personalityTags(current.ownerSelected);
             draft.personalityTags={...current,ownerSelected};
 
-            // 질문 API가 이미 compactDraft.traits를 AI 입력에 넣고 있으므로, 오너 확정 태그도
-            // 이 요청에서만 명시적인 참고 메모로 함께 전달한다. 원본 traits 저장값은 건드리지 않는다.
-            const guidance=personalityGuidance(ownerSelected);
-            if(guidance){
-              const traits=draft.traits&&typeof draft.traits==='object'?draft.traits as Record<string,unknown>:{};
-              draft.traits={...traits,ownerConfirmedPersonalityTags:guidance};
+            // 질문 생성에만 참고 문구를 일시적으로 traits에 싣는다.
+            // finalize에는 이 합성 필드를 넣지 않아 저장된 원본 traits를 오염시키지 않는다.
+            if(isQuestionRequest){
+              const guidance=personalityGuidance(ownerSelected);
+              if(guidance){
+                const traits=draft.traits&&typeof draft.traits==='object'?draft.traits as Record<string,unknown>:{};
+                draft.traits={...traits,ownerConfirmedPersonalityTags:guidance};
+              }
             }
 
             payload.draft=draft;
