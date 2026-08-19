@@ -73,8 +73,6 @@ export function AnalyzeFlow(){
       setReason(saved.reason||'');
     }
     setStage('interview');
-    // Prefetch exactly one question ahead, generated with every answer known at
-    // this moment, so the next question reflects prior answers with no wait.
     if(q.order<20&&!history.some(item=>item.order===q.order+1)){
       void requestBatch(q.order+1,answerList,history).catch(()=>{});
     }
@@ -93,8 +91,6 @@ export function AnalyzeFlow(){
 
   function clearProgressState(){setStage('input');setName('');setProfileText('');setSecretProfileText('');clearAppearanceImages();setDraft(null);setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);resetResponseDraft();setBusy(false);setError('');setResult(null);batchRequests.current.clear()}
 
-  // 관리자 "사용자 시점 요약 테스트": /analyze?replay=<코드> 로 진입하면 저장된 답변을
-  // 불러와 제출 직전 상태로 세팅한다(관리자 쿠키 필요). 저장/이어하기 로직은 건너뛴다.
   async function loadReplay(shareCode:string){
     persistenceEnabled.current=false;setBusy(true);setError('');
     try{
@@ -120,9 +116,6 @@ export function AnalyzeFlow(){
     return()=>window.clearTimeout(timer);
   },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary]);
 
-  // Everything we've analyzed so far, used to pick character-fitting loading flavor
-  // without any AI call. At parse time this is the pasted profile; by finalize it also
-  // includes inferences, confirmed facts, trait labels and the 20 answers.
   const characterSignalText=useMemo(()=>{
     const parts:string[]=[profileText,secretProfileText];
     if(draft){
@@ -135,8 +128,6 @@ export function AnalyzeFlow(){
     return parts.join(' ');
   },[profileText,secretProfileText,draft,answers]);
 
-  // Summary is non-streaming (two Claude passes, ~1-2min). Show a time-based bar so
-  // the screen never looks frozen during the wait.
   useEffect(()=>{
     if(stage!=='finalizing')return;
     setFinalizeProgress(4);
@@ -223,7 +214,7 @@ export function AnalyzeFlow(){
 
     {stage==='review'&&draft&&<div className="stack" aria-busy={busy}><div className="card"><div className="eyebrow">첫 해석</div><h2 style={{marginTop:10}}>{applyName('{name}을 이렇게 이해했어요.',draft.basicProfile.name)}</h2><div className="two-col"><div><div className="label">분석 정밀도</div><div style={{fontSize:40,fontWeight:900}}>{Math.round(confidence)}%</div></div><div><div className="label">확인된 설정</div><div style={{fontSize:40,fontWeight:900}}>{draft.confirmedFacts.length}</div></div></div><div className="progress" style={{marginTop:16}}><span style={{width:`${confidence}%`}}/></div></div><div className="card"><h3>첫 해석 확인</h3><p className="muted">애매하거나 틀린 해석은 직접 보충하면 이후 질문과 최종 해석에 반영돼요.</p>{draft.aiInferences.map(x=><div className="inference" key={x.id}><div className="inference-top"><p>{x.text}</p><span className="muted">{Math.round(x.confidence)}%</span></div>{x.evidence.length>0&&<div style={{marginTop:10}}><div className="label">근거</div><div className="tags" style={{marginTop:7}}>{x.evidence.map((e,i)=><span className="tag" key={`${x.id}-e-${i}`}>{e}</span>)}</div></div>}<div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginTop:10}}><div className="pills" style={{marginTop:0}}><button disabled={busy} className={`pill ${x.ownerVerdict==='confirmed'?'active':''}`} onClick={()=>verdict(x.id,'confirmed')}>맞음</button><button disabled={busy} className={`pill ${x.ownerVerdict==='ambiguous'?'active':''}`} onClick={()=>verdict(x.id,'ambiguous')}>애매함</button><button disabled={busy} className={`pill ${x.ownerVerdict==='rejected'?'active':''}`} onClick={()=>verdict(x.id,'rejected')}>아님</button></div>{(x.ownerVerdict==='ambiguous'||x.ownerVerdict==='rejected')&&<div style={{flex:'1 1 320px',minWidth:240}}><label className="label">{x.ownerVerdict==='ambiguous'?'어떤 부분이 맞고, 어떤 부분이 다른가요?':'실제로는 어떤가요?'}</label><textarea disabled={busy} className="input" style={{minHeight:84,resize:'vertical',marginTop:7}} maxLength={1200} value={x.ownerFeedback||''} onChange={e=>inferenceFeedback(x.id,e.target.value)} /></div>}</div></div>)}</div>{busy&&<div role="status" aria-live="polite" className="card" style={{background:'var(--accent-soft)'}}><div className="loading" style={{fontWeight:900}}>첫 5문항을 준비하고 있어요 <i className="dot"/><i className="dot"/><i className="dot"/></div><p className="muted" style={{marginBottom:0}}>처음 5개를 한 번에 만든 뒤, 답변하는 동안 다음 5개를 뒤에서 미리 준비합니다.</p></div>}<div className="actions"><button disabled={busy} className="btn primary" onClick={startInterview}>{busy?'첫 5문항 준비 중…':'20문항 인터뷰 시작'}</button><button disabled={busy} className="btn" onClick={()=>setStage('input')}>프로필 다시 입력</button></div></div>}
 
-    {stage==='interview'&&question&&<div className="card question-card"><div><div className="q-meta"><span>{question.order} / 20</span>{responseType&&<span>{RESPONSE_TYPE_LABELS[responseType]}</span>}{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{renderResponseControls()}<div className="field"><label className="label">왜 그렇게 답했나요? <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">여기에 적은 이유·맥락은 원문 그대로 다음 질문과 최종 해석에 반영돼요.</span></div></div><div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">다음 질문 묶음 준비를 마치는 중이에요.</p>}<div className="actions" style={{marginTop:16}}>{question.order>1&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&questionHistory.some(item=>item.order===question.order+1)&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!hasCurrentResponse} onClick={answerCurrent}>{busy?'질문 준비 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div></div>}
+    {stage==='interview'&&question&&<div className="card question-card"><div><div className="q-meta"><span>{question.order} / 20</span>{responseType&&<span>{RESPONSE_TYPE_LABELS[responseType]}</span>}{viewingPastQuestion&&<span>이전 질문 확인 중</span>}</div><div className="progress" style={{marginTop:10}}><span style={{width:`${(question.order-1)/20*100}%`}}/></div><h2 className="q-title">{question.question}</h2>{renderResponseControls()}<div className="field"><label className="label">왜 그렇게 답했나요? <span className="muted">(선택)</span></label><textarea disabled={busy} className="input" style={{minHeight:78,resize:'vertical'}} value={reason} onChange={e=>setReason(e.target.value)} /><span className="muted">여기에 적은 이유·맥락은 원문 그대로 다음 질문과 최종 해석에 반영돼요.</span></div></div><div>{error&&<p className="error">{error}</p>}{busy&&<p className="muted">다음 질문 묶음 준비를 마치는 중이에요.</p>}<div className="actions" style={{marginTop:16}}>{question.order===1&&<button className="btn" disabled={busy} onClick={()=>setStage('input')}>← 프로필 다시 작성하기</button>}{question.order>1&&<button className="btn" disabled={busy} onClick={previousQuestion}>← 이전 질문</button>}{viewingPastQuestion&&questionHistory.some(item=>item.order===question.order+1)&&<button className="btn" disabled={busy} onClick={forwardQuestion}>다음 질문 보기 →</button>}<button className="btn primary" disabled={busy||!hasCurrentResponse} onClick={answerCurrent}>{busy?'질문 준비 중…':viewingPastQuestion?(currentAnswerChanged?'수정하고 여기서부터 다시 진행':'이 답변부터 다시 진행'):question.order===20?'20문항 완료하고 요약 보기':'답변하고 다음 질문'}</button></div></div></div>}
 
     {stage==='replay'&&<div className="card" aria-busy={busy}>
       <div className="eyebrow">사용자 시점 요약 테스트</div>
