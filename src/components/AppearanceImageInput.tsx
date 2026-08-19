@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 type AppearanceImagePayload = {
   name: string;
@@ -12,15 +12,48 @@ const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_DATA_URL_CHARS = 700_000;
 const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp']);
 const CLEAR_EVENT = 'chara-appearance-clear';
+const STORAGE_KEY = 'chara_appearance_images_v1';
 
 let currentImages: AppearanceImagePayload[] = [];
 
+function readStoredImages() {
+  if (currentImages.length) return currentImages.map(image=>({...image}));
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const restored = parsed
+      .filter((item): item is AppearanceImagePayload => !!item && typeof item === 'object' && typeof (item as AppearanceImagePayload).name === 'string' && typeof (item as AppearanceImagePayload).dataUrl === 'string' && (item as AppearanceImagePayload).dataUrl.startsWith('data:image/'))
+      .slice(0,MAX_IMAGES)
+      .map(image=>({...image}));
+    currentImages = restored;
+    return restored.map(image=>({...image}));
+  } catch {
+    return [];
+  }
+}
+
+function storeImages(images: AppearanceImagePayload[]) {
+  currentImages = images.map(image=>({...image}));
+  if (typeof window === 'undefined') return;
+  try {
+    if (images.length) sessionStorage.setItem(STORAGE_KEY,JSON.stringify(images));
+    else sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sessionStorage is best-effort. The in-memory copy still preserves images
+    // while moving between the profile, inference review and interview screens.
+  }
+}
+
 export function getAppearanceImagesForRequest() {
+  if (!currentImages.length) readStoredImages();
   return currentImages.map(image=>({...image}));
 }
 
 export function clearAppearanceImages() {
-  currentImages = [];
+  storeImages([]);
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(CLEAR_EVENT));
 }
 
@@ -72,7 +105,7 @@ async function compressImage(file:File):Promise<AppearanceImagePayload>{
 
 export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
   const inputId=useId();
-  const [images,setImages]=useState<AppearanceImagePayload[]>(()=>currentImages);
+  const [images,setImages]=useState<AppearanceImagePayload[]>(()=>readStoredImages());
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const blocked=disabled||busy||images.length>=MAX_IMAGES;
@@ -83,23 +116,45 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
     return()=>window.removeEventListener(CLEAR_EVENT,clear);
   },[]);
 
-  function commit(next:AppearanceImagePayload[]){currentImages=next;setImages(next)}
+  const commit=useCallback((next:AppearanceImagePayload[])=>{
+    const normalized=next.slice(0,MAX_IMAGES).map(image=>({...image}));
+    storeImages(normalized);
+    setImages(normalized);
+  },[]);
 
-  async function addFiles(files:FileList|null){
-    if(!files?.length||disabled||busy)return;
+  const addFiles=useCallback(async(files:FileList|File[]|null)=>{
+    const incoming=files?Array.from(files):[];
+    if(!incoming.length||disabled||busy)return;
     setError('');
     const available=MAX_IMAGES-images.length;
     if(available<=0){setError(`외관 자료는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`);return}
-    const selected=[...files].slice(0,available);
-    if(files.length>available)setError(`외관 자료는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`);
+    const selected=incoming.slice(0,available);
+    if(incoming.length>available)setError(`외관 자료는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`);
     setBusy(true);
     try{
       const converted:AppearanceImagePayload[]=[];
       for(const file of selected)converted.push(await compressImage(file));
-      commit([...images,...converted].slice(0,MAX_IMAGES));
+      commit([...images,...converted]);
     }catch(cause){setError(cause instanceof Error?cause.message:String(cause))}
     finally{setBusy(false)}
-  }
+  },[busy,commit,disabled,images]);
+
+  useEffect(()=>{
+    const paste=(event:ClipboardEvent)=>{
+      if(disabled||busy||images.length>=MAX_IMAGES)return;
+      const clipboard=event.clipboardData;
+      if(!clipboard)return;
+      const pastedFiles=Array.from(clipboard.items)
+        .filter(item=>item.kind==='file'&&ALLOWED_TYPES.has(item.type))
+        .map(item=>item.getAsFile())
+        .filter((file):file is File=>!!file);
+      if(!pastedFiles.length)return;
+      event.preventDefault();
+      void addFiles(pastedFiles);
+    };
+    window.addEventListener('paste',paste);
+    return()=>window.removeEventListener('paste',paste);
+  },[addFiles,busy,disabled,images.length]);
 
   function removeAt(index:number){commit(images.filter((_,i)=>i!==index))}
 
@@ -110,6 +165,7 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
         {busy?'이미지 준비 중…':`이미지 첨부 ${images.length}/${MAX_IMAGES}`}
       </label>
       <input id={inputId} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" disabled={blocked} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}}/>
+      <span className="muted" style={{display:'inline-block',marginLeft:12,fontSize:13}}>또는 이미지 복사 후 Ctrl+V</span>
     </div>
     {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
       <img src={image.dataUrl} alt={`외관 자료 ${index+1}`} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
