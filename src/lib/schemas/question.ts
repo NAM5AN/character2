@@ -31,6 +31,11 @@ export const questionResponseTypeSchema = z.enum([
   'owner_meta',
 ]);
 
+const matrixRowOptionsSchema = z.record(
+  z.string().min(1).max(65),
+  z.array(z.string().min(1).max(65)).min(2).max(5),
+);
+
 export const questionResponseConfigSchema = z.object({
   prompt2: z.string().min(1).max(160).optional(),
   leftLabel: z.string().min(1).max(65).optional(),
@@ -38,11 +43,14 @@ export const questionResponseConfigSchema = z.object({
   minLabel: z.string().min(1).max(65).optional(),
   maxLabel: z.string().min(1).max(65).optional(),
   rows: z.array(z.string().min(1).max(65)).max(6).default([]),
+  // Legacy/shared matrix options. New relationship_matrix questions should prefer rowOptions.
   columns: z.array(z.string().min(1).max(65)).max(5).default([]),
+  // Per-row choices for relationship_matrix. Keys must match rows exactly.
+  rowOptions: matrixRowOptionsSchema.default({}),
   // Separate option set for the changed-condition follow-up (condition_followup only).
   options2: z.array(z.string().min(1).max(65)).max(6).default([]),
   maxSelections: z.number().int().min(1).max(6).optional(),
-}).default({ rows: [], columns: [], options2: [] });
+}).default({ rows: [], columns: [], rowOptions: {}, options2: [] });
 
 const OPTION_RESPONSE_TYPES = new Set([
   'fill_blank',
@@ -95,8 +103,25 @@ export const interviewQuestionSchema = z.object({
   if (type === 'slider' && (!config.minLabel || !config.maxLabel)) {
     ctx.addIssue({ code: 'custom', path: ['responseConfig'], message: '슬라이더형에는 minLabel과 maxLabel이 필요합니다.' });
   }
-  if (type === 'relationship_matrix' && (config.rows.length < 2 || config.columns.length < 2)) {
-    ctx.addIssue({ code: 'custom', path: ['responseConfig'], message: '관계별 반응표에는 2개 이상의 행과 열이 필요합니다.' });
+  if (type === 'relationship_matrix') {
+    if (config.rows.length < 2) {
+      ctx.addIssue({ code: 'custom', path: ['responseConfig', 'rows'], message: '관계별 반응표에는 2개 이상의 상대/조건이 필요합니다.' });
+    }
+    const rowOptionKeys = Object.keys(config.rowOptions || {});
+    if (rowOptionKeys.length > 0) {
+      for (const row of config.rows) {
+        if (!config.rowOptions[row] || config.rowOptions[row].length < 2) {
+          ctx.addIssue({ code: 'custom', path: ['responseConfig', 'rowOptions', row], message: `"${row}"에 맞는 선택지를 2개 이상 넣어야 합니다.` });
+        }
+      }
+      for (const key of rowOptionKeys) {
+        if (!config.rows.includes(key)) {
+          ctx.addIssue({ code: 'custom', path: ['responseConfig', 'rowOptions', key], message: 'rowOptions의 키는 rows에 있는 상대/조건명과 같아야 합니다.' });
+        }
+      }
+    } else if (config.columns.length < 2) {
+      ctx.addIssue({ code: 'custom', path: ['responseConfig', 'columns'], message: '구버전 관계별 반응표에는 공통 선택지가 2개 이상 필요합니다.' });
+    }
   }
   if ((type === 'inner_outer' || type === 'condition_followup') && !config.prompt2) {
     ctx.addIssue({ code: 'custom', path: ['responseConfig', 'prompt2'], message: '두 번째 질문 문구가 필요합니다.' });
