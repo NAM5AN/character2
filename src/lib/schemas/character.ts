@@ -46,6 +46,9 @@ export const keywordTagMapSchema=z.record(z.string(),z.array(z.string().min(1).m
 export const tagListSchema=z.array(z.string().min(1).max(16)).max(4);
 // 섹션 핵심 한 줄 요약(TL;DR).
 export const tldrLineSchema=z.string().min(1).max(140);
+// 성향 스펙트럼 바 — 두 극(left↔right) 사이 캐릭터의 위치(value 0=left, 100=right). 섹션별 평면 키로 저장(병합 안전).
+export const spectrumItemSchema=z.object({left:z.string().min(1).max(24),right:z.string().min(1).max(24),value:z.number().min(0).max(100)});
+export const spectrumListSchema=z.array(spectrumItemSchema).max(4);
 
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
@@ -153,6 +156,14 @@ export const finalAnalysisSchema=z.object({
   conflictStyleDetailedTldr:tldrLineSchema.optional(),
   charmAndContradictionsTldr:tldrLineSchema.optional(),
   integratedReportTldr:tldrLineSchema.optional(),
+  // 섹션 성향 스펙트럼(선별). 섹션별 평면 키.
+  characterOverviewSpectrums:spectrumListSchema.optional(),
+  innerMechanicsSpectrums:spectrumListSchema.optional(),
+  relationshipStyleSpectrums:spectrumListSchema.optional(),
+  attachmentStyleSpectrums:spectrumListSchema.optional(),
+  conflictStyleDetailedSpectrums:spectrumListSchema.optional(),
+  charmAndContradictionsSpectrums:spectrumListSchema.optional(),
+  integratedReportSpectrums:spectrumListSchema.optional(),
   // 요약 카드별 키워드 태그(outerSelf 등 요약 필드 키).
   summaryTags:keywordTagMapSchema.optional(),
 
