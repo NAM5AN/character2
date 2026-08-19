@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { CharacterReportView } from '@/components/CharacterReportView';
 import { CompletedCharacterReportView, type CompletedDetailPayload } from '@/components/CompletedCharacterReportView';
+import { PersonalityFlavorProvider } from '@/lib/loading-flavor';
 
 export function CharacterReportClient({preview,completedDetail}:{preview:CharacterReportPreview;completedDetail?:CompletedDetailPayload|null}){
   const [creatorEditToken,setCreatorEditToken]=useState<string|undefined>(undefined);
@@ -34,9 +35,23 @@ export function CharacterReportClient({preview,completedDetail}:{preview:Charact
     return()=>{cancelled=true};
   },[completedDetail,preview.shareCode]);
 
-  if(resolvedDetail){
-    return <CompletedCharacterReportView preview={preview} detail={resolvedDetail}/>;
-  }
+  const tagState=preview.personalityTags;
+  const flavorTags=tagState
+    ? tagState.finalAdaptive.length
+      ? tagState.finalAdaptive
+      : tagState.interviewAdaptive.length
+        ? tagState.interviewAdaptive
+        : tagState.ownerSelected.length
+          ? tagState.ownerSelected
+          : tagState.aiInitial.length
+            ? tagState.aiInitial
+            : null
+    : null;
 
-  return <CharacterReportView preview={preview} creatorEditToken={creatorEditToken}/>;
+  return <PersonalityFlavorProvider tags={flavorTags}>
+    {resolvedDetail
+      ? <CompletedCharacterReportView preview={preview} detail={resolvedDetail}/>
+      : <CharacterReportView preview={preview} creatorEditToken={creatorEditToken}/>
+    }
+  </PersonalityFlavorProvider>;
 }
