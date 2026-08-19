@@ -73,6 +73,44 @@ function fmtUsd(usd: number | null): string {
   return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// AI 생성 실패 로그.
+type FailureGroup = { stage: string; errorCode: string; count: number; lastSeen: string };
+type FailureRow = {
+  id: number; createdAt: string; stage: string; shareCode: string | null;
+  errorCode: string; errorDetail: string | null; characterName: string | null; ownerName: string | null;
+};
+type FailuresData = { total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[] };
+type FailuresState =
+  | { state: 'loading' }
+  | { state: 'ready'; data: FailuresData }
+  | { state: 'error'; detail: string };
+
+// 내부 stage 코드 → 사람이 읽는 단계 이름. 동적 코드(questions_3_6, detail_stage_2)도 처리.
+function stageLabel(stage: string): string {
+  if (stage === 'profile_image') return '프로필 이미지 분석';
+  if (stage === 'profile_parse') return '프로필 해석';
+  if (stage === 'summary_psychology') return '요약 · 심리분석';
+  if (stage === 'summary_teaser') return '요약 · 작성';
+  if (stage.startsWith('questions')) return '질문 생성';
+  if (stage === 'detail_stage_1') return '상세 · 1단계';
+  if (stage === 'detail_stage_rest') return '상세 · 나머지';
+  const m = stage.match(/^detail_stage_(\d+)$/);
+  if (m) return `상세 · ${m[1]}단계`;
+  if (stage.startsWith('detail')) return '상세 리포트';
+  return stage;
+}
+
+// 짧은 상대 시간(방금 / N분 전 / N시간 전 / 날짜).
+function fmtAgo(value: string): string {
+  const t = new Date(value).getTime();
+  if (!Number.isFinite(t)) return '—';
+  const sec = Math.max(0, (Date.now() - t) / 1000);
+  if (sec < 60) return '방금';
+  if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}시간 전`;
+  return new Date(value).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
 // gpt-5.6-luna 단가 (Vercel 게이트웨이 = OpenAI, 마크업 없음). 단가 바뀌면 여기만 고치면 됨.
 const GPT_RATE = { input: 0.20, output: 1.20 }; // $/1M tokens
 function gptCost(inTok: number | string | null, outTok: number | string | null): number {
@@ -283,6 +321,24 @@ export default function AdminConsolePage() {
 
   useEffect(() => { void loadBalance(); }, [loadBalance]);
 
+  // AI 생성 실패 로그(사용자 이탈과 직결되는 지점).
+  const [failures, setFailures] = useState<FailuresState>({ state: 'loading' });
+  const [showRecentFailures, setShowRecentFailures] = useState(false);
+
+  const loadFailures = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/gen-failures', { cache: 'no-store' });
+      if (res.status === 401) { setStatus('denied'); return; }
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body?.failures) setFailures({ state: 'ready', data: body.failures });
+      else setFailures({ state: 'error', detail: body?.error || 'LOAD_FAILED' });
+    } catch {
+      setFailures({ state: 'error', detail: 'NETWORK' });
+    }
+  }, []);
+
+  useEffect(() => { void loadFailures(); }, [loadFailures]);
+
   const loadSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/config', { cache: 'no-store' });
@@ -481,6 +537,8 @@ export default function AdminConsolePage() {
   const balanceWarn = balance.state === 'ready' && balance.balance != null && balance.balance > 0 && balance.balance < 5;
   const balanceColor = balanceLow ? '#c0392b' : balanceWarn ? '#b8860b' : 'var(--fg, #111)';
 
+  const failuresActive = failures.state === 'ready' && failures.data.total24h > 0;
+
   return (
     <main className="container page">
       <div
@@ -539,6 +597,83 @@ export default function AdminConsolePage() {
         </div>
       </div>
 
+      <div
+        className="card"
+        style={{
+          padding: '16px 18px', marginBottom: 14,
+          background: failuresActive ? 'rgba(192,57,43,.06)' : 'var(--paper)',
+          border: `1px solid ${failuresActive ? 'rgba(192,57,43,.35)' : 'var(--line)'}`,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <strong style={{ fontSize: 16 }}>AI 생성 실패</strong>
+            {failures.state === 'ready' && (
+              <span className="muted" style={{ fontSize: 13 }}>
+                최근 24시간 <b style={{ color: failuresActive ? '#c0392b' : 'inherit' }}>{failures.data.total24h}</b>건 · 7일 {failures.data.total7d}건
+              </span>
+            )}
+            {failures.state === 'loading' && <span className="muted" style={{ fontSize: 13 }}>조회 중…</span>}
+            {failures.state === 'error' && <span style={{ fontSize: 13, color: '#c0392b' }}>조회 실패 · {failures.detail}</span>}
+          </div>
+          <button className="btn soft" style={{ padding: '6px 12px' }} onClick={() => void loadFailures()} disabled={failures.state === 'loading'}>
+            새로고침
+          </button>
+        </div>
+
+        {failures.state === 'ready' && failures.data.total7d === 0 && (
+          <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>최근 7일간 생성 실패가 없어요. 👍</p>
+        )}
+
+        {failures.state === 'ready' && failures.data.total7d > 0 && (
+          <>
+            <p className="muted" style={{ margin: '10px 0 8px', fontSize: 12 }}>최근 7일 · 단계 × 오류별 (많은 순)</p>
+            <div className="stack" style={{ gap: 6 }}>
+              {failures.data.rollup.map((g, i) => (
+                <div
+                  key={i}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                    padding: '8px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper)' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                    <span className="tag" style={{ fontSize: 12, fontWeight: 800 }}>{stageLabel(g.stage)}</span>
+                    <code style={{ fontSize: 12, color: '#c0392b', wordBreak: 'break-all' }}>{g.errorCode}</code>
+                  </div>
+                  <span className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <b style={{ color: 'var(--fg,#111)' }}>{g.count}</b>건 · {fmtAgo(g.lastSeen)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="btn soft"
+              style={{ padding: '6px 12px', marginTop: 12 }}
+              onClick={() => setShowRecentFailures(v => !v)}
+            >
+              {showRecentFailures ? '개별 기록 접기' : `개별 기록 보기 (${failures.data.recent.length})`}
+            </button>
+
+            {showRecentFailures && (
+              <div className="stack" style={{ gap: 6, marginTop: 10 }}>
+                {failures.data.recent.map(r => (
+                  <div key={r.id} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper)' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(r.stage)}</span>
+                      <code style={{ fontSize: 11, color: '#c0392b' }}>{r.errorCode}</code>
+                      {r.characterName && <span className="muted" style={{ fontSize: 12 }}>· {r.characterName}{r.ownerName ? ` (${r.ownerName})` : ''}</span>}
+                      {r.shareCode && <span className="tag" style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '.06em' }}>{r.shareCode}</span>}
+                      <span className="muted" style={{ fontSize: 11, marginLeft: 'auto', whiteSpace: 'nowrap' }}>{fmtAgo(r.createdAt)}</span>
+                    </div>
+                    {r.errorDetail && <p className="muted" style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.5, wordBreak: 'break-word' }}>{r.errorDetail}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div className="eyebrow">Admin console · owner only</div>
@@ -548,7 +683,7 @@ export default function AdminConsolePage() {
           </p>
         </div>
         <div className="actions" style={{ marginTop: 4 }}>
-          <button className="btn" onClick={() => { void load(); void loadBalance(); }}>새로고침</button>
+          <button className="btn" onClick={() => { void load(); void loadBalance(); void loadFailures(); }}>새로고침</button>
           <button className="btn soft" onClick={() => void logout()}>로그아웃</button>
         </div>
       </div>

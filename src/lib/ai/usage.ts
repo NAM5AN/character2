@@ -14,8 +14,57 @@ type UnknownRecord = Record<string, unknown>;
 
 const usageStore = new AsyncLocalStorage<AiUsageContext>();
 
-export function withAiUsageContext<T>(context: AiUsageContext, work: () => T): T {
-  return usageStore.run(context, work);
+// Runs `work` inside the usage context and, if it throws, records the failure to
+// character2_gen_failures before re-throwing. Every AI generation call is wrapped in
+// this, so it is the single place that sees which stage/character a failure belongs to.
+// (streamOpenAIJson/askOpenAIJson already retry + fall back internally, so a throw here
+// means the whole stage genuinely failed — one row per real user-facing drop-off.)
+export function withAiUsageContext<T>(context: AiUsageContext, work: () => Promise<T>): Promise<T> {
+  return usageStore.run(context, async () => {
+    try {
+      return await work();
+    } catch (error) {
+      scheduleGenFailureRecord(context, error);
+      throw error;
+    }
+  });
+}
+
+// Split "CODE: detail" into a short error code + detail, mirroring lib/http structuredError.
+function splitErrorMessage(message: string) {
+  const colon = message.indexOf(':');
+  const rawCode = (colon >= 0 ? message.slice(0, colon) : message).trim();
+  const code = /^[A-Z0-9_./-]{2,80}$/.test(rawCode) ? rawCode : 'SERVER_ERROR';
+  const detail = (colon >= 0 ? message.slice(colon + 1) : code === 'SERVER_ERROR' ? message : '').trim();
+  return { code, detail };
+}
+
+async function writeGenFailure(args: { context: AiUsageContext; code: string; detail: string }) {
+  try {
+    const sb = getSupabaseServer();
+    await sb.rpc('character2_log_gen_failure', {
+      p_stage: args.context.stage,
+      p_share_code: args.context.shareCode?.trim() || null,
+      p_session_id: safeUuid(args.context.sessionId),
+      p_error_code: args.code,
+      p_error_detail: args.detail || null,
+    });
+  } catch (error) {
+    console.warn('GEN_FAILURE_DB_WRITE_FAILED', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// Best-effort: schedule the failure write after the response, never block or throw.
+function scheduleGenFailureRecord(context: AiUsageContext, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const { code, detail } = splitErrorMessage(message);
+  const snapshot = { context: { ...context }, code, detail };
+  try {
+    after(async () => { await writeGenFailure(snapshot); });
+  } catch {
+    // after() unavailable in this context — fall back to a detached write.
+    void writeGenFailure(snapshot);
+  }
 }
 
 export function currentAiUsageContext() {
