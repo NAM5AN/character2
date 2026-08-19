@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  isPersonalityTagKey,
+  PERSONALITY_TAG_MAX_SELECTIONS,
+  type PersonalityTagKey,
+} from '@/lib/personality-tags';
 
 export const verdictSchema = z.enum(['confirmed', 'ambiguous', 'rejected', 'unreviewed']);
 
@@ -24,8 +29,24 @@ const traitValueSchema = z.union([z.number().min(0).max(100),z.string(),z.boolea
 const confirmedFactSchema = z.object({key:z.string(),value:z.unknown(),source:z.enum(['profile','owner_answer'])});
 const publicBasicProfileSchema = z.object({name:z.string().min(1),age:z.union([z.string(),z.number()]).nullable().optional(),gender:z.string().nullable().optional(),profileText:z.string().min(20)});
 
-export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),analysisConfidence:z.unknown().optional()}).passthrough();
-export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),analysisConfidence:z.number().min(0).max(100)});
+const personalityTagSchema = z.custom<PersonalityTagKey>(isPersonalityTagKey, {
+  message: '지원하지 않는 성격 태그입니다.',
+});
+const emptyPersonalityTags = () => ({
+  aiInitial: [] as PersonalityTagKey[],
+  ownerSelected: [] as PersonalityTagKey[],
+  interviewAdaptive: [] as PersonalityTagKey[],
+  finalAdaptive: [] as PersonalityTagKey[],
+});
+export const personalityTagStateSchema = z.object({
+  aiInitial: z.array(personalityTagSchema).max(PERSONALITY_TAG_MAX_SELECTIONS).default([]),
+  ownerSelected: z.array(personalityTagSchema).max(PERSONALITY_TAG_MAX_SELECTIONS).default([]),
+  interviewAdaptive: z.array(personalityTagSchema).max(PERSONALITY_TAG_MAX_SELECTIONS).default([]),
+  finalAdaptive: z.array(personalityTagSchema).max(PERSONALITY_TAG_MAX_SELECTIONS).default([]),
+}).default(emptyPersonalityTags);
+
+export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),personalityTags:z.unknown().optional(),analysisConfidence:z.unknown().optional()}).passthrough();
+export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),personalityTags:personalityTagStateSchema,analysisConfidence:z.number().min(0).max(100)});
 
 // Public summary: legacy four fields stay required for old passports and compatibility.
 // New teaser-only fields are optional so previously saved characters remain readable.
@@ -199,7 +220,7 @@ export const finalAnalysisSchema=z.object({
   pressureStages:pressureStagesSchema.optional(),
 });
 
-export const characterPassportSchema=z.object({schemaVersion:z.literal('character-passport/1.0'),characterId:z.string().uuid(),shareCode:z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),basicProfile:publicBasicProfileSchema,traits:characterDraftSchema.shape.traits,relationshipTraits:characterDraftSchema.shape.relationshipTraits,confirmedFacts:characterDraftSchema.shape.confirmedFacts,aiInferences:characterDraftSchema.shape.aiInferences,interview:z.object({version:z.literal('interview/1.0'),completedCount:z.number().int().min(0).max(20),answers:z.array(interviewAnswerSchema)}),analysis:finalAnalysisSchema,engineVersions:z.object({parser:z.string(),interview:z.string(),analysis:z.string()})});
+export const characterPassportSchema=z.object({schemaVersion:z.literal('character-passport/1.0'),characterId:z.string().uuid(),shareCode:z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),basicProfile:publicBasicProfileSchema,traits:characterDraftSchema.shape.traits,relationshipTraits:characterDraftSchema.shape.relationshipTraits,confirmedFacts:characterDraftSchema.shape.confirmedFacts,aiInferences:characterDraftSchema.shape.aiInferences,personalityTags:characterDraftSchema.shape.personalityTags,interview:z.object({version:z.literal('interview/1.0'),completedCount:z.number().int().min(0).max(20),answers:z.array(interviewAnswerSchema)}),analysis:finalAnalysisSchema,engineVersions:z.object({parser:z.string(),interview:z.string(),analysis:z.string()})});
 
 export type InitialCharacterDraft=z.infer<typeof initialCharacterDraftSchema>;
 export type CharacterDraft=z.infer<typeof characterDraftSchema>;
