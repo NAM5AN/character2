@@ -65,6 +65,12 @@ function saveOwnerSelection(sessionId:string,tags:PersonalityTagKey[]){
   }catch{}
 }
 
+function personalityGuidance(tags:PersonalityTagKey[]){
+  const descriptions=tags.map(key=>PERSONALITY_TAG_CATALOG.find(tag=>tag.key===key)).filter(Boolean).map(tag=>`${tag!.label} (${tag!.family})`);
+  if(!descriptions.length)return '';
+  return `오너가 직접 확인한 참고 성향: ${descriptions.join(' / ')}. 이 태그는 질문의 정답이나 절대적 설정이 아닙니다. 성격 라벨을 그대로 다시 묻지 말고 실제 프로필·오너 검수·이전 답변을 우선하세요. 태그는 조건, 예외, 반례, 관계별 차이를 탐색할 때만 보조 참고로 사용하세요.`;
+}
+
 // 질문/답변 화자 일치 검증은 질문 생성 API에서 처리하고, 이 컴포넌트는 화면 문구와
 // 첫 해석 단계의 오너 성격 태그 검수 UI를 다듬습니다.
 export function AnalyzeReviewUiPolish(){
@@ -86,6 +92,15 @@ export function AnalyzeReviewUiPolish(){
             const saved=sessionId?readOwnerSelection(sessionId):null;
             const ownerSelected=saved??personalityTags(current.ownerSelected);
             draft.personalityTags={...current,ownerSelected};
+
+            // 질문 API가 이미 compactDraft.traits를 AI 입력에 넣고 있으므로, 오너 확정 태그도
+            // 이 요청에서만 명시적인 참고 메모로 함께 전달한다. 원본 traits 저장값은 건드리지 않는다.
+            const guidance=personalityGuidance(ownerSelected);
+            if(guidance){
+              const traits=draft.traits&&typeof draft.traits==='object'?draft.traits as Record<string,unknown>:{};
+              draft.traits={...traits,ownerConfirmedPersonalityTags:guidance};
+            }
+
             payload.draft=draft;
             init={...init,body:JSON.stringify(payload)};
           }
