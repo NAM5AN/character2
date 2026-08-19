@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { applyName } from '@/lib/josa';
 import {
   PERSONALITY_TAG_CATALOG,
@@ -165,7 +165,7 @@ export function PersonalityFlavorProvider({
   tags: PersonalityTagKey[] | null;
   children: ReactNode;
 }) {
-  return <PersonalityFlavorContext.Provider value={tags}>{children}</PersonalityFlavorContext.Provider>;
+  return createElement(PersonalityFlavorContext.Provider, { value: tags }, children);
 }
 
 function detectFlavorTags(text: string): Set<PersonalityTagKey> {
