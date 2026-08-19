@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { summaryCardLinesSchema, type CharacterPassport } from '@/lib/schemas/character';
+import { personalityTagStateSchema, summaryCardLinesSchema, type CharacterPassport } from '@/lib/schemas/character';
 
 export const characterReportPreviewSchema = z.object({
   name: z.string().min(1),
@@ -14,6 +14,8 @@ export const characterReportPreviewSchema = z.object({
     misunderstoodPoint: z.string().optional(),
     hiddenPattern: z.string().optional(),
   }),
+  // 로딩 문구와 후속 분석에서 사용할 성격 태그 상태. 구버전 데이터는 없을 수 있음.
+  personalityTags: personalityTagStateSchema.optional(),
   // 요약 카드별 키워드 태그(스캔용). 키=요약 필드명, 값=짧은 키워드 배열. 없을 수 있음.
   summaryTags: z.record(z.string(), z.array(z.string())).optional(),
   // 요약 카드 전용 한 문장(카드 미리보기용). 없으면 렌더에서 본문 첫 문장으로 폴백.
@@ -44,6 +46,7 @@ export function buildCharacterReportPreview(passport: CharacterPassport): Charac
     shareCode: passport.shareCode,
     oneLineSummary: analysis.oneLineSummary,
     summary,
+    personalityTags: passport.personalityTags,
     summaryTags: analysis.summaryTags,
     summaryCardLines: analysis.summaryCardLines,
   });
