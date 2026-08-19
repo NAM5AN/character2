@@ -1,0 +1,154 @@
+/* Summary report polish: cover header, save panel placement, read alignment, springy view toggle. */
+
+/* Remove the small subtitle under the character name. */
+.report-mag .cover--summary-only h1 span {
+  display: none !important;
+}
+
+/* Reserve the right side of the one-line summary cover for character save. */
+.report-mag .cover--summary-only {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
+  align-items: end;
+  gap: 36px;
+  min-height: 360px;
+}
+
+/* The old explanatory copy is removed; keep the save panel visually inside the cover. */
+.report-summary-head {
+  position: relative !important;
+  z-index: 4;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.report-summary-head .report-summary-copy {
+  display: none !important;
+}
+
+.report-summary-head .save-character-panel {
+  position: absolute;
+  right: 48px;
+  bottom: 48px;
+  width: min(520px, 38vw);
+  max-width: none;
+  margin: 0;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(3px);
+}
+
+/* Whole segmented control is clickable. The black fill slides with a soft overshoot. */
+.report-mag .summary-view-toggle {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 0 0 auto;
+  min-width: 202px;
+  gap: 0;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.report-mag .summary-view-toggle::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: var(--ink);
+  transform: translateX(0);
+  transform-origin: right center;
+  transition: transform .52s cubic-bezier(.2, 1.62, .36, 1);
+  will-change: transform;
+}
+
+.report-mag .summary-view-toggle:has(button:nth-child(2).is-active)::before {
+  transform: translateX(100%);
+  transform-origin: left center;
+}
+
+.report-mag .summary-view-toggle button {
+  position: relative;
+  z-index: 1;
+  min-height: 34px;
+  padding: 0 13px;
+  background: transparent !important;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .15s ease, transform .15s ease;
+}
+
+.report-mag .summary-view-toggle button.is-active {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+.report-mag .summary-view-toggle:active::before {
+  filter: brightness(.93);
+}
+
+.report-mag .summary-view-toggle:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--ink) 65%, transparent);
+  outline-offset: 3px;
+}
+
+/* Read mode: every text column starts at the same top edge. */
+.report-mag .summary-expanded-body {
+  align-items: start;
+}
+
+.report-mag .summary-expanded-body .summary-paragraph {
+  align-self: start;
+  height: auto;
+  margin-top: 0 !important;
+}
+
+.report-mag .summary-expanded-body .summary-paragraph + .summary-paragraph {
+  margin-top: 0 !important;
+}
+
+/* SummaryFullText already draws a thin bottom rule. Remove the wrapper's duplicate thin rule. */
+.report-mag .summary-read-item {
+  border-bottom: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .report-mag .cover--summary-only {
+    grid-template-columns: 1fr;
+    padding-bottom: 330px;
+  }
+
+  .report-summary-head .save-character-panel {
+    left: 48px;
+    right: 48px;
+    bottom: 48px;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .report-mag .cover--summary-only {
+    padding-bottom: 370px;
+  }
+
+  .report-summary-head .save-character-panel {
+    left: 24px;
+    right: 24px;
+    bottom: 24px;
+  }
+}
