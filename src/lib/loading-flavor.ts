@@ -105,6 +105,66 @@ const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 질문 반쯤 흘려듣고 대충 끄덕이는 중', g: ['lazy'] },
   { t: '{name}가 턱 괴고 나른하게 천장 보는 중', g: ['lazy'] },
   { t: '{name}가 괜히 시계 보며 끝나길 기다리는 중', g: ['lazy'] },
+
+  { t: '{name}가 책상 위 물건들을 1cm 단위로 각 맞추는 중', g: ['perfectionist'] },
+  { t: '{name}가 방금 한 대답이 완벽하지 않다며 처음부터 다시 하는 중', g: ['perfectionist'] },
+  { t: '{name}가 상담사 넥타이가 삐뚤어진 걸 못 견뎌 하는 중', g: ['perfectionist'] },
+  { t: '{name}가 자기 대답을 속으로 채점하며 감점하는 중', g: ['perfectionist'] },
+  { t: '{name}가 벽에 걸린 액자가 수평인지 고개 기울여 확인하는 중', g: ['perfectionist'] },
+
+  { t: '{name}가 이 상담이 자기한테 무슨 이득인지 계산하는 중', g: ['calculating'] },
+  { t: '{name}가 어느 대답이 유리할지 머릿속으로 저울질하는 중', g: ['calculating'] },
+  { t: '{name}가 상담사 표정 보며 정답을 역산하는 중', g: ['calculating'] },
+  { t: '{name}가 괜히 손해 볼 말은 안 하려 단어를 고르는 중', g: ['calculating'] },
+  { t: '{name}가 상담비가 아깝지 않은지 속으로 따져보는 중', g: ['calculating'] },
+
+  { t: '{name}가 아까 빌려준 펜을 계속 눈으로 좇는 중', g: ['possessive'] },
+  { t: '{name}가 상담사가 딴생각하는 것 같아 신경 곤두세우는 중', g: ['possessive'] },
+  { t: '{name}가 상담사 관심을 독차지하려 화제를 붙드는 중', g: ['possessive'] },
+  { t: '{name}가 자기 얘기 도중 시선이 딴 데 갈까 확인하는 중', g: ['possessive'] },
+  { t: '{name}가 두고 갈 물건 하나까지 손에 꼭 쥐는 중', g: ['possessive'] },
+
+  { t: '{name}가 이 대답이 맞는지 상담사에게 되묻는 중', g: ['dependent'] },
+  { t: '{name}가 상담사가 고개 끄덕여주길 기다렸다 말 잇는 중', g: ['dependent'] },
+  { t: '{name}가 혼자 정하기 어려워 결정을 자꾸 미루는 중', g: ['dependent'] },
+  { t: '{name}가 이래도 될까요를 벌써 세 번째 묻는 중', g: ['dependent'] },
+  { t: '{name}가 상담사 반응부터 살피고 대답을 고르는 중', g: ['dependent'] },
+
+  { t: '{name}가 상담사 말을 하나도 안 의심하고 다 믿는 중', g: ['naive'] },
+  { t: '{name}가 농담을 진담으로 알아듣고 진지해지는 중', g: ['naive'] },
+  { t: '{name}가 함정 질문인 줄도 모르고 술술 다 말하는 중', g: ['naive'] },
+  { t: '{name}가 처음 본 상담사한테 벌써 마음을 활짝 여는 중', g: ['naive'] },
+  { t: '{name}가 세상 사람 다 착한 줄 알고 방긋 웃는 중', g: ['naive'] },
+
+  { t: '{name}가 상담 순서를 자기가 정하려 드는 중', g: ['dominant'] },
+  { t: '{name}가 제가 먼저 질문할게요 하며 주도권 잡는 중', g: ['dominant'] },
+  { t: '{name}가 대화 흐름을 슬쩍 자기 쪽으로 끌고 가는 중', g: ['dominant'] },
+  { t: '{name}가 팔짱 끼고 상황을 총괄하려 드는 중', g: ['dominant'] },
+  { t: '{name}가 상담사에게 다음 질문을 지정해주는 중', g: ['dominant'] },
+
+  { t: '{name}가 틀렸다는 말에도 뜻을 안 굽히는 중', g: ['stubborn'] },
+  { t: '{name}가 아까 한 말을 끝까지 번복 안 하는 중', g: ['stubborn'] },
+  { t: '{name}가 다른 관점 얘기에 팔짱만 더 꽉 끼는 중', g: ['stubborn'] },
+  { t: '{name}가 그래도 제 말이 맞다며 제자리로 돌아오는 중', g: ['stubborn'] },
+  { t: '{name}가 의자를 자기 원하는 각도로만 두려는 중', g: ['stubborn'] },
+
+  { t: '{name}가 상담을 무슨 시험처럼 만점 받으려는 중', g: ['competitive'] },
+  { t: '{name}가 앞사람보다 잘 대답했나 은근히 궁금해하는 중', g: ['competitive'] },
+  { t: '{name}가 질문을 이기고 지는 승부로 여기는 중', g: ['competitive'] },
+  { t: '{name}가 이 정도면 1등이죠 하고 확인받는 중', g: ['competitive'] },
+  { t: '{name}가 상담사와 눈싸움에서도 안 지려 버티는 중', g: ['competitive'] },
+
+  { t: '{name}가 상담사 서류를 거꾸로도 읽어보려는 중', g: ['curious'] },
+  { t: '{name}가 되레 상담사한테 질문 공세를 퍼붓는 중', g: ['curious'] },
+  { t: '{name}가 벽에 걸린 자격증을 한참 뜯어보는 중', g: ['curious'] },
+  { t: '{name}가 녹음기가 어떻게 작동하는지 궁금해하는 중', g: ['curious'] },
+  { t: '{name}가 그건 왜요를 벌써 다섯 번째 묻는 중', g: ['curious'] },
+
+  { t: '{name}가 자기 얘기는 제쳐두고 상담사 걱정을 하는 중', g: ['self_sacrificing'] },
+  { t: '{name}가 시간 다 됐다며 자기 질문을 양보하는 중', g: ['self_sacrificing'] },
+  { t: '{name}가 상담사 힘들까 봐 대답을 짧게 줄이는 중', g: ['self_sacrificing'] },
+  { t: '{name}가 자기보다 다음 사람 순서를 먼저 챙기는 중', g: ['self_sacrificing'] },
+  { t: '{name}가 안 괜찮으면서 저는 괜찮아요 하는 중', g: ['self_sacrificing'] },
 ];
 
 const LOADING_TAG_KEY = 'chara_lab_personality_loading_tags_v1';
