@@ -11,7 +11,7 @@ import {
   type InterviewAnswer,
 } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
-import { inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
+import { inferFinalAdaptiveTags, inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
 import { attachAiUsageSession, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
@@ -335,10 +335,18 @@ export async function POST(request:Request){
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
     const summaryGenMs=Date.now()-summaryStartedAt;
 
+    const fallbackFinal=body.draft.personalityTags.interviewAdaptive.length?body.draft.personalityTags.interviewAdaptive:fallbackAdaptive;
+    try{
+      const finalAdaptive=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'personality_final'},()=>inferFinalAdaptiveTags(body.draft,summaryResult));
+      body.draft.personalityTags={...body.draft.personalityTags,finalAdaptive};
+    }catch{
+      body.draft.personalityTags={...body.draft.personalityTags,finalAdaptive:fallbackFinal};
+    }
+
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
     const sharedInferences=body.draft.aiInferences.map(x=>({id:x.id,text:x.text,confidence:x.confidence,evidenceIds:[],evidence:[],ownerVerdict:x.ownerVerdict}));
-    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,personalityTags:body.draft.personalityTags,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,...(summaryResult.summaryTags?{summaryTags:summaryResult.summaryTags}:{}),...(summaryResult.summaryCardLines?{summaryCardLines:summaryResult.summaryCardLines}:{}),outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.5-personality',analysis:'claude-summary-dossier/4.0'}});
+    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,personalityTags:body.draft.personalityTags,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,...(summaryResult.summaryTags?{summaryTags:summaryResult.summaryTags}:{}),...(summaryResult.summaryCardLines?{summaryCardLines:summaryResult.summaryCardLines}:{}),outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.5-personality',analysis:'claude-summary-dossier/4.1-personality-final'}});
     const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,personalityTags:body.draft.personalityTags,evidencePack:summaryResult.evidencePack};
     const appearanceForDetail=body.draft.basicProfile.appearanceNotes?.trim()?`[외관 자료 관찰 메모 — 시각 보조 근거이며 성격·감정·과거를 단독으로 확정하지 말 것]\n${body.draft.basicProfile.appearanceNotes.trim()}`:'';
     const secretProfileText=[body.draft.basicProfile.secretProfileText||'',appearanceForDetail].filter(Boolean).join('\n\n');
