@@ -59,6 +59,27 @@
   margin-top: 68px !important;
 }
 
+/* Saved/completed report has no character-save card: use the cover as a true single column. */
+.completed-report-view .report-mag .cover--summary-only {
+  min-height: 360px;
+  padding: 56px 60px;
+}
+
+.completed-report-view .report-mag .cover--summary-only > div:first-child {
+  width: 100%;
+  max-width: none;
+}
+
+.completed-report-view .report-mag .cover--summary-only .cover-quote {
+  width: 100%;
+  max-width: 1080px;
+  margin-top: 30px;
+}
+
+.completed-report-view .completed-summary-notes {
+  margin-top: 72px;
+}
+
 /* Whole segmented control is clickable. The black fill slides with a soft overshoot. */
 .report-mag .summary-view-toggle {
   position: relative;
@@ -172,6 +193,15 @@
   .report-summary-head + div {
     margin-top: 56px !important;
   }
+
+  .completed-report-view .report-mag .cover--summary-only {
+    min-height: 0;
+    padding: 48px;
+  }
+
+  .completed-report-view .completed-summary-notes {
+    margin-top: 60px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -185,5 +215,13 @@
 
   .report-summary-head + div {
     margin-top: 44px !important;
+  }
+
+  .completed-report-view .report-mag .cover--summary-only {
+    padding: 34px 26px;
+  }
+
+  .completed-report-view .completed-summary-notes {
+    margin-top: 44px;
   }
 }
