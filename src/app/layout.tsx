@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ReportSummaryToggleBridge } from '@/components/ReportSummaryToggleBridge';
 import './globals.css';
 import './report-pagination.css';
 import './report-readability.css';
 import './report-magazine.css';
 import './report-summary-explorer.css';
+import './report-summary-polish.css';
 import './report-detail-uniform.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
@@ -56,6 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko">
       <body>
+        <ReportSummaryToggleBridge/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
