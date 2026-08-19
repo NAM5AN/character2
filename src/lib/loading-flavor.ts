@@ -12,6 +12,11 @@ import {
 type Flavor = { t: string; g: Array<PersonalityTagKey | 'any'> };
 const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 의자에 앉자마자 자세부터 고쳐 앉는 중', g: ['any'] },
+  { t: '{name}가 상담실 의자가 편한지 살짝 움직여보는 중', g: ['any'] },
+  { t: '{name}가 상담실 안을 천천히 둘러보는 중', g: ['any'] },
+  { t: '{name}가 상담사가 첫 질문을 고르길 기다리는 중', g: ['any'] },
+  { t: '{name}가 책상 위에 놓인 안내문을 슬쩍 읽어보는 중', g: ['any'] },
+  { t: '{name}가 상담 시작 안내를 듣고 고개를 끄덕이는 중', g: ['any'] },
 
   { t: '{name}가 대답할수록 목소리가 작아지는 중', g: ['shy'] },
   { t: '{name}가 손 어디 둘지 몰라 무릎에 얹었다 뗐다 하는 중', g: ['shy'] },
