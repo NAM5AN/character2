@@ -65,7 +65,7 @@ const RESPONSE_TYPE_RULES: Record<ResponseType, string> = {
   multi_select: '동시에 일어날 수 있는 행동이나 반응 4~6개를 options에 넣으세요. 필요하면 responseConfig.maxSelections에 2~4를 넣으세요.',
   least_likely: 'options 3~5개 중 이 캐릭터가 가장 하지 않을 것 하나를 고르게 하세요.',
   slider: '한 가지 가능성이나 강도를 0~100 점수로 고르게 하세요. options=[]이고 responseConfig.minLabel/maxLabel에 양 끝 상태를 넣으세요. A/B 비교형으로 만들지 마세요.',
-  relationship_matrix: '같은 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]이고 responseConfig.rows에는 2~4개의 관계 상대, columns에는 2~4개의 짧은 반응을 넣으세요.',
+  relationship_matrix: '같은 상황을 관계가 다른 상대에게 적용해 비교하게 하세요. options=[]이고 responseConfig.rows에는 2~4개의 관계 상대/조건을 넣으세요. responseConfig.rowOptions에는 rows의 각 문자열을 키로 사용해 그 상대/조건에서 실제로 자연스러운 선택지 2~5개를 각각 따로 만드세요. 예: rows=["부모님","직장 상사"]라면 rowOptions={"부모님":[부모님에게 할 법한 반응들],"직장 상사":[상사에게 할 법한 다른 반응들]}처럼 구성합니다. 일부 반응이 겹칠 수는 있지만 모든 행에 같은 보기 세트를 그대로 복사하지 마세요. 새 문항에서는 columns=[]로 두고, 각 행의 보기는 rowOptions를 사용하세요.',
   inner_outer: '속으로 가장 먼저 드는 생각과 실제로 겉으로 보이는 행동을 따로 적게 하세요. options=[]이고 responseConfig.prompt2에 두 번째 항목을 넣으세요.',
   temporal_compare: '같은 사건에 대한 서로 다른 두 시점의 반응을 비교합니다. options는 두 시점 모두에서 공통으로 선택 가능한 3~5개 반응이고 responseConfig.leftLabel/rightLabel에 두 시점을 넣으세요.',
   condition_followup: '기본 상황을 제시하고 options(3~5개)로 한 번 고르게 한 뒤, 조건 하나가 바뀐 상황을 responseConfig.prompt2에 두 번째 질문으로 넣고, 그 바뀐 상황에 실제로 어울리는 별도의 선택지를 responseConfig.options2(3~5개)에 넣으세요. options와 options2는 각각 자기 상황에서 자연스럽고 서로 구별되는 반응이어야 하며, 두 목록이 같을 필요는 없습니다. 바뀐 조건 때문에 기본 보기가 어색해지는 상황이라면(예: 상대가 이미 거절했거나 전제가 달라짐) options2는 그 조건에 맞는 새 반응들로 다시 구성하고 기본 보기를 그대로 재사용하지 마세요. 두 목록 모두 어느 답이 더 도덕적으로 좋아 보이지 않게 만드세요. 기본 질문은 특정 행동을 미리 전제하지 말고("~하려 할 때"처럼 이미 그 행동을 하는 것으로 못박지 말고) 열린 상황으로 두세요.',
