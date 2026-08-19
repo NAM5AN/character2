@@ -138,7 +138,9 @@ function readBrowserLoadingTags(): PersonalityTagKey[] | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<LoadingTagState>;
     const currentSession = currentAnalysisSessionId();
-    if (!currentSession || parsed.sessionId !== currentSession) return null;
+    // 분석 진행 중에는 세션이 일치할 때만 사용한다. finalize가 끝난 직후에는
+    // 분석 세션이 지워지므로 방금 계산한 태그를 그대로 유지해 상세 리포트 로딩에도 쓴다.
+    if (currentSession && parsed.sessionId !== currentSession) return null;
     return normalizeTags(parsed.tags);
   } catch {
     return null;
@@ -211,7 +213,7 @@ export function useRotatingFlavor(
     const onTags = (event: Event) => {
       const custom = event as CustomEvent<LoadingTagState>;
       const currentSession = currentAnalysisSessionId();
-      if (!currentSession || custom.detail?.sessionId !== currentSession) return;
+      if (currentSession && custom.detail?.sessionId !== currentSession) return;
       setBrowserTags(normalizeTags(custom.detail.tags));
     };
     window.addEventListener(LOADING_TAG_EVENT, onTags);
