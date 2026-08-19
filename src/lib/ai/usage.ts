@@ -21,13 +21,51 @@ const usageStore = new AsyncLocalStorage<AiUsageContext>();
 // means the whole stage genuinely failed — one row per real user-facing drop-off.)
 export function withAiUsageContext<T>(context: AiUsageContext, work: () => Promise<T>): Promise<T> {
   return usageStore.run(context, async () => {
+    // Heartbeat: record an in-flight row so a hard process death (300s timeout, OOM)
+    // — which never runs our catch/finally in a way that reaches the DB after the kill —
+    // still leaves a trace. The row is cleared below on success or caught failure; only
+    // a killed process leaves it behind for the admin console to flag.
+    const inflightId = await beginInflight(context);
     try {
       return await work();
     } catch (error) {
       scheduleGenFailureRecord(context, error);
       throw error;
+    } finally {
+      await endInflight(inflightId);
     }
   });
+}
+
+// Insert an in-flight heartbeat row; returns its id (or null if the write failed).
+// Awaited before work starts so a fast completion cannot race ahead of the insert.
+async function beginInflight(context: AiUsageContext): Promise<string | null> {
+  const id = crypto.randomUUID();
+  try {
+    const sb = getSupabaseServer();
+    await sb.rpc('character2_gen_inflight_begin', {
+      p_id: id,
+      p_stage: context.stage,
+      p_share_code: context.shareCode?.trim() || null,
+      p_session_id: safeUuid(context.sessionId),
+    });
+    return id;
+  } catch (error) {
+    console.warn('GEN_INFLIGHT_BEGIN_FAILED', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+// Clear the heartbeat row. Best-effort — a rare failure here only risks a false
+// "stuck" entry, which ages out on its own.
+async function endInflight(id: string | null) {
+  if (!id) return;
+  try {
+    const sb = getSupabaseServer();
+    await sb.rpc('character2_gen_inflight_end', { p_id: id });
+  } catch (error) {
+    console.warn('GEN_INFLIGHT_END_FAILED', error instanceof Error ? error.message : String(error));
+  }
 }
 
 // Split "CODE: detail" into a short error code + detail, mirroring lib/http structuredError.

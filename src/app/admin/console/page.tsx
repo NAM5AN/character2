@@ -79,7 +79,11 @@ type FailureRow = {
   id: number; createdAt: string; stage: string; shareCode: string | null;
   errorCode: string; errorDetail: string | null; characterName: string | null; ownerName: string | null;
 };
-type FailuresData = { total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[] };
+type StuckRow = {
+  id: string; startedAt: string; stage: string; shareCode: string | null;
+  minutesStuck: number; characterName: string | null; ownerName: string | null;
+};
+type FailuresData = { total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[]; stuck: StuckRow[] };
 type FailuresState =
   | { state: 'loading' }
   | { state: 'ready'; data: FailuresData }
@@ -537,7 +541,8 @@ export default function AdminConsolePage() {
   const balanceWarn = balance.state === 'ready' && balance.balance != null && balance.balance > 0 && balance.balance < 5;
   const balanceColor = balanceLow ? '#c0392b' : balanceWarn ? '#b8860b' : 'var(--fg, #111)';
 
-  const failuresActive = failures.state === 'ready' && failures.data.total24h > 0;
+  const stuckCount = failures.state === 'ready' ? (failures.data.stuck?.length ?? 0) : 0;
+  const failuresActive = failures.state === 'ready' && (failures.data.total24h > 0 || stuckCount > 0);
 
   return (
     <main className="container page">
@@ -621,7 +626,26 @@ export default function AdminConsolePage() {
           </button>
         </div>
 
-        {failures.state === 'ready' && failures.data.total7d === 0 && (
+        {failures.state === 'ready' && stuckCount > 0 && (
+          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(184,134,11,.45)', background: 'rgba(184,134,11,.10)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: 13, color: '#8a6400' }}>⏱ 멈춤 · 타임아웃 추정 {stuckCount}건</strong>
+              <span className="muted" style={{ fontSize: 12 }}>6분 넘게 안 끝난 생성 (300초 제한 초과 = 강제 종료)</span>
+            </div>
+            <div className="stack" style={{ gap: 6, marginTop: 8 }}>
+              {failures.data.stuck.map(k => (
+                <div key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
+                  <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(k.stage)}</span>
+                  {k.characterName && <span className="muted">· {k.characterName}{k.ownerName ? ` (${k.ownerName})` : ''}</span>}
+                  {k.shareCode && <span className="tag" style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '.06em' }}>{k.shareCode}</span>}
+                  <span className="muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{k.minutesStuck}분째 · {fmtAgo(k.startedAt)} 시작</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {failures.state === 'ready' && failures.data.total7d === 0 && stuckCount === 0 && (
           <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>최근 7일간 생성 실패가 없어요. 👍</p>
         )}
 
