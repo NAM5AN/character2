@@ -61,6 +61,18 @@ type AdminSettings = {
   hasHash: boolean;
 };
 
+// Vercel AI Gateway 잔액 상태.
+type GatewayBalance =
+  | { state: 'loading' }
+  | { state: 'ready'; balance: number | null; totalUsed: number | null; fetchedAt: string; refreshing?: boolean }
+  | { state: 'error'; detail: string };
+
+// 달러 금액 표시($1,234.56). 잔액은 게이트웨이가 달러로 집계한다.
+function fmtUsd(usd: number | null): string {
+  if (usd == null || !Number.isFinite(usd)) return '—';
+  return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 // gpt-5.6-luna 단가 (Vercel 게이트웨이 = OpenAI, 마크업 없음). 단가 바뀌면 여기만 고치면 됨.
 const GPT_RATE = { input: 0.20, output: 1.20 }; // $/1M tokens
 function gptCost(inTok: number | string | null, outTok: number | string | null): number {
@@ -249,6 +261,27 @@ export default function AdminConsolePage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Vercel AI Gateway 크레딧 잔액(달러). 0이면 AI 호출이 전부 402로 실패한다.
+  const [balance, setBalance] = useState<GatewayBalance>({ state: 'loading' });
+
+  const loadBalance = useCallback(async () => {
+    setBalance(prev => (prev.state === 'ready' ? { ...prev, refreshing: true } : { state: 'loading' }));
+    try {
+      const res = await fetch('/api/admin/gateway-balance', { cache: 'no-store' });
+      if (res.status === 401) { setStatus('denied'); return; }
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body?.ok) {
+        setBalance({ state: 'ready', balance: body.balance, totalUsed: body.totalUsed, fetchedAt: body.fetchedAt });
+      } else {
+        setBalance({ state: 'error', detail: body?.detail || body?.error || 'UNKNOWN' });
+      }
+    } catch {
+      setBalance({ state: 'error', detail: 'NETWORK' });
+    }
+  }, []);
+
+  useEffect(() => { void loadBalance(); }, [loadBalance]);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -444,8 +477,62 @@ export default function AdminConsolePage() {
 
   const sections = detailChar ? buildSections(detailChar) : [];
 
+  const balanceLow = balance.state === 'ready' && balance.balance != null && balance.balance <= 0;
+  const balanceWarn = balance.state === 'ready' && balance.balance != null && balance.balance > 0 && balance.balance < 5;
+  const balanceColor = balanceLow ? '#c0392b' : balanceWarn ? '#b8860b' : 'var(--fg, #111)';
+
   return (
     <main className="container page">
+      <div
+        className="card"
+        style={{
+          padding: '14px 18px', marginBottom: 14,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+          background: balanceLow ? 'rgba(192,57,43,.08)' : balanceWarn ? 'rgba(184,134,11,.08)' : 'var(--paper)',
+          border: `1px solid ${balanceLow ? 'rgba(192,57,43,.4)' : balanceWarn ? 'rgba(184,134,11,.4)' : 'var(--line)'}`,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
+          <span className="muted" style={{ fontSize: 13, fontWeight: 700 }}>AI Gateway 잔액</span>
+          {balance.state === 'loading' && <span className="muted" style={{ fontSize: 15 }}>조회 중…</span>}
+          {balance.state === 'error' && (
+            <span style={{ fontSize: 14, color: '#c0392b' }}>조회 실패 · {balance.detail}</span>
+          )}
+          {balance.state === 'ready' && (
+            <>
+              <strong style={{ fontSize: 26, letterSpacing: '-.02em', color: balanceColor }}>
+                {fmtUsd(balance.balance)}
+              </strong>
+              {balance.balance != null && (
+                <span className="muted" style={{ fontSize: 13 }}>
+                  ≈ {Math.round(balance.balance * USD_TO_KRW).toLocaleString('ko-KR')}원
+                </span>
+              )}
+              {balance.totalUsed != null && (
+                <span className="muted" style={{ fontSize: 12 }}>누적 사용 {fmtUsd(balance.totalUsed)}</span>
+              )}
+              {balance.refreshing && <span className="muted" style={{ fontSize: 12 }}>갱신 중…</span>}
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {balanceLow && <span style={{ fontSize: 12, fontWeight: 800, color: '#c0392b' }}>⚠ 잔액 부족 — AI 호출이 실패합니다</span>}
+          {balanceWarn && <span style={{ fontSize: 12, fontWeight: 800, color: '#b8860b' }}>⚠ 잔액이 적어요</span>}
+          <button className="btn soft" style={{ padding: '6px 12px' }} onClick={() => void loadBalance()} disabled={balance.state === 'loading'}>
+            새로고침
+          </button>
+          <a
+            className="btn"
+            style={{ padding: '6px 12px' }}
+            href="https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dtop-up"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            충전
+          </a>
+        </div>
+      </div>
+
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div className="eyebrow">Admin console · owner only</div>
@@ -455,7 +542,7 @@ export default function AdminConsolePage() {
           </p>
         </div>
         <div className="actions" style={{ marginTop: 4 }}>
-          <button className="btn" onClick={() => void load()}>새로고침</button>
+          <button className="btn" onClick={() => { void load(); void loadBalance(); }}>새로고침</button>
           <button className="btn soft" onClick={() => void logout()}>로그아웃</button>
         </div>
       </div>
