@@ -69,9 +69,9 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'});
   }
 
-  return <>
+  return <div className="completed-report-view">
     <ReportCover preview={preview}/>
-    <div style={{marginTop:22}}><SummaryNotes preview={preview}/></div>
+    <div className="completed-summary-notes"><SummaryNotes preview={preview}/></div>
 
     <div id="paid-detail-report" style={{marginTop:38,scrollMarginTop:90}}>
       {isPaged?<>
@@ -101,5 +101,5 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
         <div className="actions" style={{marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
       </>}
     </div>
-  </>;
+  </div>;
 }
