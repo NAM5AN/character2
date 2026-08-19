@@ -165,6 +165,42 @@ const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 상담사 힘들까 봐 대답을 짧게 줄이는 중', g: ['self_sacrificing'] },
   { t: '{name}가 자기보다 다음 사람 순서를 먼저 챙기는 중', g: ['self_sacrificing'] },
   { t: '{name}가 안 괜찮으면서 저는 괜찮아요 하는 중', g: ['self_sacrificing'] },
+
+  { t: '{name}가 별것 아닌 얘기를 대하드라마처럼 풀어놓는 중', g: ['theatrical'] },
+  { t: '{name}가 상담사 리액션이 약하자 더 크게 한숨 쉬는 중', g: ['theatrical'] },
+  { t: '{name}가 조명이 자기한테 잘 드는 자리로 옮겨 앉는 중', g: ['theatrical'] },
+  { t: '{name}가 눈물 연기까지 곁들여 사연을 말하는 중', g: ['theatrical'] },
+  { t: '{name}가 상담사가 자기만 봐주는지 자꾸 확인하는 중', g: ['theatrical'] },
+
+  { t: '{name}가 앉으라는 의자 말고 굳이 다른 데 앉는 중', g: ['rebellious'] },
+  { t: '{name}가 상담 규칙을 왜 지켜야 하냐고 따지는 중', g: ['rebellious'] },
+  { t: '{name}가 정해진 질문 순서를 일부러 무시하는 중', g: ['rebellious'] },
+  { t: '{name}가 팔짱 끼고 삐딱하게 다리 꼬는 중', g: ['rebellious'] },
+  { t: '{name}가 하지 말라는 건 꼭 한 번 해보려는 중', g: ['rebellious'] },
+
+  { t: '{name}가 질문은 흘려듣고 창밖 구름에 이름 붙이는 중', g: ['dreamy'] },
+  { t: '{name}가 대답하다 말고 딴 세계로 여행 떠난 중', g: ['dreamy'] },
+  { t: '{name}가 천장을 밤하늘이라 상상하며 별을 세는 중', g: ['dreamy'] },
+  { t: '{name}가 만약에 제가 새라면요 로 얘기를 시작하는 중', g: ['dreamy'] },
+  { t: '{name}가 눈은 뜨고 있는데 꿈속을 헤매는 중', g: ['dreamy'] },
+
+  { t: '{name}가 분위기 싸해진 줄도 모르고 태평하게 웃는 중', g: ['oblivious'] },
+  { t: '{name}가 상담사 눈치 신호를 하나도 못 알아채는 중', g: ['oblivious'] },
+  { t: '{name}가 민감한 질문을 아무렇지 않게 툭 넘기는 중', g: ['oblivious'] },
+  { t: '{name}가 다들 조용한데 혼자 과자 봉지 뜯는 중', g: ['oblivious'] },
+  { t: '{name}가 진지한 순간에 엉뚱한 포인트에서 웃는 중', g: ['oblivious'] },
+
+  { t: '{name}가 별것 아닌 질문에도 눈물이 그렁그렁해지는 중', g: ['sentimental'] },
+  { t: '{name}가 자기 얘기하다 스스로 감동해 울컥하는 중', g: ['sentimental'] },
+  { t: '{name}가 상담실 화분 잎사귀를 보고도 뭉클해하는 중', g: ['sentimental'] },
+  { t: '{name}가 휴지를 미리 한 장 뽑아 손에 쥐고 있는 중', g: ['sentimental'] },
+  { t: '{name}가 슬픈 기억에 목소리가 잠겨 잠시 멈추는 중', g: ['sentimental'] },
+
+  { t: '{name}가 안 물어본 자기 무용담을 늘어놓는 중', g: ['boastful'] },
+  { t: '{name}가 별거 아닌 일을 열 배로 부풀려 말하는 중', g: ['boastful'] },
+  { t: '{name}가 상담사한테 되레 아는 척 훈수 두는 중', g: ['boastful'] },
+  { t: '{name}가 긴장한 걸 들킬까 봐 더 큰소리치는 중', g: ['boastful'] },
+  { t: '{name}가 팔자 좋은 척 다리 꼬고 으스대는 중', g: ['boastful'] },
 ];
 
 const LOADING_TAG_KEY = 'chara_lab_personality_loading_tags_v1';
