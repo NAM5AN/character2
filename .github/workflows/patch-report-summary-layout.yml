@@ -1,0 +1,223 @@
+name: Patch report summary layout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-report-summary-layout.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch report summary layout
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # 1) Report cover + summary toggle
+          path = Path('src/components/ReportMagazine.tsx')
+          text = path.read_text()
+
+          old_cover = '''export function ReportCover({ preview }: { preview: CharacterReportPreview }) {
+  return <div className="report-mag"><section className="cover cover--summary-only">
+    <div>
+      <div className="cover-eyebrow">CHARACTER DETAIL REPORT</div>
+      <h1>{preview.name}<span>정밀 캐릭터 분석</span></h1>
+      {preview.oneLineSummary ? <p className="cover-quote">{preview.oneLineSummary}</p> : null}
+    </div>
+  </section></div>;
+}'''
+          new_cover = '''export function ReportCover({ preview, aside }: { preview: CharacterReportPreview; aside?: ReactNode }) {
+  return <div className="report-mag"><section className="cover cover--summary-only">
+    <div>
+      <div className="cover-eyebrow">CHARACTER DETAIL REPORT</div>
+      <h1>{preview.name}</h1>
+      {preview.oneLineSummary ? <p className="cover-quote">{preview.oneLineSummary}</p> : null}
+    </div>
+    {aside ? <aside className="cover-summary-aside">{aside}</aside> : null}
+  </section></div>;
+}'''
+          if old_cover not in text:
+              raise SystemExit('ReportCover block not found')
+          text = text.replace(old_cover, new_cover, 1)
+
+          old_toggle = '''      <div className="summary-view-toggle" aria-label="요약 보기 방식">
+        <button type="button" className={mode === 'glance' ? 'is-active' : ''} onClick={() => setMode('glance')}>한눈에 보기</button>
+        <button type="button" className={mode === 'read' ? 'is-active' : ''} onClick={() => setMode('read')}>전체 읽기</button>
+      </div>'''
+          new_toggle = '''      <button
+        type="button"
+        className={`summary-view-toggle is-${mode}`}
+        aria-label={mode === 'glance' ? '전체 읽기로 전환' : '한눈에 보기로 전환'}
+        onClick={() => setMode(current => current === 'glance' ? 'read' : 'glance')}
+      >
+        <span className="summary-view-toggle-pill" aria-hidden="true" />
+        <span className={`summary-view-label${mode === 'glance' ? ' is-active' : ''}`}>한눈에 보기</span>
+        <span className={`summary-view-label${mode === 'read' ? ' is-active' : ''}`}>전체 읽기</span>
+      </button>'''
+          if old_toggle not in text:
+              raise SystemExit('summary toggle block not found')
+          text = text.replace(old_toggle, new_toggle, 1)
+          path.write_text(text)
+
+          # 2) Move character save panel into report cover
+          path = Path('src/components/CharacterReportView.tsx')
+          text = path.read_text()
+          text = text.replace("  const richSummary=Boolean(preview.summary.misunderstoodPoint?.trim()&&preview.summary.hiddenPattern?.trim());\n", '', 1)
+
+          old_styles = '''      .report-summary-head{display:flex;flex-wrap:wrap;align-items:flex-start;gap:28px}
+      .report-summary-copy{flex:1 1 340px;min-width:0}
+      .save-character-panel{flex:0 1 480px;max-width:520px;border:1px solid var(--line);border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.46)}'''
+          new_styles = '''      .cover-summary-aside{min-width:0;display:flex;align-items:flex-end}
+      .save-character-panel{width:100%;max-width:520px;margin-left:auto;border:1px solid var(--line);border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.62)}'''
+          if old_styles not in text:
+              raise SystemExit('report summary styles block not found')
+          text = text.replace(old_styles, new_styles, 1)
+          text = text.replace('        .save-character-panel{flex-basis:100%;max-width:none}\n', '        .save-character-panel{max-width:none}\n', 1)
+
+          old_summary_head = '''    <ReportCover preview={preview}/>
+
+    <div className="result-hero report-summary-head" style={{marginTop:20}}>
+      <div className="report-summary-copy"><p className="muted" style={{lineHeight:1.7,marginTop:0}}>{richSummary?'프로필과 20개의 답변에서 반복되는 패턴을 연결해, 겉으로 바로 보이지 않는 부분까지 먼저 읽어봤어요.':'20개의 답변과 프로필을 바탕으로 핵심만 먼저 요약했어요. 상세 원문은 결제 코드 확인 후에만 정리됩니다.'}</p></div>
+      <div className="save-character-panel">
+        <div className="label">캐릭터 저장</div>
+        {canEditIdentity?<>
+          <div className="save-character-row">
+            <div className="field"><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
+            <button className="btn soft" disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'저장'}</button>
+          </div>
+          {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}
+        </>:preview.ownerName?<div style={{marginTop:9,fontSize:14}}>오너명 · <strong>{preview.ownerName}</strong></div>:null}
+        <p className="save-character-note">오너명을 함께 저장해두면 나중에 리포트를 다시 꺼내볼 수 있고, 추후 2인·다인 페어 궁합이나 5~20인 이상 단체 조합 기능에도 지금 저장한 캐릭터 정보를 그대로 활용할 수 있어요.</p>
+      </div>
+    </div>'''
+          new_summary_head = '''    <ReportCover preview={preview} aside={
+      <div className="save-character-panel">
+        <div className="label">캐릭터 저장</div>
+        {canEditIdentity?<>
+          <div className="save-character-row">
+            <div className="field"><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
+            <button className="btn soft" disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'저장'}</button>
+          </div>
+          {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}
+        </>:preview.ownerName?<div style={{marginTop:9,fontSize:14}}>오너명 · <strong>{preview.ownerName}</strong></div>:null}
+        <p className="save-character-note">오너명을 함께 저장해두면 나중에 리포트를 다시 꺼내볼 수 있고, 추후 2인·다인 페어 궁합이나 5~20인 이상 단체 조합 기능에도 지금 저장한 캐릭터 정보를 그대로 활용할 수 있어요.</p>
+      </div>
+    }/>'''
+          if old_summary_head not in text:
+              raise SystemExit('report cover/save layout block not found')
+          text = text.replace(old_summary_head, new_summary_head, 1)
+          path.write_text(text)
+
+          # 3) Summary explorer alignment / separator / spring toggle polish
+          path = Path('src/app/report-summary-explorer.css')
+          text = path.read_text()
+          polish = r'''
+
+/* 2026-08 summary report polish */
+.report-mag .cover--summary-only {
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  align-items: end;
+  gap: 36px;
+}
+
+.report-mag .cover-summary-aside {
+  min-width: 0;
+  width: 100%;
+}
+
+.report-mag .summary-view-toggle {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 0 0 auto;
+  min-width: 202px;
+  gap: 0;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.report-mag .summary-view-toggle-pill {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: var(--ink);
+  transform: translateX(0) scaleX(1);
+  transform-origin: right center;
+  transition: transform .5s cubic-bezier(.2, 1.55, .36, 1);
+  will-change: transform;
+}
+
+.report-mag .summary-view-toggle.is-read .summary-view-toggle-pill {
+  transform: translateX(100%) scaleX(1);
+  transform-origin: left center;
+}
+
+.report-mag .summary-view-label {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 13px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: color .16s ease;
+  pointer-events: none;
+}
+
+.report-mag .summary-view-label.is-active { color: #fff; }
+.report-mag .summary-view-toggle:active .summary-view-toggle-pill { filter: brightness(.92); }
+.report-mag .summary-view-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.report-mag .summary-expanded-body { align-items: start; }
+.report-mag .summary-expanded-body .summary-paragraph {
+  align-self: start;
+  margin-top: 0;
+  height: auto;
+}
+.report-mag .summary-expanded-body .summary-paragraph + .summary-paragraph { margin-top: 0; }
+
+/* SummaryFullText already draws its own thin bottom rule. Avoid a second thin rule from the wrapper. */
+.report-mag .summary-read-item { border-bottom: 0; }
+
+@media (max-width: 900px) {
+  .report-mag .cover--summary-only { grid-template-columns: 1fr; align-items: stretch; }
+  .report-mag .cover-summary-aside { margin-top: 4px; }
+}
+'''
+          if '/* 2026-08 summary report polish */' in text:
+              raise SystemExit('summary polish block already exists')
+          path.write_text(text + polish)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/ReportMagazine.tsx src/components/CharacterReportView.tsx src/app/report-summary-explorer.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Polish summary report header and view toggle"
+          git push origin main
