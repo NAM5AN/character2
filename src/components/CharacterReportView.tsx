@@ -322,7 +322,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>)}
           <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
         </div>
-        <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{position:'absolute',left:'50%',top:'66.2%',transform:'translate(-50%,-50%)',zIndex:5,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
+        <div style={{position:'absolute',left:'50%',top:'60%',transform:'translate(-50%,-50%)',zIndex:5,width:'min(600px,90%)',display:'flex',flexDirection:'column',alignItems:'center',gap:18,pointerEvents:'none'}}>
+          {!busy&&<div style={{pointerEvents:'none',textAlign:'center',padding:'18px 22px',borderRadius:18,background:'rgba(255,253,248,.86)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',border:'1px solid var(--line)',boxShadow:'0 12px 34px rgba(23,24,22,.12)'}}>
+            <div style={{fontSize:12,fontWeight:900,letterSpacing:'.14em',color:'var(--accent,#b8860b)',marginBottom:9}}>여기까지는 예고편이에요</div>
+            <p style={{margin:0,fontSize:'clamp(14px,2.4vw,16px)',lineHeight:1.75,fontWeight:700}}>가장 아끼는 사람 앞에서 왜 무너지는지, 끝까지 숨기고 싶어 하는 게 무엇인지, 겉과 속이 어긋나는 진짜 순간까지 — 나머지 이야기가 바로 아래에서 열려요.</p>
+          </div>}
+          <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{pointerEvents:'auto',boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
+        </div>
       </div>
 
       {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
