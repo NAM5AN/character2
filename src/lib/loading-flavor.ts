@@ -12,16 +12,13 @@ import {
 type Flavor = { t: string; g: Array<PersonalityTagKey | 'any'> };
 const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 의자에 앉자마자 자세부터 고쳐 앉는 중', g: ['any'] },
-  { t: '{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중', g: ['any'] },
-  { t: '{name}가 괜히 시계 보며 끝나길 기다리는 중', g: ['any'] },
-  { t: '{name}가 물컵만 만지작대며 딴청 부리는 중', g: ['any'] },
-  { t: '{name}가 대기실에서 연습한 말 다 까먹은 중', g: ['any'] },
 
   { t: '{name}가 대답할수록 목소리가 작아지는 중', g: ['shy'] },
   { t: '{name}가 손 어디 둘지 몰라 무릎에 얹었다 뗐다 하는 중', g: ['shy'] },
   { t: '{name}가 발끝만 내려다보며 겨우 대답하는 중', g: ['shy'] },
   { t: '{name}가 말 꺼내려다 몇 번이나 다시 삼키는 중', g: ['shy'] },
   { t: '{name}가 얼굴 빨개져 소매 끝만 끌어당기는 중', g: ['shy'] },
+  { t: '{name}가 물컵만 만지작대며 딴청 부리는 중', g: ['shy'] },
 
   { t: '{name}가 다리 꼬고 여유로운 척 앉아있는 중', g: ['proud'] },
   { t: '{name}가 질문을 시시하다는 듯 웃어넘기는 중', g: ['proud'] },
@@ -58,6 +55,8 @@ const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 다리를 쉴 새 없이 떠는 중', g: ['anxious'] },
   { t: '{name}가 손톱 옆 거스러미만 계속 뜯는 중', g: ['anxious'] },
   { t: '{name}가 별말 아닌데 괜히 변명을 덧붙이는 중', g: ['anxious'] },
+  { t: '{name}가 카톡 읽씹해놓고 혼자 죄책감 느끼는 중', g: ['anxious'] },
+  { t: '{name}가 대기실에서 연습한 말 다 까먹은 중', g: ['anxious'] },
 
   { t: '{name}가 창밖 비둘기랑 눈싸움하는 중', g: ['chaotic'] },
   { t: '{name}가 질문은 잊고 천장 무늬 세는 중', g: ['chaotic'] },
@@ -100,6 +99,7 @@ const FLAVOR_POOL: Flavor[] = [
   { t: '{name}가 하품 참으며 느릿느릿 대답하는 중', g: ['lazy'] },
   { t: '{name}가 질문 반쯤 흘려듣고 대충 끄덕이는 중', g: ['lazy'] },
   { t: '{name}가 턱 괴고 나른하게 천장 보는 중', g: ['lazy'] },
+  { t: '{name}가 괜히 시계 보며 끝나길 기다리는 중', g: ['lazy'] },
 ];
 
 const LOADING_TAG_KEY = 'chara_lab_personality_loading_tags_v1';
