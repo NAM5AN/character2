@@ -26,6 +26,10 @@ export async function generateValidatedJson<T>(args: {
   let lastReason = 'AI_STRUCTURED_OUTPUT_FAILED';
   const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? 3, 3));
   const images = (args.images ?? []).filter(Boolean);
+  // 출력이 상한에 걸려 잘리면(finishReason 'length') 도구 호출 JSON이 미완성이라 반드시 검증에 실패한다.
+  // 같은 상한으로 다시 시도하면 똑같이 잘려서 성공할 수 없으므로, 그 경우에만 상한을 올려 재시도한다.
+  // 상한을 낮추는 일은 없으므로 정상 성공 경로의 출력은 달라지지 않는다.
+  let outputCap = args.maxOutputTokens;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryNote = attempt === 0
@@ -34,6 +38,7 @@ export async function generateValidatedJson<T>(args: {
     const prompt = `${args.prompt}${retryNote}`;
     const providerOptions=aiGatewayUsageOptions();
 
+    let truncated = false;
     try {
       const response = await generateText({
         model: args.model,
@@ -55,15 +60,17 @@ export async function generateValidatedJson<T>(args: {
         },
         toolChoice: { type: 'tool', toolName: 'submit_result' },
         ...(providerOptions?{providerOptions}:{}),
-        ...(typeof args.maxOutputTokens === 'number' ? { maxOutputTokens: args.maxOutputTokens } : {}),
+        ...(typeof outputCap === 'number' ? { maxOutputTokens: outputCap } : {}),
       });
 
+      truncated = response.finishReason === 'length';
       scheduleAiUsageRecord({model:args.model,attempt:attempt+1,response});
       const call = response.toolCalls.find(item => item.toolName === 'submit_result');
       if (!call) throw new Error('AI_TOOL_RESULT_MISSING');
       return args.schema.parse(call.input);
     } catch (error) {
       lastReason = error instanceof Error ? error.message : String(error);
+      if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
     }
   }
 
@@ -97,6 +104,8 @@ export async function streamValidatedJson<T>(args: {
   const expectedChars = Math.max(1200, (args.maxOutputTokens ?? 2000) * 3);
   const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? 3, 3));
   let lastReason = 'AI_STRUCTURED_OUTPUT_FAILED';
+  // generateValidatedJson과 같은 이유로, 잘린 출력일 때만 상한을 올려 재시도한다.
+  let outputCap = args.maxOutputTokens;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryNote = attempt === 0
@@ -106,6 +115,7 @@ export async function streamValidatedJson<T>(args: {
     const providerOptions = aiGatewayUsageOptions();
 
     let toolCallInput: unknown;
+    let truncated = false;
     try {
       const result = streamText({
         model: args.model,
@@ -127,7 +137,7 @@ export async function streamValidatedJson<T>(args: {
         },
         toolChoice: { type: 'tool', toolName: 'submit_result' },
         ...(providerOptions ? { providerOptions } : {}),
-        ...(typeof args.maxOutputTokens === 'number' ? { maxOutputTokens: args.maxOutputTokens } : {}),
+        ...(typeof outputCap === 'number' ? { maxOutputTokens: outputCap } : {}),
       });
 
       let acc = 0;
@@ -142,6 +152,7 @@ export async function streamValidatedJson<T>(args: {
         }
       }
 
+      truncated = (await result.finishReason) === 'length';
       const calls = await result.toolCalls;
       const call = calls.find(item => item.toolName === 'submit_result');
       if (!call) throw new Error('AI_TOOL_RESULT_MISSING');
@@ -177,6 +188,7 @@ export async function streamValidatedJson<T>(args: {
       return parsed.data;
     }
     lastReason = parsed.error.message;
+    if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
   }
 
   throw new Error(`AI_JSON_SCHEMA_FAILED: ${lastReason}`);
