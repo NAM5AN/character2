@@ -45,9 +45,17 @@ function applyCharacterDeepAnalysisSkill(system: string) {
   ].join('\n\n---\n\n');
 }
 
-async function finalizeClaudeResult<T>(value: T, system: string, model: string) {
-  if (!isReportWriterSystem(system)) return value;
+async function finalizeClaudeResult<T>(value: T, system: string, model: string, skip?: boolean) {
+  if (skip || !isReportWriterSystem(system)) return value;
   return rewriteDetailedReportParagraphLeads(value, model);
+}
+
+// Rewrite paragraph leads for an already-generated report object, using the same model
+// askClaudeJson would have used for that system prompt. Lets a caller that produced
+// several report stages fold their lead rewrites into a single call instead of one per
+// stage — the rewriter already handles every report field in one pass.
+export function rewriteReportLeads<T>(value: T, system: string): Promise<T> {
+  return rewriteDetailedReportParagraphLeads(value, resolveClaudeModel(system));
 }
 
 export async function askClaudeJson<T>(args: {
@@ -58,6 +66,9 @@ export async function askClaudeJson<T>(args: {
   maxAttempts?: number;
   allowFallback?: boolean;
   model?: string;
+  // Skip the per-call paragraph-lead rewrite so the caller can batch several stages
+  // into one rewrite (see rewriteReportLeads). Leaves output identical either way.
+  skipLeadRewrite?: boolean;
 }): Promise<T> {
   const primaryModel = resolveClaudeModel(args.system, args.model);
   const resolvedSystem = applyCharacterDeepAnalysisSkill(args.system);
@@ -76,7 +87,7 @@ export async function askClaudeJson<T>(args: {
       maxOutputTokens,
       maxAttempts,
     });
-    return await finalizeClaudeResult(result, args.system, primaryModel);
+    return await finalizeClaudeResult(result, args.system, primaryModel, args.skipLeadRewrite);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
@@ -91,7 +102,7 @@ export async function askClaudeJson<T>(args: {
       maxOutputTokens,
       maxAttempts,
     });
-    return finalizeClaudeResult(result, args.system, fallbackModel);
+    return finalizeClaudeResult(result, args.system, fallbackModel, args.skipLeadRewrite);
   }
 }
 

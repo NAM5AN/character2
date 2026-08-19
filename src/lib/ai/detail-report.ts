@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { askClaudeJson } from '@/lib/ai/anthropic';
+import { askClaudeJson, rewriteReportLeads } from '@/lib/ai/anthropic';
 import {
   analysisTypeSummarySchema,
   characterEvidencePackSchema,
@@ -435,12 +435,13 @@ async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
   });
 }
 
-async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
+async function writeStage2(seed:DetailSeed,dossier:ReportDossier,skipLeadRewrite=false){
   return askClaudeJson({
     system:REPORT_SYSTEM,
     schema:stage2Schema,
     maxAttempts:2,
     allowFallback:true,
+    skipLeadRewrite,
     input:`${commonWriterInput(seed,dossier)}\n\n이번에는 두 번째 페이지의 아래 3개 필드만 작성하세요.\n\nrelationshipStyle — 화면 제목: "${seed.name}는 이렇게 관계를 맺어요"\n반드시 포함:\n- 처음 만난 사람에게 보이는 태도\n- 친해지는 데 필요한 조건\n- 가까운 사람을 대하는 방식\n- 싫어하는 사람, 존경하는 사람을 대하는 방식\n- 약한 사람과 강한 사람을 대하는 방식의 차이\n- 관계에서 주도권을 잡는지 넘기는지\n- 사람을 믿는 기준과 관계를 끊는 기준\n- 어떤 사람을 좋아하고 싫어하는지, 어떤 사람에게 특히 약한지의 심층 기준\n- 일반적인 애정 표현이 관계에서 어떻게 나타나는지\n- 캐릭터 사용 설명서의 내용을 산문 안에 자연스럽게 포함: 친해지는 방법 / 특히 하면 안 되는 것 / 좋아하고 신뢰한다는 신호\n\nattachmentStyle — 화면 제목: "${seed.name}는 이런 애착이 있어요"\n반드시 포함:\n- 누군가를 좋아하게 되는 과정과 속도\n- 친밀해질수록 편안해지는지 불안해지는지\n- 사랑받고 있다는 것을 어떻게 확인하려 하는지\n- 상대에게 원하는 것과 의존을 허용하는 정도\n- 버림받음·배신·구속 중 무엇에 특히 민감한지와 이유\n- 플러팅과 고백 방식\n- 연애 초반과 장기 관계의 차이\n- 질투와 싸웠을 때의 행동\n- 애정표현과 갈등 후 관계 회복 방식\n- 이별 후의 반응\n- 잘 맞는 상대와 최악의 상대가 어떤 사람인지, 왜 그런지\n\nconflictStyleDetailed — 화면 제목: "${seed.name}는 이렇게 갈등해요"\n반드시 포함:\n- 갈등을 감지하는 기준과 초기 대응\n- 불편함이 자기 기준의 침범으로 바뀌는 임계점\n- 평상시 → 압박받을 때 → 한계에 몰렸을 때 성격과 행동이 어떻게 달라지는지\n- 한계에서 공격·회피·통제·거리두기·혼자 해결하기 등이 어떻게 나타나는지\n- 절대 양보하지 않는 가치와 상황에 따라 포기할 수 있는 것\n- 거짓말을 어디까지 허용하는지\n- 목적을 위해 수단을 정당화하는지\n- 자기 자신과 타인에게 적용하는 기준의 차이\n- 타인의 잘못을 어디까지 용서하는지\n- 극한상황에서 자신 vs 타인, 사랑하는 사람 vs 다수, 신념 vs 생존, 진실 vs 평온, 복수 vs 용서, 책임 vs 도망 중 어디로 기울지와 그 이유
 
 추가 구조화 블록 — 위 세 산문과 별개로 아래 JSON 필드도 함께 출력하세요. 각 산문에서 이미 다룬 내용을 짧은 개조식으로 뽑되, 산문과 모순되지 않게, dossier 근거 안에서만 쓰고 없는 내용을 지어내지 마세요.
@@ -462,12 +463,13 @@ async function writeStage2(seed:DetailSeed,dossier:ReportDossier){
   });
 }
 
-async function writeStage3(seed:DetailSeed,dossier:ReportDossier){
+async function writeStage3(seed:DetailSeed,dossier:ReportDossier,skipLeadRewrite=false){
   return askClaudeJson({
     system:REPORT_SYSTEM,
     schema:stage3Schema,
     maxAttempts:2,
     allowFallback:true,
+    skipLeadRewrite,
     input:`${commonWriterInput(seed,dossier)}\n\n이번에는 마지막 페이지의 아래 2개 필드만 작성하세요.\n\ncharmAndContradictions — 화면 제목: "${seed.name}에겐 이런 매력이 있어요"\n반드시 포함:\n- 캐릭터 안의 모순과 양면성, 상반된 행동이 같은 욕구에서 갈라지는 이유\n- 쉽게 오해받는 부분과 실제 내부 기능의 차이\n- 같은 특성이 어떤 상황에서는 강점이 되고 다른 상황에서는 약점이 되는 방식\n- 첫인상에서 눈에 띄는 매력\n- 알고 지낼수록 발견되는 매력\n- 위험하지만 매력적인 부분\n- 호불호가 갈릴 부분과 그 이유\n- 여러 단서를 연결했을 때 새롭게 읽히는 속내·맹점·관계의 숨은 기대\n- 오너가 직접 적지 않았을 가능성이 높은 새로운 연결을 최소 여러 개 포함\n\nintegratedReport — 화면 제목: "통합 리포트"\n- 앞의 여섯 카테고리를 순서대로 다시 요약하지 마세요.\n- coreEngine을 중심으로 욕구·두려움·감정·자기보호·관계·애착·갈등·자기기만·양면성이 한 사람 안에서 어떻게 이어지는지를 하나의 긴 흐름으로 통합하세요.\n- 오너가 이미 아는 사실보다 여러 독립 단서를 연결해서 새롭게 보이는 부분을 중심으로 쓰세요.\n- 자연스럽게 논점이 바뀌는 곳에서만 문단을 나누세요.\n\n섹션 스캔용 키워드 태그도 함께 출력하세요(각 2~3개, 항목당 2~10자의 짧은 한국어 키워드, 문장/설명/해시태그 기호 금지, 그 섹션 핵심만).\n- charmAndContradictionsTags / integratedReportTags: 각 해당 섹션의 핵심 키워드\n\n각 섹션의 핵심 한 줄 요약(TL;DR)도 출력하세요(30~70자, 한 문장, 길잡이가 아니라 그 섹션의 결론을 먼저 말하는 문장, 자연스러운 해요체).\n- charmAndContradictionsTldr / integratedReportTldr\n\n성향 스펙트럼(선택) — {section}Spectrums 형식: [{"left":왼쪽 극,"right":오른쪽 극,"value":0~100}], 축 2~3개. left/right는 서로 반대되는 짧은 성향 라벨(각 4~14자), value는 캐릭터가 어느 쪽에 치우쳤는지(0=left, 100=right). 두 극단 사이 성향으로 뚜렷이 설명될 때만 넣고, 애매하거나 안 맞으면 생략하세요(억지 금지). 특히 integratedReport(통합)는 대개 스펙트럼이 어울리지 않으니 신중히.\n- 필드명: charmAndContradictionsSpectrums / integratedReportSpectrums`,
   });
 }
@@ -508,10 +510,13 @@ export async function generatePaidDetailStage1(seedInput:unknown,publicProfileTe
 export async function generatePaidDetailRemaining(seedInput:unknown,dossierInput:unknown):Promise<Partial<FinalAnalysis>>{
   const seed=detailSeedSchema.parse(seedInput);
   const dossier=reportDossierSchema.parse(dossierInput);
-  const [stage2,stage3]=await Promise.all([writeStage2(seed,dossier),writeStage3(seed,dossier)]);
+  // 두 stage 모두 문단 안내문 재작성을 건너뛰고, 합친 뒤 한 번만 재작성한다.
+  // 안내문은 문단별로 독립 생성되고 재작성기는 원래 모든 리포트 필드를 한 번에 처리하므로
+  // 결과 텍스트는 동일하고, Claude 호출만 2회에서 1회로 줄어든다.
+  const [stage2,stage3]=await Promise.all([writeStage2(seed,dossier,true),writeStage3(seed,dossier,true)]);
   validateVisibleText(`${stage2.relationshipStyle} ${stage2.attachmentStyle} ${stage2.conflictStyleDetailed}`);
   validateVisibleText(`${stage3.charmAndContradictions} ${stage3.integratedReport}`);
-  return {...stage2,...stage3};
+  return rewriteReportLeads({...stage2,...stage3},REPORT_SYSTEM);
 }
 
 export async function generatePaidDetailContinuation(seedInput:unknown,dossierInput:unknown,stage:2|3):Promise<Partial<FinalAnalysis>>{
