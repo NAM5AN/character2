@@ -89,6 +89,21 @@ type FailuresState =
   | { state: 'ready'; data: FailuresData }
   | { state: 'error'; detail: string };
 
+// 일별 비용 추이.
+type DayCost = {
+  date: string; claudeCostUsd: number | string;
+  gptInTok: number | string; gptOutTok: number | string; sessions: number;
+};
+type CostState =
+  | { state: 'loading' }
+  | { state: 'ready'; days: DayCost[] }
+  | { state: 'error'; detail: string };
+
+// 하루 총비용(USD) = Claude 실측 + gpt 추정. 캐릭터별 카드와 동일한 gptCost/GPT_RATE 사용.
+function dayCostUsd(d: DayCost): number {
+  return Number(d.claudeCostUsd || 0) + gptCost(d.gptInTok, d.gptOutTok);
+}
+
 // 내부 stage 코드 → 사람이 읽는 단계 이름. 동적 코드(questions_3_6, detail_stage_2)도 처리.
 function stageLabel(stage: string): string {
   if (stage === 'profile_image') return '프로필 이미지 분석';
@@ -343,6 +358,23 @@ export default function AdminConsolePage() {
 
   useEffect(() => { void loadFailures(); }, [loadFailures]);
 
+  // 일별 비용 추이(최근 30일).
+  const [costs, setCosts] = useState<CostState>({ state: 'loading' });
+
+  const loadCosts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/daily-costs', { cache: 'no-store' });
+      if (res.status === 401) { setStatus('denied'); return; }
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(body?.costs?.days)) setCosts({ state: 'ready', days: body.costs.days });
+      else setCosts({ state: 'error', detail: body?.error || 'LOAD_FAILED' });
+    } catch {
+      setCosts({ state: 'error', detail: 'NETWORK' });
+    }
+  }, []);
+
+  useEffect(() => { void loadCosts(); }, [loadCosts]);
+
   const loadSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/config', { cache: 'no-store' });
@@ -544,6 +576,13 @@ export default function AdminConsolePage() {
   const stuckCount = failures.state === 'ready' ? (failures.data.stuck?.length ?? 0) : 0;
   const failuresActive = failures.state === 'ready' && (failures.data.total24h > 0 || stuckCount > 0);
 
+  const costDays = costs.state === 'ready' ? costs.days : [];
+  const costTotals = costDays.map(dayCostUsd);
+  const costMax = costTotals.reduce((m, v) => Math.max(m, v), 0);
+  const costSum = costTotals.reduce((s, v) => s + v, 0);
+  const costToday = costTotals.length ? costTotals[costTotals.length - 1] : 0;
+  const costAvg = costTotals.length ? costSum / costTotals.length : 0;
+
   return (
     <main className="container page">
       <div
@@ -698,6 +737,55 @@ export default function AdminConsolePage() {
         )}
       </div>
 
+      <div className="card" style={{ padding: '16px 18px', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 16 }}>일별 비용 추이 <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>· 최근 30일 (KST)</span></strong>
+          {costs.state === 'ready' && (
+            <span className="muted" style={{ fontSize: 13 }}>
+              합계 <b style={{ color: 'var(--fg,#111)' }}>{fmtCost(costSum)}</b> · 일평균 {fmtCost(costAvg)} · 오늘 {fmtCost(costToday)}
+            </span>
+          )}
+          {costs.state === 'loading' && <span className="muted" style={{ fontSize: 13 }}>조회 중…</span>}
+          {costs.state === 'error' && <span style={{ fontSize: 13, color: '#c0392b' }}>조회 실패 · {costs.detail}</span>}
+        </div>
+
+        {costs.state === 'ready' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 120, marginTop: 16, overflowX: 'auto', paddingBottom: 2 }}>
+              {costDays.map((d, i) => {
+                const usd = costTotals[i];
+                const h = costMax > 0 ? Math.max(usd > 0 ? 3 : 0, Math.round((usd / costMax) * 116)) : 0;
+                const isToday = i === costDays.length - 1;
+                return (
+                  <div
+                    key={d.date}
+                    title={`${d.date} · ${fmtCost(usd)} · ${d.sessions}세션`}
+                    style={{ flex: '1 0 8px', minWidth: 8, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', height: '100%' }}
+                  >
+                    <div
+                      style={{
+                        width: '100%', height: h, borderRadius: '3px 3px 0 0',
+                        background: isToday ? 'var(--accent, #6b4bff)' : usd > 0 ? 'rgba(107,75,255,.45)' : 'transparent',
+                        border: usd > 0 ? '1px solid rgba(107,75,255,.55)' : '1px dashed var(--line)',
+                        borderBottom: 'none',
+                        transition: 'height .2s',
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+              <span className="muted" style={{ fontSize: 11 }}>{costDays[0]?.date?.slice(5)}</span>
+              <span className="muted" style={{ fontSize: 11 }}>{costDays[costDays.length - 1]?.date?.slice(5)} (오늘)</span>
+            </div>
+            <p className="muted" style={{ margin: '10px 0 0', fontSize: 11, lineHeight: 1.6 }}>
+              막대에 마우스를 올리면 날짜·금액·세션 수가 보여요. Claude는 실측, GPT는 토큰 기준 추정이라 게이트웨이 청구액과 소폭 차이날 수 있어요.
+            </p>
+          </>
+        )}
+      </div>
+
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div className="eyebrow">Admin console · owner only</div>
@@ -707,7 +795,7 @@ export default function AdminConsolePage() {
           </p>
         </div>
         <div className="actions" style={{ marginTop: 4 }}>
-          <button className="btn" onClick={() => { void load(); void loadBalance(); void loadFailures(); }}>새로고침</button>
+          <button className="btn" onClick={() => { void load(); void loadBalance(); void loadFailures(); void loadCosts(); }}>새로고침</button>
           <button className="btn soft" onClick={() => void logout()}>로그아웃</button>
         </div>
       </div>
