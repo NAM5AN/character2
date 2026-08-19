@@ -45,12 +45,18 @@
 .report-summary-head .save-character-panel {
   position: absolute;
   right: 60px;
-  bottom: 56px;
+  top: calc(-430px + 56px);
+  bottom: auto;
   width: min(420px, 31vw);
   max-width: 420px;
   margin: 0;
   background: rgba(255,255,255,.74);
   backdrop-filter: blur(3px);
+}
+
+/* Give the next summary section enough breathing room below the large cover. */
+.report-summary-head + div {
+  margin-top: 68px !important;
 }
 
 /* Whole segmented control is clickable. The black fill slides with a soft overshoot. */
@@ -153,14 +159,18 @@
   .report-summary-head {
     height: auto !important;
     min-height: 0 !important;
-    margin-top: 20px !important;
+    margin-top: 28px !important;
   }
 
   .report-summary-head .save-character-panel {
     position: static;
     width: 100%;
-    max-width: 520px;
+    max-width: 480px;
     margin-left: auto;
+  }
+
+  .report-summary-head + div {
+    margin-top: 56px !important;
   }
 }
 
@@ -171,5 +181,9 @@
 
   .report-summary-head .save-character-panel {
     max-width: none;
+  }
+
+  .report-summary-head + div {
+    margin-top: 44px !important;
   }
 }
