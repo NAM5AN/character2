@@ -198,10 +198,12 @@ export function SummaryNotes({ preview }: { preview: CharacterReportPreview }) {
       <div className="summary-card-grid">
         {cards.map((card, index) => {
           const text = preview.summary[card.key] || '';
+          // 카드 전용 한 문장이 있으면 그것을, 없으면(구버전) 본문 첫 문장으로 폴백.
+          const cardLine = preview.summaryCardLines?.[card.key]?.trim() || summaryFirstSentence(text);
           const selected = activeKey === card.key;
           return <button type="button" className={`summary-card${selected ? ' is-active' : ''}`} key={card.key} onClick={() => setActiveKey(selected ? null : card.key)} aria-expanded={selected}>
             <div className="summary-card-top"><span className="summary-card-no">{String(index + 1).padStart(2, '0')}</span><h3>{card.label}</h3></div>
-            <p className="summary-card-preview">{summaryFirstSentence(text)}</p>
+            <p className="summary-card-preview">{cardLine}</p>
             <span className="summary-card-hint">{selected ? '접기 ↑' : '자세히 보기 ↓'}</span>
           </button>;
         })}

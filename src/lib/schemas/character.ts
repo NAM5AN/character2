@@ -40,6 +40,17 @@ export const analysisTypeSummarySchema=z.object({
   hiddenPattern:z.string().min(20).max(800).optional(),
 });
 
+// 요약 카드 전용 한 문장(카드 미리보기). 긴 summary 본문을 자르지 않고 AI가 별도로 생성한 결론형 한 문장.
+// 모두 optional(구버전 저장본은 없으므로 폴백 사용). 카드 6개 키는 summary 필드명과 동일.
+export const summaryCardLinesSchema=z.object({
+  outerSelf:z.string().min(6).max(90),
+  innerSelf:z.string().min(6).max(90),
+  conflictStyle:z.string().min(6).max(90),
+  affectionStyle:z.string().min(6).max(90),
+  misunderstoodPoint:z.string().min(6).max(90),
+  hiddenPattern:z.string().min(6).max(90),
+}).partial();
+
 // 스캔용 키워드 태그. 키=섹션/카드 필드명, 값=짧은 키워드 2~3개. 모두 optional(예전 저장본 호환).
 export const keywordTagMapSchema=z.record(z.string(),z.array(z.string().min(1).max(16)).max(4));
 // 상세 섹션 태그는 섹션별 "평면 키"로 저장한다(스테이지 병합 시 nested 맵이 서로를 덮는 충돌을 피함).
@@ -78,7 +89,7 @@ const summaryAnalysisRawSummarySchema=z.object({
   hiddenPattern:z.unknown(),
 });
 export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:summaryAnalysisRawSummarySchema,evidencePack:z.record(z.string(),z.unknown()).optional().default({})}).passthrough();
-export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,summaryTags:keywordTagMapSchema.optional(),evidencePack:characterEvidencePackSchema});
+export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,summaryTags:keywordTagMapSchema.optional(),summaryCardLines:summaryCardLinesSchema.optional(),evidencePack:characterEvidencePackSchema});
 
 // Paid detail 6.4+: seven large narrative sections only.
 // No character-count limits are applied to these generated sections.
@@ -166,6 +177,8 @@ export const finalAnalysisSchema=z.object({
   integratedReportSpectrums:spectrumListSchema.optional(),
   // 요약 카드별 키워드 태그(outerSelf 등 요약 필드 키).
   summaryTags:keywordTagMapSchema.optional(),
+  // 요약 카드 전용 한 문장(카드 미리보기용).
+  summaryCardLines:summaryCardLinesSchema.optional(),
 
   // 6.4+ grouped detail fields.
   characterOverview:z.string().optional(),
