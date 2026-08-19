@@ -151,8 +151,10 @@ export function AnalyzeReviewUiPolish(){
         #${PERSONALITY_PICKER_ID} .personality-copy{margin:6px 0 0;color:var(--muted,#777);font-size:13px;line-height:1.55}
         #${PERSONALITY_PICKER_ID} .personality-count{font-size:12px;font-weight:800;color:var(--muted,#777);white-space:nowrap}
         #${PERSONALITY_PICKER_ID} .personality-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;overflow:visible}
-        #${PERSONALITY_PICKER_ID} .personality-chip{position:relative;border:1px solid var(--line);background:white;color:var(--ink,#171816);border-radius:999px;padding:9px 13px;font:inherit;font-size:13px;font-weight:800;line-height:1;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease;overflow:visible}
+        #${PERSONALITY_PICKER_ID} .personality-chip{position:relative;border:1px solid var(--line);background:white;color:var(--ink,#171816);border-radius:999px;padding:9px 13px 9px 31px;font:inherit;font-size:13px;font-weight:800;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease;overflow:visible}
+        #${PERSONALITY_PICKER_ID} .personality-chip::before{content:'';position:absolute;left:12px;top:50%;transform:translateY(-50%);width:12px;text-align:center;font-size:13px;font-weight:900;line-height:1}
         #${PERSONALITY_PICKER_ID} .personality-chip[data-selected="true"]{background:var(--ink,#171816);border-color:var(--ink,#171816);color:white}
+        #${PERSONALITY_PICKER_ID} .personality-chip[data-selected="true"]::before{content:'✓'}
         #${PERSONALITY_PICKER_ID} .personality-chip[data-blocked="true"]{opacity:.42;cursor:not-allowed}
         #${PERSONALITY_PICKER_ID} .personality-chip::after{content:attr(data-tooltip);position:absolute;left:50%;bottom:calc(100% + 9px);transform:translate(-50%,5px);width:max-content;max-width:240px;padding:7px 9px;border-radius:8px;background:#171816;color:#fff;font-size:11px;font-weight:700;line-height:1.35;white-space:normal;opacity:0;visibility:hidden;pointer-events:none;z-index:20;box-shadow:0 6px 18px rgba(0,0,0,.16);transition:opacity .12s ease,transform .12s ease,visibility .12s ease}
         #${PERSONALITY_PICKER_ID} .personality-chip:hover::after,#${PERSONALITY_PICKER_ID} .personality-chip:focus-visible::after{opacity:1;visibility:visible;transform:translate(-50%,0)}
@@ -191,8 +193,8 @@ export function AnalyzeReviewUiPolish(){
       const copy=document.createElement('p');
       copy.className='personality-copy';
       copy.textContent=aiInitial.length
-        ?'AI가 프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.'
-        :'AI가 프로필을 바탕으로 가까운 성향을 고르고 있어요. 잠시 뒤 자동으로 선택돼요.';
+        ?'프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.'
+        :'프로필을 바탕으로 가까운 성향을 고르고 있어요. 잠시 뒤 자동으로 선택돼요.';
       const count=document.createElement('span');
       count.className='personality-count';
       intro.append(title,copy);heading.append(intro,count);
@@ -211,10 +213,10 @@ export function AnalyzeReviewUiPolish(){
           button.className='personality-chip';
           button.dataset.selected=String(active);
           button.dataset.blocked=String(blocked);
-          button.dataset.tooltip=tag.family;
+          button.dataset.tooltip=tag.tooltip;
           button.setAttribute('aria-pressed',String(active));
-          button.setAttribute('aria-label',`${tag.label}: ${tag.family}`);
-          button.textContent=`${active?'✓ ':''}${tag.label}`;
+          button.setAttribute('aria-label',`${tag.label}: ${tag.tooltip}`);
+          button.textContent=tag.label;
           button.addEventListener('click',()=>{
             if(active){selected=selected.filter(key=>key!==tag.key)}
             else if(selected.length<PERSONALITY_TAG_MAX_SELECTIONS){selected=[...selected,tag.key]}
@@ -254,7 +256,7 @@ export function AnalyzeReviewUiPolish(){
             }else{
               selected=readOwnerSelection(sessionId)??selected;
             }
-            copy.textContent='AI가 프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.';
+            copy.textContent='프로필을 읽고 가까운 성향을 먼저 골라뒀어요. 맞지 않는 건 빼고, 필요한 건 더해주세요.';
             render();
           }catch{}
         })();
