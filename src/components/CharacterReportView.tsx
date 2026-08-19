@@ -368,17 +368,17 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         <div style={{marginTop:20}}><strong>페이지 {reportPage} / 3</strong></div>
 
         {reportPage===1&&<>
-          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={detail.analysis.characterOverview} tags={detail.analysis.sectionTags?.characterOverview}/>
-          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={detail.analysis.innerMechanics} tags={detail.analysis.sectionTags?.innerMechanics} extra={<DesireGapBlock data={detail.analysis.desireGap}/>}/>
+          <NarrativeSection index={0} title={applyName('{name}는 이런 캐릭터예요', preview.name)} text={detail.analysis.characterOverview} tags={detail.analysis.characterOverviewTags??detail.analysis.sectionTags?.characterOverview}/>
+          <NarrativeSection index={1} title={applyName('{name}는 이렇게 작동해요', preview.name)} text={detail.analysis.innerMechanics} tags={detail.analysis.innerMechanicsTags??detail.analysis.sectionTags?.innerMechanics} extra={<DesireGapBlock data={detail.analysis.desireGap}/>}/>
         </>}
         {reportPage===2&&<>
-          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={detail.analysis.relationshipStyle} tags={detail.analysis.sectionTags?.relationshipStyle} extra={<RelationshipManualBlock data={detail.analysis.relationshipManual}/>}/>
-          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={detail.analysis.attachmentStyle} tags={detail.analysis.sectionTags?.attachmentStyle} extra={<MatchProfileBlock data={detail.analysis.matchProfile}/>}/>
-          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={detail.analysis.conflictStyleDetailed} tags={detail.analysis.sectionTags?.conflictStyleDetailed} extra={<PressureStagesBlock data={detail.analysis.pressureStages}/>}/>
+          <NarrativeSection index={2} title={applyName('{name}는 이렇게 관계를 맺어요', preview.name)} text={detail.analysis.relationshipStyle} tags={detail.analysis.relationshipStyleTags??detail.analysis.sectionTags?.relationshipStyle} extra={<RelationshipManualBlock data={detail.analysis.relationshipManual}/>}/>
+          <NarrativeSection index={3} title={applyName('{name}는 이런 애착이 있어요', preview.name)} text={detail.analysis.attachmentStyle} tags={detail.analysis.attachmentStyleTags??detail.analysis.sectionTags?.attachmentStyle} extra={<MatchProfileBlock data={detail.analysis.matchProfile}/>}/>
+          <NarrativeSection index={4} title={applyName('{name}는 이렇게 갈등해요', preview.name)} text={detail.analysis.conflictStyleDetailed} tags={detail.analysis.conflictStyleDetailedTags??detail.analysis.sectionTags?.conflictStyleDetailed} extra={<PressureStagesBlock data={detail.analysis.pressureStages}/>}/>
         </>}
         {reportPage===3&&<>
-          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={detail.analysis.charmAndContradictions} tags={detail.analysis.sectionTags?.charmAndContradictions}/>
-          <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport} tags={detail.analysis.sectionTags?.integratedReport}/>
+          <NarrativeSection index={5} title={applyName('{name}에겐 이런 매력이 있어요', preview.name)} text={detail.analysis.charmAndContradictions} tags={detail.analysis.charmAndContradictionsTags??detail.analysis.sectionTags?.charmAndContradictions}/>
+          <NarrativeSection index={6} title="통합 리포트" text={detail.analysis.integratedReport} tags={detail.analysis.integratedReportTags??detail.analysis.sectionTags?.integratedReport}/>
         </>}
 
         {prefetchError&&reportPage<3&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>

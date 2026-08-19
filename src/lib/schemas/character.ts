@@ -39,6 +39,12 @@ export const analysisTypeSummarySchema=z.object({
   misunderstoodPoint:z.string().min(20).max(800).optional(),
   hiddenPattern:z.string().min(20).max(800).optional(),
 });
+
+// 스캔용 키워드 태그. 키=섹션/카드 필드명, 값=짧은 키워드 2~3개. 모두 optional(예전 저장본 호환).
+export const keywordTagMapSchema=z.record(z.string(),z.array(z.string().min(1).max(16)).max(4));
+// 상세 섹션 태그는 섹션별 "평면 키"로 저장한다(스테이지 병합 시 nested 맵이 서로를 덮는 충돌을 피함).
+export const tagListSchema=z.array(z.string().min(1).max(16)).max(4);
+
 const evidenceTextSchema=z.string().min(8).max(190);
 const interviewEvidenceSchema=z.object({order:z.number().int().min(1).max(20),finding:z.string().min(8).max(190)});
 
@@ -67,7 +73,7 @@ const summaryAnalysisRawSummarySchema=z.object({
   hiddenPattern:z.unknown(),
 });
 export const summaryAnalysisRawSchema=z.object({oneLineSummary:z.unknown(),summary:summaryAnalysisRawSummarySchema,evidencePack:z.record(z.string(),z.unknown()).optional().default({})}).passthrough();
-export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,evidencePack:characterEvidencePackSchema});
+export const summaryAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,summaryTags:keywordTagMapSchema.optional(),evidencePack:characterEvidencePackSchema});
 
 // Paid detail 6.4+: seven large narrative sections only.
 // No character-count limits are applied to these generated sections.
@@ -96,10 +102,6 @@ export const finalAnalysisRawSchema=z.object({
   characterOverview:z.unknown(),innerMechanics:z.unknown(),relationshipStyle:z.unknown(),attachmentStyle:z.unknown(),conflictStyleDetailed:z.unknown(),charmAndContradictions:z.unknown(),integratedReport:z.unknown(),
 }).passthrough();
 export const finalAnalysisGenerationSchema=z.object({oneLineSummary:z.string().min(25).max(80),summary:analysisTypeSummarySchema,...detailAnalysisGenerationSchema.shape});
-
-// 섹션/카드별 키워드 태그(스캔용). 키=섹션 필드명, 값=짧은 키워드 2~3개.
-// 예전 저장본에는 없으므로 optional. 태그 개수·길이는 넉넉히 허용해 검증 실패로 리포트를 버리지 않는다.
-export const keywordTagMapSchema=z.record(z.string(),z.array(z.string().min(1).max(16)).max(4));
 
 // ── 혼합 레이아웃용 구조화 블록 ──
 // 산문 섹션 사이에 끼우는 나열·비교·단계 블록. 모두 생성 optional(모델이 안 주면 산문만 렌더).
@@ -131,8 +133,16 @@ export const pressureStagesSchema=z.object({
 export const finalAnalysisSchema=z.object({
   oneLineSummary:z.string(),
   summary:analysisTypeSummarySchema.optional(),
-  // 상세 리포트 섹션별 키워드 태그(characterOverview 등 7개 섹션 키).
+  // 상세 리포트 섹션별 키워드 태그(구버전 nested 맵 — 백필/하위호환용, 렌더 폴백).
   sectionTags:keywordTagMapSchema.optional(),
+  // 상세 섹션 태그 평면 키(신규 생성 경로 — 스테이지 병합 안전). 렌더는 이걸 우선 사용.
+  characterOverviewTags:tagListSchema.optional(),
+  innerMechanicsTags:tagListSchema.optional(),
+  relationshipStyleTags:tagListSchema.optional(),
+  attachmentStyleTags:tagListSchema.optional(),
+  conflictStyleDetailedTags:tagListSchema.optional(),
+  charmAndContradictionsTags:tagListSchema.optional(),
+  integratedReportTags:tagListSchema.optional(),
   // 요약 카드별 키워드 태그(outerSelf 등 요약 필드 키).
   summaryTags:keywordTagMapSchema.optional(),
 

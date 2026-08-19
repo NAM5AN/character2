@@ -156,6 +156,15 @@ function clipSentence(v:string,max:number){
   return end>=25?cut.slice(0,end+1):`${cut}…`;
 }
 function texts(v:unknown,maxItems:number){const a=Array.isArray(v)?v:typeof v==='string'?v.split(/\n+/):[];return [...new Set(a.map(text).map(x=>clip(x,190)).filter(x=>x.length>=8))].slice(0,maxItems)}
+// 요약 카드 키워드 태그를 관대하게 정리한다. 잘못된 형식은 조용히 버려서 요약 생성 자체를 실패시키지 않는다.
+function cleanTags(v:unknown):string[]{const a=Array.isArray(v)?v:[];return [...new Set(a.map(x=>typeof x==='string'?x.replace(/^#/,'').replace(/\s+/g,' ').trim():'').filter(x=>x.length>=1&&x.length<=16))].slice(0,4)}
+function summaryTagMap(v:unknown):Record<string,string[]>|undefined{
+  const src=rec(v);const out:Record<string,string[]>={};
+  for(const key of ['outerSelf','innerSelf','conflictStyle','affectionStyle','misunderstoodPoint','hiddenPattern']){
+    const tags=cleanTags(src[key]);if(tags.length)out[key]=tags;
+  }
+  return Object.keys(out).length?out:undefined;
+}
 function fragments(source:string,maxItems:number){
   const out:string[]=[];
   for(const line of source.replace(/\r\n?/g,'\n').split('\n')){
@@ -198,6 +207,7 @@ function normalize(raw:z.infer<typeof summaryAnalysisRawSchema>,src:SummarySourc
       misunderstoodPoint:summaryText(s.misunderstoodPoint),
       hiddenPattern:summaryText(s.hiddenPattern),
     },
+    ...(summaryTagMap((raw as Record<string,unknown>).summaryTags)?{summaryTags:summaryTagMap((raw as Record<string,unknown>).summaryTags)}:{}),
     evidencePack:buildPack(raw.evidencePack,src),
   };
 }
@@ -280,7 +290,7 @@ async function generateSummary(input:string,src:SummarySource):Promise<SummaryAn
 export async function generateSummaryReport(src:SummarySource,usage:{sessionId?:string;shareCode?:string}):Promise<SummaryAnalysisGeneration>{
   const dossierInput=`캐릭터 데이터:\n${JSON.stringify(src.analysisDraft)}\n\n오너 검수:\n${JSON.stringify(src.review)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(src.answers)}\n\n작업 규칙:\n- 답변의 문장을 순서대로 요약하지 말고 행동·조건·이유를 의미 단위로 압축하세요.\n- 서로 멀리 떨어진 단서를 최소 두 개 이상 연결해서만 강한 insight를 만드세요.\n- 오너가 정정한 내용은 기존 추론보다 우선하세요.\n- 한 행동이 어떤 욕구를 충족하거나 어떤 위험을 피하는지, 어떤 조건에서 반대로 뒤집히는지까지 보세요.\n- evidenceAnchors는 원 질문 전체를 복사하지 말고 행동·관계·조건만 짧게 남기세요.`;
   const summaryDossier=await withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_psychology'},()=>buildSummaryDossier(dossierInput));
-  const summaryInput=`캐릭터 이름: ${src.name}\n\n[검증된 요약용 심층 해석 묶음]\n${JSON.stringify(summaryDossier)}\n\n출력 규칙:\n- 원 프로필과 원 문답은 다시 볼 수 없다고 생각하고 이 심층 해석 묶음만으로 작성하세요.\n- oneLineSummary: 25~80자의 한 문장. 가장 흥미로운 긴장이나 행동 원리를 잡으세요.\n- summary.outerSelf: 겉으로 보이는 인상과 그 인상을 단순 라벨로 설명할 수 없는 이유.\n- summary.innerSelf: 실제 선택을 움직이는 자기상·욕구·내적 기준.\n- summary.conflictStyle: 감정이 흔들리는 자극과 평소 반응이 달라지는 임계점.\n- summary.affectionStyle: 신뢰가 생기는 조건과 관계에서 반복되는 거리·개입 패턴.\n- summary.misunderstoodPoint: 겉에서 오해하기 쉬운 의미와 실제 내부 기능의 차이.\n- summary.hiddenPattern: 서로 다른 insight를 다시 연결했을 때 보이는 의외의 공통 원리.\n- summary 6개 필드는 각각 160~260자를 목표로 하세요.\n- 각 필드는 정확히 2개의 자연스러운 문단으로 나누고 문단 사이는 빈 줄 하나(\\n\\n)로 구분하세요.\n- 모든 문단은 **문단에서 다룰 주제만 알려주는 짧은 안내문**으로 시작하세요.\n- 본문은 실제 상담사가 오너에게 캐릭터를 풀이하듯 자연스러운 해요체 존댓말로 작성하세요.\n- evidenceAnchors를 근거 목록처럼 나열하지 말고 필요한 경우 짧은 예시로만 사용하세요.\n- 여섯 카드는 같은 행동이나 같은 결론을 반복하지 마세요.\n- 상세 리포트에서 다룰 전체 인과와 반례를 미리 다 풀지는 마세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성하고 각 축은 중요한 발견만 0~3개로 제한하세요.\n최종 JSON 키는 oneLineSummary, summary, evidencePack만 사용하세요.`;
+  const summaryInput=`캐릭터 이름: ${src.name}\n\n[검증된 요약용 심층 해석 묶음]\n${JSON.stringify(summaryDossier)}\n\n출력 규칙:\n- 원 프로필과 원 문답은 다시 볼 수 없다고 생각하고 이 심층 해석 묶음만으로 작성하세요.\n- oneLineSummary: 25~80자의 한 문장. 가장 흥미로운 긴장이나 행동 원리를 잡으세요.\n- summary.outerSelf: 겉으로 보이는 인상과 그 인상을 단순 라벨로 설명할 수 없는 이유.\n- summary.innerSelf: 실제 선택을 움직이는 자기상·욕구·내적 기준.\n- summary.conflictStyle: 감정이 흔들리는 자극과 평소 반응이 달라지는 임계점.\n- summary.affectionStyle: 신뢰가 생기는 조건과 관계에서 반복되는 거리·개입 패턴.\n- summary.misunderstoodPoint: 겉에서 오해하기 쉬운 의미와 실제 내부 기능의 차이.\n- summary.hiddenPattern: 서로 다른 insight를 다시 연결했을 때 보이는 의외의 공통 원리.\n- summary 6개 필드는 각각 160~260자를 목표로 하세요.\n- 각 필드는 정확히 2개의 자연스러운 문단으로 나누고 문단 사이는 빈 줄 하나(\\n\\n)로 구분하세요.\n- 모든 문단은 **문단에서 다룰 주제만 알려주는 짧은 안내문**으로 시작하세요.\n- 본문은 실제 상담사가 오너에게 캐릭터를 풀이하듯 자연스러운 해요체 존댓말로 작성하세요.\n- evidenceAnchors를 근거 목록처럼 나열하지 말고 필요한 경우 짧은 예시로만 사용하세요.\n- 여섯 카드는 같은 행동이나 같은 결론을 반복하지 마세요.\n- 상세 리포트에서 다룰 전체 인과와 반례를 미리 다 풀지는 마세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성하고 각 축은 중요한 발견만 0~3개로 제한하세요.\n- summaryTags: 각 요약 카드의 스캔용 키워드 태그. {"outerSelf":[...],"innerSelf":[...],"conflictStyle":[...],"affectionStyle":[...],"misunderstoodPoint":[...],"hiddenPattern":[...]} 형태로, 카드마다 2~3개, 항목당 2~10자의 짧은 한국어 키워드(문장/설명/해시태그 기호 금지). 해당 카드 본문의 핵심만 담으세요.\n최종 JSON 키는 oneLineSummary, summary, summaryTags, evidencePack만 사용하세요.`;
   return withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_teaser'},()=>generateSummary(summaryInput,src));
 }
 
@@ -310,7 +320,7 @@ export async function POST(request:Request){
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;
     const sharedInferences=body.draft.aiInferences.map(x=>({id:x.id,text:x.text,confidence:x.confidence,evidenceIds:[],evidence:[],ownerVerdict:x.ownerVerdict}));
-    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.4',analysis:'claude-summary-dossier/4.0'}});
+    const passport=characterPassportSchema.parse({schemaVersion:'character-passport/1.0',characterId,shareCode,basicProfile:{name,age,gender,profileText},traits:body.draft.traits,relationshipTraits:body.draft.relationshipTraits,confirmedFacts:body.draft.confirmedFacts,aiInferences:sharedInferences,interview:{version:'interview/1.0',completedCount:20,answers:body.answers},analysis:{oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,...(summaryResult.summaryTags?{summaryTags:summaryResult.summaryTags}:{}),outerSelf:'',innerSelf:'',coreValues:[],desires:[],fears:[],conflictStyle:'',affectionStyle:'',misunderstoodPoints:[],contradictions:[],interestingPoints:[]},engineVersions:{parser:'parser/1.4-image',interview:'interview/1.4',analysis:'claude-summary-dossier/4.0'}});
     const detailSeed={version:'detail-seed/2.0',name,oneLineSummary:summaryResult.oneLineSummary,summary:summaryResult.summary,evidencePack:summaryResult.evidencePack};
     const appearanceForDetail=body.draft.basicProfile.appearanceNotes?.trim()?`[외관 자료 관찰 메모 — 시각 보조 근거이며 성격·감정·과거를 단독으로 확정하지 말 것]\n${body.draft.basicProfile.appearanceNotes.trim()}`:'';
     const secretProfileText=[body.draft.basicProfile.secretProfileText||'',appearanceForDetail].filter(Boolean).join('\n\n');
