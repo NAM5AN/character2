@@ -295,9 +295,14 @@
   font-size: 15.5px; line-height: 1.82; max-width: 46em;
   word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty;
 }
+/* 구조 블록이 해당 항목 안에 중첩될 때 — 본문과 같은 들여쓰기로 정렬 */
+#paid-detail-report .topic-extra { padding: 0 0 18px 42px; }
+#paid-detail-report .topic-extra .report-block { margin: 4px 0 0; }
+
 @media (max-width: 760px) {
   #paid-detail-report details.topic .topic-body { padding-left: 0; }
   #paid-detail-report details.topic > summary { font-size: 15.5px; }
+  #paid-detail-report .topic-extra { padding-left: 0; }
 }
 
 /* Keep this stylesheet in the deployment bundle when spacing-only changes are released. */

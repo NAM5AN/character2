@@ -18,11 +18,26 @@ function splitTopics(text: string) {
     });
 }
 
-export function TopicAccordion({ text }: { text?: string }) {
+// 구조 블록을 "가장 잘 맞는 항목"에 붙이기 위한 설명자. match 키워드가 항목 리드에 들어가면 그 항목 안에 렌더.
+export type TopicBlock = { match: string[]; node: ReactNode };
+
+export function TopicAccordion({ text, blocks = [] }: { text?: string; blocks?: TopicBlock[] }) {
   const topics = text?.trim() ? splitTopics(text) : [];
   // open 상태를 React가 제어해 배경 재렌더에도 펼친 항목이 유지되게 한다. 기본은 첫 항목만 펼침.
   const [open, setOpen] = useState<Record<number, boolean>>({ 0: true });
-  if (!topics.length) return null;
+
+  // 각 블록을 리드가 매칭되는 첫 항목에 배치. 못 맞추면 아코디언 뒤에 남긴다.
+  const perTopic: Record<number, ReactNode[]> = {};
+  const leftover: ReactNode[] = [];
+  blocks.forEach((block, blockIndex) => {
+    const wrapped = <div key={`blk-${blockIndex}`} className="topic-block">{block.node}</div>;
+    const target = topics.findIndex(topic => block.match.some(keyword => topic.lead.includes(keyword)));
+    if (target >= 0) (perTopic[target] ??= []).push(wrapped);
+    else leftover.push(wrapped);
+  });
+
+  if (!topics.length) return blocks.length ? <>{blocks.map((block, i) => <div key={i}>{block.node}</div>)}</> : null;
+
   const allOpen = topics.every((_, index) => open[index]);
   const toggleAll = () => {
     const next = !allOpen;
@@ -42,8 +57,10 @@ export function TopicAccordion({ text }: { text?: string }) {
       >
         <summary><span className="topic-lead">{topic.lead}</span><span className="chev" aria-hidden="true">▾</span></summary>
         {topic.body && <div className="topic-body">{topic.body}</div>}
+        {perTopic[index]?.length ? <div className="topic-extra">{perTopic[index]}</div> : null}
       </details>)}
     </div>
+    {leftover.length ? leftover : null}
   </div>;
 }
 
