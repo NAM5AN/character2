@@ -500,9 +500,15 @@ export default function AdminConsolePage() {
           )}
           {balance.state === 'ready' && (
             <>
-              <strong style={{ fontSize: 26, letterSpacing: '-.02em', color: balanceColor }}>
+              <a
+                href="https://vercel.com/nam-s-projects4/~/ai-gateway"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Vercel AI Gateway 대시보드 열기"
+                style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: balanceColor, textDecoration: 'none' }}
+              >
                 {fmtUsd(balance.balance)}
-              </strong>
+              </a>
               {balance.balance != null && (
                 <span className="muted" style={{ fontSize: 13 }}>
                   ≈ {Math.round(balance.balance * USD_TO_KRW).toLocaleString('ko-KR')}원
@@ -524,11 +530,11 @@ export default function AdminConsolePage() {
           <a
             className="btn"
             style={{ padding: '6px 12px' }}
-            href="https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dtop-up"
+            href="https://vercel.com/nam-s-projects4/~/ai-gateway"
             target="_blank"
             rel="noopener noreferrer"
           >
-            충전
+            대시보드 · 충전
           </a>
         </div>
       </div>
