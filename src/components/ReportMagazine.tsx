@@ -4,12 +4,9 @@ import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { applyName } from '@/lib/josa';
 
-// 매거진형 리포트 렌더. 상세는 "다양한 토픽 그리드"(hero/half/feature/wide/timeline)로 배치하고
-// 섹션 단위로 접기/펴기 가능. 구조 블록·스펙트럼은 관련 토픽 뒤에 study-block으로 끼운다.
-// 새 데이터(스펙트럼 등)가 없으면 해당 요소만 빠지고 산문 그리드는 정상 렌더된다.
-
 type UnknownRecord = Record<string, unknown>;
 type SpectrumItem = { left: string; right: string; value: number };
+type SummaryKey = keyof CharacterReportPreview['summary'];
 
 function asRecord(v: unknown): UnknownRecord { return v && typeof v === 'object' ? v as UnknownRecord : {}; }
 function strList(v: unknown): string[] { return Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()) : []; }
@@ -30,7 +27,6 @@ function splitTopics(text: string) {
     });
 }
 
-// 토픽 레이아웃 타입을 인덱스로 결정해 매거진의 리듬을 만든다.
 function topicClass(index: number, total: number, key: string) {
   if (index === 0) return 'topic topic--hero';
   if (key === 'integratedReport') return 'topic topic--timeline';
@@ -68,7 +64,6 @@ function SpectrumStudy({ items, label }: { items: SpectrumItem[]; label: string 
   </div>)}</div></aside>;
 }
 
-// 섹션별 study-block과 그 삽입 위치(해당 토픽 index 뒤). 데이터가 있을 때만.
 function sectionStudyBlocks(key: string, analysis: FinalAnalysis): { after: number; node: ReactNode }[] {
   const a = analysis as unknown as UnknownRecord;
   const out: { after: number; node: ReactNode }[] = [];
@@ -99,10 +94,10 @@ function MagazineSection({ meta, name, analysis }: { meta: SectionMeta; name: st
   if (!text?.trim()) return null;
   const topics = splitTopics(text);
   const total = topics.length;
-  const tags = strList(a[`${meta.key}Tags`]) .concat(strList(asRecord(a.sectionTags)[meta.key])).slice(0, 4);
+  const tags = strList(a[`${meta.key}Tags`]).concat(strList(asRecord(a.sectionTags)[meta.key])).slice(0, 4);
   const uniqueTags = Array.from(new Set(tags));
   const tldr = a[`${meta.key}Tldr`] as string | undefined;
-  const blocks = sectionStudyBlocks(meta.key, analysis);
+  const blocks = sectionStudyBlocks(String(meta.key), analysis);
   return <section className={`report-section${open ? ' is-open' : ''}`}>
     <header className="section-head" onClick={() => setOpen(v => !v)} aria-expanded={open}>
       <div className="section-number">{meta.no}</div>
@@ -132,7 +127,6 @@ const PAGES: { no: string; kicker: string; heading: string; secs: number[] }[] =
   { no: '03', kicker: 'CHARM / INTEGRATED', heading: '{name}의 모순과 방향을 함께 봅니다', secs: [5, 6] },
 ];
 
-// 상세 리포트 한 페이지(1~3)를 매거진 시트로 렌더.
 export function DetailMagazinePage({ page, name, analysis, endNote }: { page: number; name: string; analysis: FinalAnalysis; endNote?: string }) {
   const p = PAGES[page - 1];
   if (!p) return null;
@@ -146,54 +140,78 @@ export function DetailMagazinePage({ page, name, analysis, endNote }: { page: nu
   </article></div>;
 }
 
-// ── 요약 페이지(커버 + 노트 그리드) ──
 function summaryFirstSentence(field?: string) {
   if (!field) return '';
   const body = field.replace(/^\s*\*\*.+?\*\*\s*/su, '').replace(/\s+/g, ' ').trim();
   const cut = body.search(/[.?!]\s|[.?!]$/u);
   const one = cut >= 0 ? body.slice(0, cut + 1) : body;
-  return one.length > 46 ? `${one.slice(0, 44).trimEnd()}…` : one;
+  return one.length > 82 ? `${one.slice(0, 80).trimEnd()}…` : one;
 }
 
-const CORE_MAP: { key: keyof CharacterReportPreview['summary']; tag: string; label: string }[] = [
-  { key: 'outerSelf', tag: 'OUTER', label: '겉으로 보이는 모습' },
-  { key: 'innerSelf', tag: 'INNER', label: '실제 내면' },
-  { key: 'conflictStyle', tag: 'CONFLICT', label: '감정이 흔들리는 순간' },
-  { key: 'affectionStyle', tag: 'BOND', label: '관계에서 반복되는 패턴' },
-  { key: 'misunderstoodPoint', tag: 'MISREAD', label: '쉽게 오해받는 부분' },
-  { key: 'hiddenPattern', tag: 'HIDDEN', label: '의외로 눈에 띄는 지점' },
+const SUMMARY_CARDS: { key: SummaryKey; label: string }[] = [
+  { key: 'outerSelf', label: '겉으로 보이는 모습' },
+  { key: 'innerSelf', label: '실제 내면' },
+  { key: 'conflictStyle', label: '감정이 흔들리는 순간' },
+  { key: 'affectionStyle', label: '관계에서 반복되는 패턴' },
+  { key: 'misunderstoodPoint', label: '쉽게 오해받는 부분' },
+  { key: 'hiddenPattern', label: '의외로 눈에 띄는 지점' },
 ];
 
 export function ReportCover({ preview }: { preview: CharacterReportPreview }) {
-  const cells = CORE_MAP.map((c, i) => ({ ...c, no: String(i + 1).padStart(2, '0'), desc: summaryFirstSentence(preview.summary[c.key]) })).filter(c => c.desc);
-  return <div className="report-mag"><section className="cover">
+  return <div className="report-mag"><section className="cover cover--summary-only">
     <div>
       <div className="cover-eyebrow">CHARACTER DETAIL REPORT</div>
       <h1>{preview.name}<span>정밀 캐릭터 분석</span></h1>
       {preview.oneLineSummary ? <p className="cover-quote">{preview.oneLineSummary}</p> : null}
     </div>
-    {cells.length === 6 ? <div className="core-map">{cells.map(c => <div className="map-cell" key={c.key}>
-      <span>{c.no} / {c.tag}</span><div><h3>{c.label}</h3><p>{c.desc}</p></div>
-    </div>)}</div> : null}
   </section></div>;
 }
 
+function SummaryFullText({ index, label, text }: { index: number; label: string; text: string }) {
+  const paras = splitTopics(text);
+  return <div className="summary-expanded">
+    <div className="summary-expanded-head"><span>{String(index + 1).padStart(2, '0')}</span><h3>{label}</h3></div>
+    <div className="summary-expanded-body">
+      {paras.map((p, i) => <div className="summary-paragraph" key={i}><h4>{p.lead}</h4>{p.body ? <p>{p.body}</p> : null}</div>)}
+    </div>
+  </div>;
+}
+
 export function SummaryNotes({ preview }: { preview: CharacterReportPreview }) {
-  const s = preview.summary;
-  const rich = Boolean(s.misunderstoodPoint?.trim() && s.hiddenPattern?.trim());
-  const cards: [keyof CharacterReportPreview['summary'], string][] = rich
-    ? [['outerSelf', '겉으로 보이는 모습'], ['innerSelf', '실제 내면'], ['conflictStyle', '감정이 흔들리는 순간'], ['affectionStyle', '관계에서 반복되는 패턴'], ['misunderstoodPoint', '쉽게 오해받는 부분'], ['hiddenPattern', '의외로 눈에 띄는 지점']]
-    : [['outerSelf', '겉으로 보이는 모습'], ['innerSelf', '실제 내면'], ['conflictStyle', '갈등 방식'], ['affectionStyle', '애정 표현']];
+  const [mode, setMode] = useState<'glance' | 'read'>('glance');
+  const [activeKey, setActiveKey] = useState<SummaryKey | null>(null);
+  const cards = SUMMARY_CARDS.filter(card => preview.summary[card.key]?.trim());
+  const activeIndex = activeKey ? cards.findIndex(card => card.key === activeKey) : -1;
+  const activeCard = activeIndex >= 0 ? cards[activeIndex] : null;
+  const activeText = activeCard ? preview.summary[activeCard.key] : '';
+
   return <div className="report-mag"><section className="sheet">
-    <header className="summary-heading"><h2>먼저, {preview.name}의 핵심을 한눈에 정리해볼게요.</h2><p>제목과 굵은 문장만 훑어도 전체 방향이 잡히고, 아래 설명에서 근거와 뉘앙스를 확인할 수 있어요.</p></header>
-    <div className="summary-grid">{cards.map(([key, label], index) => {
-      const text = s[key];
-      if (!text?.trim()) return null;
-      const paras = splitTopics(text);
-      return <article className="summary-note" key={key}>
-        <div className="summary-top"><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{label}</h3></div></div>
-        {paras.map((p, i) => <div className="summary-paragraph" key={i}><h4>{p.lead}</h4>{p.body ? <p>{p.body}</p> : null}</div>)}
-      </article>;
-    })}</div>
+    <header className="summary-explorer-head">
+      <h2>먼저, {preview.name}의 핵심을 한눈에 정리해볼게요.</h2>
+      <div className="summary-view-toggle" aria-label="요약 보기 방식">
+        <button type="button" className={mode === 'glance' ? 'is-active' : ''} onClick={() => setMode('glance')}>한눈에 보기</button>
+        <button type="button" className={mode === 'read' ? 'is-active' : ''} onClick={() => setMode('read')}>전체 읽기</button>
+      </div>
+    </header>
+
+    {mode === 'glance' ? <>
+      <div className="summary-card-grid">
+        {cards.map((card, index) => {
+          const text = preview.summary[card.key] || '';
+          const selected = activeKey === card.key;
+          return <button type="button" className={`summary-card${selected ? ' is-active' : ''}`} key={card.key} onClick={() => setActiveKey(selected ? null : card.key)} aria-expanded={selected}>
+            <div className="summary-card-top"><span className="summary-card-no">{String(index + 1).padStart(2, '0')}</span><h3>{card.label}</h3></div>
+            <p className="summary-card-preview">{summaryFirstSentence(text)}</p>
+            <span className="summary-card-hint">{selected ? '접기 ↑' : '자세히 보기 ↓'}</span>
+          </button>;
+        })}
+      </div>
+      {activeCard && activeText ? <SummaryFullText index={activeIndex} label={activeCard.label} text={activeText} /> : null}
+    </> : <div className="summary-read-list">
+      {cards.map((card, index) => {
+        const text = preview.summary[card.key] || '';
+        return text ? <article className="summary-read-item" key={card.key}><SummaryFullText index={index} label={card.label} text={text} /></article> : null;
+      })}
+    </div>}
   </section></div>;
 }
