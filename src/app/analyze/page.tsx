@@ -31,6 +31,9 @@ export default function AnalyzePage(){
         font-size: 10px;
         font-weight: 900;
       }
+      .question-card > div:last-child > p.muted {
+        display: none !important;
+      }
     `}</style>
     <AnalyzeReviewUiPolish/>
     <PersonalityLoadingBridge/>
