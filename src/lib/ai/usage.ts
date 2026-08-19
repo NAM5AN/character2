@@ -77,7 +77,7 @@ function splitErrorMessage(message: string) {
   return { code, detail };
 }
 
-async function writeGenFailure(args: { context: AiUsageContext; code: string; detail: string }) {
+async function writeGenFailure(args: { context: AiUsageContext; code: string; detail: string; kind?: 'failure' | 'retry' }) {
   try {
     const sb = getSupabaseServer();
     await sb.rpc('character2_log_gen_failure', {
@@ -86,9 +86,25 @@ async function writeGenFailure(args: { context: AiUsageContext; code: string; de
       p_session_id: safeUuid(args.context.sessionId),
       p_error_code: args.code,
       p_error_detail: args.detail || null,
+      p_kind: args.kind || 'failure',
     });
   } catch (error) {
     console.warn('GEN_FAILURE_DB_WRITE_FAILED', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// Record an attempt that failed but was retried. Retries silently re-send the whole
+// prompt, so they cost as much as the original call — logging why one happened is the
+// only way to find the recurring rule violations worth fixing at the prompt level.
+// Best-effort and never blocks or throws; a no-op outside an AI usage context.
+export function logGenRetry(code: string, detail: string) {
+  const context = currentAiUsageContext();
+  if (!context) return;
+  const snapshot = { context: { ...context }, code, detail: detail.slice(0, 2000), kind: 'retry' as const };
+  try {
+    after(async () => { await writeGenFailure(snapshot); });
+  } catch {
+    void writeGenFailure(snapshot);
   }
 }
 

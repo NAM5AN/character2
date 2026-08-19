@@ -83,11 +83,25 @@ type StuckRow = {
   id: string; startedAt: string; stage: string; shareCode: string | null;
   minutesStuck: number; characterName: string | null; ownerName: string | null;
 };
-type FailuresData = { total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[]; stuck: StuckRow[] };
+type RetryGroup = { stage: string; errorCode: string; count: number; lastSeen: string; sampleDetail: string | null };
+type FailuresData = {
+  total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[]; stuck: StuckRow[];
+  retry24h?: number; retries?: RetryGroup[];
+};
 type FailuresState =
   | { state: 'loading' }
   | { state: 'ready'; data: FailuresData }
   | { state: 'error'; detail: string };
+
+// 재시도 사유 코드 → 읽을 수 있는 설명. 재시도는 프롬프트를 통째로 다시 보내므로 비용이 두 배가 된다.
+function retryLabel(code: string) {
+  if (code === 'RETRY_TRUNCATED') return '출력이 상한에 잘림';
+  if (code === 'RETRY_SCHEMA') return 'JSON 구조 검증 실패';
+  if (code === 'RETRY_SUMMARY_TOO_SHORT') return '요약 필드가 너무 짧음';
+  if (code === 'RETRY_SUMMARY_FORMAT') return '요약 문단 형식 오류';
+  if (code === 'RETRY_INSIGHT_QUALITY') return 'insight 품질 기준 미달';
+  return code;
+}
 
 // 일별 비용 추이.
 type DayCost = {
@@ -684,7 +698,31 @@ export default function AdminConsolePage() {
           </div>
         )}
 
-        {failures.state === 'ready' && failures.data.total7d === 0 && stuckCount === 0 && (
+        {failures.state === 'ready' && (failures.data.retries?.length ?? 0) > 0 && (
+          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: 13 }}>🔁 재시도 사유 · 7일</strong>
+              <span className="muted" style={{ fontSize: 12 }}>
+                재시도는 프롬프트를 통째로 다시 보내 비용이 두 배가 돼요{typeof failures.data.retry24h === 'number' ? ` · 24시간 ${failures.data.retry24h}건` : ''}
+              </span>
+            </div>
+            <div className="stack" style={{ gap: 6, marginTop: 8 }}>
+              {failures.data.retries!.map(r => (
+                <div key={`${r.stage}:${r.errorCode}`} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg,#fff)' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
+                    <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(r.stage)}</span>
+                    <strong style={{ fontSize: 12 }}>{retryLabel(r.errorCode)}</strong>
+                    <span style={{ fontSize: 12, fontWeight: 900 }}>{r.count}회</span>
+                    <span className="muted" style={{ marginLeft: 'auto', fontSize: 11, whiteSpace: 'nowrap' }}>{fmtAgo(r.lastSeen)}</span>
+                  </div>
+                  {r.sampleDetail && <p className="muted" style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.5, wordBreak: 'break-word' }}>{r.sampleDetail}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {failures.state === 'ready' && failures.data.total7d === 0 && stuckCount === 0 && (failures.data.retries?.length ?? 0) === 0 && (
           <p className="muted" style={{ margin: '10px 0 0', fontSize: 13 }}>최근 7일간 생성 실패가 없어요. 👍</p>
         )}
 

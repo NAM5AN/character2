@@ -12,7 +12,7 @@ import {
 } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
 import { inferFinalAdaptiveTags, inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
-import { attachAiUsageSession, withAiUsageContext } from '@/lib/ai/usage';
+import { attachAiUsageSession, logGenRetry, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
 import { createEditToken, sha256 } from '@/lib/crypto';
@@ -266,6 +266,8 @@ async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
       return {...model,validatedInsights:passed,tensions:model.tensions.filter(summaryQualityPass)};
     }
     last=`품질 기준 통과 insight ${passed.length}개`;
+    // 품질 게이트에 걸려 프롬프트를 통째로 다시 보내는 순간을 기록한다(비용이 두 배가 되는 지점).
+    if(attempt===0)logGenRetry('RETRY_INSIGHT_QUALITY',`통과 ${passed.length}/필요 3 · 생성 ${model.validatedInsights.length}개`);
   }
   // 두 번 시도해도 통과분이 3개 미만이면 재시도로 또 큰 프롬프트를 보내지 말고 마지막 결과를 그대로 사용한다.
   if(lastModel&&lastModel.validatedInsights.length>=1){
@@ -286,6 +288,7 @@ async function generateSummary(input:string,src:SummarySource):Promise<SummaryAn
         const formatIssues=summaryFormatIssues(parsed.data.summary);
         if((shortFields.length||formatIssues.length)&&attempt===0){
           last=[shortFields.length?`공개 요약 필드가 권장 최소 130자보다 짧음: ${shortFields.join(', ')}`:'',formatIssues.length?`문단 형식 오류: ${formatIssues.join(', ')}`:''].filter(Boolean).join(' / ');
+          logGenRetry(shortFields.length?'RETRY_SUMMARY_TOO_SHORT':'RETRY_SUMMARY_FORMAT',last);
           continue;
         }
         return parsed.data;

@@ -1,6 +1,6 @@
 import { generateText, streamText, tool } from 'ai';
 import { z } from 'zod';
-import { aiGatewayUsageOptions, scheduleAiUsageRecord } from '@/lib/ai/usage';
+import { aiGatewayUsageOptions, logGenRetry, scheduleAiUsageRecord } from '@/lib/ai/usage';
 
 function imageFilePart(dataUrl:string){
   const match=dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/iu);
@@ -70,6 +70,7 @@ export async function generateValidatedJson<T>(args: {
       return args.schema.parse(call.input);
     } catch (error) {
       lastReason = error instanceof Error ? error.message : String(error);
+      if (attempt + 1 < maxAttempts) logGenRetry(truncated ? 'RETRY_TRUNCATED' : 'RETRY_SCHEMA', lastReason);
       if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
     }
   }
@@ -188,6 +189,7 @@ export async function streamValidatedJson<T>(args: {
       return parsed.data;
     }
     lastReason = parsed.error.message;
+    if (attempt + 1 < maxAttempts) logGenRetry(truncated ? 'RETRY_TRUNCATED' : 'RETRY_SCHEMA', lastReason);
     if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
   }
 
