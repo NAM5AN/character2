@@ -7,6 +7,12 @@ import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 import { ndjsonStream } from '@/lib/ai/stream';
 import { resolveProfileInput } from '@/lib/profile-source';
+import {
+  isPersonalityTagKey,
+  PERSONALITY_TAG_CATALOG,
+  PERSONALITY_TAG_MAX_SELECTIONS,
+  type PersonalityTagKey,
+} from '@/lib/personality-tags';
 
 const appearanceImageSchema = z.object({
   name: z.string().min(1).max(180),
@@ -26,6 +32,10 @@ type SourceAnchor = {
   layer: 'public' | 'secret' | 'appearance';
   text: string;
 };
+
+const PERSONALITY_TAG_GUIDE = PERSONALITY_TAG_CATALOG
+  .map(tag => `${tag.key}: ${tag.label} (${tag.family})`)
+  .join('\n');
 
 const PARSER_INSTRUCTIONS_V2 = `당신은 자캐커뮤니티 캐릭터 프로필을 구조화하는 분석기입니다.
 원본에 명시된 사실과 AI 추론을 엄격히 분리하세요.
@@ -54,6 +64,15 @@ AI 추론은 반드시 이 ID들을 근거로 연결해서 만드세요.
 - 근거에 없는 "관계의 마찰을 피하려 한다", "통제하려 한다", "버림받는 것을 두려워한다" 같은 그럴듯한 심리 조건을 새로 만들지 마세요.
 - 같은 문장을 잘게 나눈 인접 조각만 두 개 골라 근거 수를 채우지 마세요. 의미가 독립적인 단서를 연결하세요.
 - 오너가 충분히 '아님'을 누를 수 있을 정도로 해석 여지가 있으면서도, 프로필 근거가 분명한 문장만 제시하세요.
+
+personalityTags.aiInitial에는 프로필을 읽고 현재 가장 가까워 보이는 성격 태그를 최대 ${PERSONALITY_TAG_MAX_SELECTIONS}개 고르세요.
+- 아래 허용된 key만 사용하세요. 한국어 label이나 임의의 새 태그를 값으로 넣지 마세요.
+${PERSONALITY_TAG_GUIDE}
+- 단어 하나가 등장했다는 이유만으로 고르지 말고, 공개/비밀 프로필의 직접 설정·행동 패턴·traits·relationshipTraits를 종합해 판단하세요.
+- 서로 반대처럼 보이는 태그도 캐릭터에게 실제로 함께 나타난다면 같이 고를 수 있습니다.
+- 근거가 약한 태그를 개수 채우기용으로 넣지 마세요. 충분한 근거가 있는 것만 1~${PERSONALITY_TAG_MAX_SELECTIONS}개 고르세요.
+- 외관 자료만으로 성격 태그를 선택하지 마세요.
+- 이 값은 오너에게 다시 확인받을 AI 최초 제안이며, 절대적 성격 판정이 아닙니다.
 
 어떤 정보도 종류만 보고 중요하거나 중요하지 않다고 단정하지 마세요. 외형, 물건, 버릇, 숫자, 장소, 신체 특징, 과거 사건, 취향처럼 사소해 보이는 정보도 핵심일 수 있고, 거창한 설정도 행동에는 큰 의미가 없을 수 있습니다.
 
@@ -104,6 +123,22 @@ function normalizeFacts(items: unknown[]) {
     if (value === undefined || value === null || value === '') return [];
     return [{ key, value, source: 'profile' as const }];
   }).slice(0, 80);
+}
+
+function normalizeInitialPersonalityTags(value: unknown): PersonalityTagKey[] {
+  const record = asRecord(value);
+  const raw = Array.isArray(record.aiInitial)
+    ? record.aiInitial
+    : Array.isArray(value)
+      ? value
+      : [];
+  const selected: PersonalityTagKey[] = [];
+  for (const item of raw) {
+    if (!isPersonalityTagKey(item) || selected.includes(item)) continue;
+    selected.push(item);
+    if (selected.length >= PERSONALITY_TAG_MAX_SELECTIONS) break;
+  }
+  return selected;
 }
 
 function isDocumentMetaInference(text: string) {
@@ -238,12 +273,13 @@ export async function POST(request: Request) {
     const raw = await withAiUsageContext({sessionId:usageSessionId,stage:'profile_parse'},()=>streamOpenAIJson({
       instructions: PARSER_INSTRUCTIONS_V2,
       schema: initialCharacterDraftSchema,
-      maxOutputTokens: 3600,
+      maxOutputTokens: 3800,
       onProgress: (r) => emit(0.15 + r * 0.82),
-      input: `캐릭터 이름: ${body.name}\n\nSOURCE_FACTS — 서버가 공개/비밀 프로필과 외관 관찰 메모를 순서대로 만든 근거 ID 목록입니다:\n${JSON.stringify(sourceAnchors)}\n\nlayer=public은 공개 프로필, layer=secret은 비밀 프로필, layer=appearance는 첨부 이미지에서 직접 관찰한 외관 보조 정보입니다.\nappearance는 외형·의상·소품·시각적 인상을 보완하는 자료이며, 심리나 과거를 단독으로 확정하는 근거로 쓰면 안 됩니다.\n공개와 비밀 정보층의 차이는 캐릭터 해석에 활용할 수 있지만, 문서 표기 차이나 누락 자체를 aiInference로 만들지는 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText/appearanceNotes는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidenceIds} 배열로 출력하세요. evidenceIds는 SOURCE_FACTS에 실제 존재하는 서로 다른 fact ID 2~4개입니다. id와 ownerVerdict는 서버가 생성합니다.`,
+      input: `캐릭터 이름: ${body.name}\n\nSOURCE_FACTS — 서버가 공개/비밀 프로필과 외관 관찰 메모를 순서대로 만든 근거 ID 목록입니다:\n${JSON.stringify(sourceAnchors)}\n\nlayer=public은 공개 프로필, layer=secret은 비밀 프로필, layer=appearance는 첨부 이미지에서 직접 관찰한 외관 보조 정보입니다.\nappearance는 외형·의상·소품·시각적 인상을 보완하는 자료이며, 심리나 과거를 단독으로 확정하는 근거로 쓰면 안 됩니다.\n공개와 비밀 정보층의 차이는 캐릭터 해석에 활용할 수 있지만, 문서 표기 차이나 누락 자체를 aiInference로 만들지는 마세요.\n\nJSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, personalityTags, analysisConfidence를 넣으세요.\nbasicProfile에는 age와 gender 정도만 넣어도 됩니다. name/profileText/secretProfileText/appearanceNotes는 서버가 직접 보존합니다.\nconfirmedFacts는 가능한 한 {key, value} 배열로 출력하세요.\naiInferences는 반드시 {text, confidence, evidenceIds} 배열로 출력하세요. evidenceIds는 SOURCE_FACTS에 실제 존재하는 서로 다른 fact ID 2~4개입니다. id와 ownerVerdict는 서버가 생성합니다.\npersonalityTags는 {"aiInitial":["허용된 key", ...]} 형태로 출력하고 최대 ${PERSONALITY_TAG_MAX_SELECTIONS}개까지만 고르세요.`,
     }));
 
     const basic = asRecord(raw.basicProfile);
+    const aiInitialPersonalityTags = normalizeInitialPersonalityTags(raw.personalityTags);
     const draft = characterDraftSchema.parse({
       usageSessionId,
       basicProfile: {
@@ -258,6 +294,12 @@ export async function POST(request: Request) {
       relationshipTraits: normalizeTraitRecord(raw.relationshipTraits),
       confirmedFacts: normalizeFacts(raw.confirmedFacts),
       aiInferences: normalizeInferences(raw.aiInferences, sourceAnchors),
+      personalityTags: {
+        aiInitial: aiInitialPersonalityTags,
+        ownerSelected: [],
+        interviewAdaptive: [],
+        finalAdaptive: [],
+      },
       analysisConfidence: normalizeScore(raw.analysisConfidence, 65),
     });
 
