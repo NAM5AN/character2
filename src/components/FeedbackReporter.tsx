@@ -130,6 +130,7 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
   const [message,setMessage]=useState('');
   const inputRef=useRef<HTMLInputElement|null>(null);
   const supabase=useMemo(()=>createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false}}),[]);
+  const tooShort=content.trim().length<5;
 
   function addFiles(list:FileList|null){
     if(!list)return;
@@ -146,7 +147,7 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
   }
 
   async function submit(){
-    if(content.trim().length<5){setMessage('제보 내용을 조금 더 적어주세요.');return;}
+    if(tooShort){setMessage('제보 내용을 조금 더 적어주세요.');return;}
     setBusy(true);setMessage('');
     try{
       const id=crypto.randomUUID();
@@ -181,7 +182,12 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
         {files.length>0&&<div className="feedback-files">{files.map((file,index)=><div className="feedback-file" key={`${file.name}-${file.size}-${index}`}><span>{file.name}</span><small>{(file.size/1024/1024).toFixed(1)}MB</small><button type="button" disabled={busy} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}>삭제</button></div>)}</div>}
         <p className="muted feedback-env-note">기기·브라우저 환경과 현재 페이지, 화면, 분석 단계, 질문 번호·유형이 자동으로 함께 전달돼요.</p>
         {message&&<p className={message.startsWith('제보가')?'feedback-success':'error'}>{message}</p>}
-        <div className="actions feedback-actions"><button className="btn" type="button" disabled={busy} onClick={()=>setOpen(false)}>닫기</button><button className="btn primary" type="button" disabled={busy||content.trim().length<5} onClick={()=>void submit()}>{busy?'전송 중…':'관리자에게 전달'}</button></div>
+        <div className="actions feedback-actions">
+          <button className="btn" type="button" disabled={busy} onClick={()=>setOpen(false)}>닫기</button>
+          <span className={`feedback-submit-wrap${tooShort&&!busy?' is-too-short':''}`} data-tooltip="제보 내용을 5자 이상 작성해주세요.">
+            <button className="btn primary" type="button" disabled={busy||tooShort} onClick={()=>void submit()}>{busy?'전송 중…':'관리자에게 전달'}</button>
+          </span>
+        </div>
       </div>
     </div>}
   </>;
