@@ -58,7 +58,7 @@ function hueDistance(a:number,b:number){
   return Math.min(diff,360-diff);
 }
 
-function isNeutral(hsl:Hsl){return hsl.s<10}
+function isNeutral(hsl:Hsl){return hsl.s<12}
 function isVeryLight(hsl:Hsl){return hsl.l>=82}
 function isVeryDark(hsl:Hsl){return hsl.l<=22}
 function isYellow(hsl:Hsl){return hsl.h>=42&&hsl.h<=76&&hsl.s>=36}
@@ -67,6 +67,7 @@ function isExtreme(hsl:Hsl){return isNeutral(hsl)||isYellow(hsl)||isNeon(hsl)||i
 
 function colorsAreSimilar(a:Hsl,b:Hsl){
   if(isNeutral(a)&&isNeutral(b))return Math.abs(a.l-b.l)<=28;
+  if(isVeryLight(a)&&isVeryLight(b)&&a.s<=18&&b.s<=18)return true;
   if(isNeutral(a)!==isNeutral(b))return false;
   return hueDistance(a.h,b.h)<=18&&Math.abs(a.s-b.s)<=52;
 }
@@ -115,7 +116,7 @@ function accentSoftColor(raw:string,strongSeparation=false){
 
 function surfaceLightness(raw:Hsl,strongSeparation:boolean){
   if(strongSeparation)return {main:89,mainSub:98};
-  if(isNeutral(raw))return {main:isVeryLight(raw)?90:89,mainSub:98};
+  if(isNeutral(raw)||isVeryLight(raw)||isVeryDark(raw))return {main:isVeryLight(raw)?90:89,mainSub:98};
   if(isYellow(raw)||isNeon(raw))return {main:90,mainSub:97};
   return {main:92,mainSub:97};
 }
