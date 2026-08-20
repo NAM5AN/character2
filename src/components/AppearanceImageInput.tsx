@@ -8,13 +8,16 @@ type AppearanceImagePayload = {
   origin?: 'manual' | 'document';
   sourceUrl?: string;
   sourceIndex?: number;
+  sourceKey?: string;
 };
 
 type DiscoveredSource={
   url:string;
   kind:'google_docs'|'postype'|'notion';
-  images:{index:number;name:string}[];
+  images:{index:number;name:string;key?:string}[];
 };
+
+type DiscoveryFailure={url:string;code:string};
 
 const MAX_IMAGES = 4;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
@@ -23,6 +26,8 @@ const MANUAL_TYPES = new Set(['image/jpeg','image/png','image/webp']);
 const REMOTE_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif']);
 const CLEAR_EVENT = 'chara-appearance-clear';
 const STORAGE_KEY = 'chara_appearance_images_v1';
+const DOCUMENT_RETRY_BASE_MS = 4_000;
+const MAX_DOCUMENT_RETRIES = 2;
 
 let currentImages: AppearanceImagePayload[] = [];
 
@@ -37,6 +42,7 @@ function normalizeStoredImage(item:unknown):AppearanceImagePayload|null{
     origin,
     ...(origin==='document'&&typeof raw.sourceUrl==='string'?{sourceUrl:raw.sourceUrl}:{}),
     ...(origin==='document'&&Number.isInteger(raw.sourceIndex)?{sourceIndex:raw.sourceIndex}:{}),
+    ...(origin==='document'&&typeof raw.sourceKey==='string'?{sourceKey:raw.sourceKey}:{}),
   };
 }
 
@@ -149,9 +155,16 @@ function documentLinksOnPage(){
   return [...new Set(values)].slice(0,2);
 }
 
-function remoteImageUrl(sourceUrl:string,index:number){
+function remoteImageUrl(sourceUrl:string,index:number,key?:string){
   const params=new URLSearchParams({url:sourceUrl,index:String(index)});
+  if(key)params.set('key',key);
   return `/api/characters/profile-images?${params.toString()}`;
+}
+
+function sameDocumentImage(image:AppearanceImagePayload,sourceUrl:string,item:{index:number;key?:string}){
+  if(image.origin!=='document'||image.sourceUrl!==sourceUrl)return false;
+  if(item.key)return image.sourceKey===item.key||(!image.sourceKey&&image.sourceIndex===item.index);
+  return image.sourceIndex===item.index;
 }
 
 export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
@@ -161,6 +174,8 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
   const loadedDocumentSources=useRef(new Set<string>());
   const lastDocumentSignature=useRef('');
   const documentGeneration=useRef(0);
+  const documentRetryAt=useRef(0);
+  const documentRetryCount=useRef(0);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const [documentBusy,setDocumentBusy]=useState(false);
@@ -176,6 +191,8 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
       loadedDocumentSources.current.clear();
       lastDocumentSignature.current='';
       documentGeneration.current+=1;
+      documentRetryAt.current=0;
+      documentRetryCount.current=0;
       setImages([]);setError('');setDocumentStatus('');setDocumentBusy(false);
     };
     window.addEventListener(CLEAR_EVENT,clear);
@@ -236,8 +253,15 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
       if(disposed||disabled)return;
       const links=documentLinksOnPage();
       const signature=links.join('\n');
-      if(signature===lastDocumentSignature.current)return;
-      lastDocumentSignature.current=signature;
+      const signatureChanged=signature!==lastDocumentSignature.current;
+      if(!signatureChanged&&(!documentRetryAt.current||Date.now()<documentRetryAt.current))return;
+      if(signatureChanged){
+        lastDocumentSignature.current=signature;
+        documentRetryAt.current=0;
+        documentRetryCount.current=0;
+      }else{
+        documentRetryAt.current=0;
+      }
       const generation=++documentGeneration.current;
 
       for(const source of [...loadedDocumentSources.current]){
@@ -259,37 +283,62 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
         });
         const body=await response.json().catch(()=>({}));
         if(disposed||generation!==documentGeneration.current)return;
-        for(const link of pending)loadedDocumentSources.current.add(link);
         if(!response.ok)throw new Error(typeof body?.error==='string'?body.error:'PROFILE_IMAGE_DISCOVERY_FAILED');
         const sources=Array.isArray(body?.sources)?body.sources as DiscoveredSource[]:[];
-        let added=0;
+        const failures=Array.isArray(body?.failures)?body.failures as DiscoveryFailure[]:[];
+        const failedUrls=new Set(failures.map(failure=>failure.url));
+        let retryNeeded=failedUrls.size>0;
         for(const source of sources){
           if(!links.includes(source.url))continue;
+          let sourceFailed=false;
           for(const item of Array.isArray(source.images)?source.images:[]){
             if(disposed||generation!==documentGeneration.current)return;
             const current=imagesRef.current;
             if(current.length>=MAX_IMAGES)break;
-            if(current.some(image=>image.origin==='document'&&image.sourceUrl===source.url&&image.sourceIndex===item.index))continue;
+            if(current.some(image=>sameDocumentImage(image,source.url,item)))continue;
             try{
-              const imageResponse=await fetch(remoteImageUrl(source.url,item.index),{cache:'no-store'});
-              if(!imageResponse.ok)continue;
+              const imageResponse=await fetch(remoteImageUrl(source.url,item.index,item.key),{cache:'no-store'});
+              if(!imageResponse.ok){sourceFailed=true;continue}
               const blob=await imageResponse.blob();
-              if(!REMOTE_TYPES.has(blob.type))continue;
+              if(!REMOTE_TYPES.has(blob.type)){sourceFailed=true;continue}
               const file=new File([blob],item.name||`document-image-${item.index+1}`,{type:blob.type});
               const converted=await compressImage(file,true);
               if(disposed||generation!==documentGeneration.current)return;
               const latest=imagesRef.current;
               if(latest.length>=MAX_IMAGES)break;
-              if(latest.some(image=>image.origin==='document'&&image.sourceUrl===source.url&&image.sourceIndex===item.index))continue;
-              commit([...latest,{...converted,origin:'document',sourceUrl:source.url,sourceIndex:item.index}]);
-              added+=1;
-            }catch{}
+              if(latest.some(image=>sameDocumentImage(image,source.url,item)))continue;
+              commit([...latest,{...converted,origin:'document',sourceUrl:source.url,sourceIndex:item.index,...(item.key?{sourceKey:item.key}:{})}]);
+            }catch{sourceFailed=true}
           }
+          if(sourceFailed)retryNeeded=true;
+          else loadedDocumentSources.current.add(source.url);
           if(imagesRef.current.length>=MAX_IMAGES)break;
         }
-        setDocumentStatus(added?`문서 이미지 ${added}장 자동 추가됨`:'문서에서 첨부할 이미지를 찾지 못했어요.');
+        for(const link of pending){
+          if(!sources.some(source=>source.url===link)&&!failedUrls.has(link))retryNeeded=true;
+        }
+        const documentImageCount=imagesRef.current.filter(image=>image.origin==='document').length;
+        if(retryNeeded&&documentRetryCount.current<MAX_DOCUMENT_RETRIES){
+          documentRetryCount.current+=1;
+          documentRetryAt.current=Date.now()+DOCUMENT_RETRY_BASE_MS*2**(documentRetryCount.current-1);
+          setDocumentStatus(documentImageCount?`문서 이미지 ${documentImageCount}장 추가됨 · 나머지 다시 시도 중…`:'문서 이미지 불러오기를 잠시 후 다시 시도해요.');
+        }else{
+          documentRetryAt.current=0;
+          documentRetryCount.current=0;
+          setDocumentStatus(documentImageCount?`문서 이미지 ${documentImageCount}장 자동 추가됨`:'문서에서 첨부할 이미지를 찾지 못했어요.');
+        }
       }catch{
-        if(!disposed&&generation===documentGeneration.current)setDocumentStatus('문서 이미지를 자동으로 불러오지 못했어요. 직접 첨부할 수 있어요.');
+        if(!disposed&&generation===documentGeneration.current){
+          if(documentRetryCount.current<MAX_DOCUMENT_RETRIES){
+            documentRetryCount.current+=1;
+            documentRetryAt.current=Date.now()+DOCUMENT_RETRY_BASE_MS*2**(documentRetryCount.current-1);
+            setDocumentStatus('문서 이미지 불러오기를 잠시 후 다시 시도해요.');
+          }else{
+            documentRetryAt.current=0;
+            documentRetryCount.current=0;
+            setDocumentStatus('문서 이미지를 자동으로 불러오지 못했어요. 직접 첨부할 수 있어요.');
+          }
+        }
       }finally{
         if(!disposed&&generation===documentGeneration.current)setDocumentBusy(false);
       }
@@ -325,7 +374,7 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
       <span className="muted" style={{display:'inline-block',marginLeft:12,fontSize:13}}>또는 이미지 복사 후 Ctrl+V</span>
     </div>
     {(documentBusy||documentStatus)&&<div className="muted" style={{fontSize:12,lineHeight:1.5,marginTop:8}}>{documentBusy?'문서 이미지 불러오는 중…':documentStatus}</div>}
-    {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${image.sourceUrl||'manual'}-${image.sourceIndex??index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
+    {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${image.sourceUrl||'manual'}-${image.sourceKey??image.sourceIndex??index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
       <img src={image.dataUrl} alt={`외관 자료 ${index+1}`} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
       {image.origin==='document'&&<span style={{position:'absolute',left:6,bottom:6,padding:'3px 6px',borderRadius:999,background:'rgba(23,24,22,.72)',color:'#fff',fontSize:9,fontWeight:800,lineHeight:1}}>문서</span>}
       <button type="button" aria-label={`${index+1}번째 이미지 삭제`} disabled={disabled||busy} onClick={()=>removeAt(index)} style={{position:'absolute',top:6,right:6,width:28,height:28,borderRadius:999,border:'1px solid rgba(0,0,0,.2)',background:'rgba(255,255,255,.92)',fontWeight:900,fontSize:18,lineHeight:1}}>×</button>

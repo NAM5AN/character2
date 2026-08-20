@@ -16,27 +16,32 @@ export async function POST(request:Request){
     const body=discoverSchema.parse(await request.json());
     const unique=[...new Set(body.urls.map(url=>url.trim()).filter(Boolean))].slice(0,2);
     const sources=[] as Awaited<ReturnType<typeof discoverProfileImages>>[];
+    const failures:{url:string;code:string}[]=[];
     for(const url of unique){
       try{sources.push(await discoverProfileImages(url))}
       catch(error){
-        console.info('PROFILE_IMAGE_DISCOVERY_SKIPPED',{url,message:error instanceof Error?error.message:String(error)});
+        const message=error instanceof Error?error.message:String(error);
+        const code=/^PROFILE_IMAGE_[A-Z_]+$/u.test(message)?message:'PROFILE_IMAGE_DISCOVERY_FAILED';
+        failures.push({url,code});
+        console.info('PROFILE_IMAGE_DISCOVERY_SKIPPED',{url,message});
       }
     }
-    return NextResponse.json({sources});
+    return NextResponse.json({sources,failures});
   }catch(error){return apiError(error)}
 }
 
 const imageQuerySchema=z.object({
   url:z.string().url().max(2200),
   index:z.coerce.number().int().min(0).max(11),
+  key:z.string().trim().regex(/^[0-9a-f-]{32,36}$/iu).optional(),
 });
 
 export async function GET(request:Request){
   try{
     await assertRateLimit('profile_image_fetch',64,60);
     const requestUrl=new URL(request.url);
-    const query=imageQuerySchema.parse({url:requestUrl.searchParams.get('url')||'',index:requestUrl.searchParams.get('index')||''});
-    const image=await loadProfileImage(query.url,query.index);
+    const query=imageQuerySchema.parse({url:requestUrl.searchParams.get('url')||'',index:requestUrl.searchParams.get('index')||'',key:requestUrl.searchParams.get('key')||undefined});
+    const image=await loadProfileImage(query.url,query.index,query.key);
     const body=Uint8Array.from(image.bytes).buffer;
     return new Response(body,{
       status:200,
