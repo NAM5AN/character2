@@ -4,6 +4,7 @@ import { ReportSummaryToggleBridge } from '@/components/ReportSummaryToggleBridg
 import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshBridge';
 import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import './globals.css';
+import './bipolar-mobile-fix.css';
 import './report-pagination.css';
 import './report-readability.css';
 import './report-magazine.css';
