@@ -13,6 +13,7 @@ import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
 import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge';
 import { AdminDeploymentVersionPanel } from '@/components/AdminDeploymentVersionPanel';
+import { AdminConsoleLayoutPolish } from '@/components/AdminConsoleLayoutPolish';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -31,6 +32,7 @@ import './character-interaction-theme.css';
 import './character-theme-final-sweep.css';
 import './report-theme-activation-fix.css';
 import './global-button-interactions.css';
+import './admin-console-polish.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
@@ -91,6 +93,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <StoredReportThemeBridge/>
         <ReportOwnerSaveGate/>
         <GlobalScreenMotionBridge/>
+        <AdminConsoleLayoutPolish/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
