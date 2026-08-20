@@ -15,7 +15,9 @@ body,
 .analyze-page .progress > span,
 .analyze-page .notice,
 .analyze-page .tag,
-.analyze-page .personality-chip {
+.analyze-page .personality-chip,
+.analyze-page .five-level-circle,
+.analyze-page .pill.active {
   transition:
     background-color var(--character-theme-duration) var(--character-theme-ease),
     border-color var(--character-theme-duration) var(--character-theme-ease),
@@ -94,8 +96,41 @@ html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thu
   box-shadow: 0 0 0 2px var(--character-accent),0 4px 12px #0002;
 }
 
-/* Keep the existing chip text/fill treatment; only add character-color emphasis. */
-html[data-character-theme='active'] .analyze-page .personality-chip[data-selected='true'] {
+/* Five-level A/B control: replace the remaining graphite/paper fills with the
+   character palette while keeping label text colors exactly as before. */
+html[data-character-theme='active'] .analyze-page .five-level-circle {
+  background: var(--character-surface) !important;
+  border-color: color-mix(in srgb,var(--character-point) 38%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .five-level-choice:hover .five-level-circle {
+  border-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .five-level-choice.selected .five-level-circle {
+  background: var(--character-accent) !important;
+  border-color: var(--character-accent) !important;
+  box-shadow: inset 0 0 0 7px var(--character-surface),0 0 0 2px var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .five-level-scale::before {
+  background: color-mix(in srgb,var(--character-point) 24%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .five-level-choice:hover {
+  background: color-mix(in srgb,var(--character-accent-soft) 56%,transparent);
+}
+
+/* Personality chips keep their existing white/ink text colors. Only the fill and
+   borders become character-colored. Mixing the point hue with ink guarantees that
+   the existing white selected text remains readable even for bright eye colors. */
+html[data-character-theme='active'] .analyze-page #personality-tag-picker .personality-chip[data-selected='false'] {
+  background: var(--character-surface) !important;
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page #personality-tag-picker .personality-chip[data-selected='true'] {
+  background: color-mix(in srgb,var(--character-accent) 58%,var(--ink)) !important;
   border-color: var(--character-accent) !important;
   box-shadow: 0 0 0 2px var(--character-accent-soft);
 }
@@ -103,6 +138,13 @@ html[data-character-theme='active'] .analyze-page .personality-chip[data-selecte
 html[data-character-theme='active'] .analyze-page .personality-chip::before,
 html[data-character-theme='active'] .analyze-page .mini-icon {
   color: var(--character-accent);
+}
+
+/* AI inference review pills also used a fixed black selected fill. Keep their
+   existing white selected text, but tint that dark fill toward the point hue. */
+html[data-character-theme='active'] .analyze-page .pill.active {
+  background-color: color-mix(in srgb,var(--character-accent) 58%,var(--ink));
+  border-color: var(--character-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
