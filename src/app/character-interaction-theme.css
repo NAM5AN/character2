@@ -1,0 +1,109 @@
+/* Character-theme interaction sweep.
+   Keep body/title text tokens unchanged; only actionable controls and remaining
+   decorative accent surfaces inherit the character point palette. */
+
+/* Buttons: primary actions use the point fill, secondary actions use the point
+   border/soft hover. Danger actions intentionally keep their warning palette. */
+html[data-character-theme='active'] .analyze-page .btn:not(.danger),
+html[data-character-theme='active'] body:has(.report-mag) .btn:not(.danger),
+html[data-character-theme='active'] .completed-report-view .btn:not(.danger) {
+  border-color: var(--character-accent);
+  transition:
+    background-color var(--character-theme-duration) var(--character-theme-ease),
+    border-color var(--character-theme-duration) var(--character-theme-ease),
+    box-shadow var(--character-theme-duration) var(--character-theme-ease);
+}
+
+html[data-character-theme='active'] .analyze-page .btn:not(.primary):not(.soft):not(.danger),
+html[data-character-theme='active'] body:has(.report-mag) .btn:not(.primary):not(.soft):not(.danger),
+html[data-character-theme='active'] .completed-report-view .btn:not(.primary):not(.soft):not(.danger) {
+  background-color: transparent;
+}
+
+html[data-character-theme='active'] .analyze-page .btn:not(.primary):not(.danger):hover,
+html[data-character-theme='active'] body:has(.report-mag) .btn:not(.primary):not(.danger):hover,
+html[data-character-theme='active'] .completed-report-view .btn:not(.primary):not(.danger):hover {
+  background-color: var(--character-accent-soft);
+}
+
+html[data-character-theme='active'] .analyze-page .btn.primary,
+html[data-character-theme='active'] body:has(.report-mag) .btn.primary,
+html[data-character-theme='active'] .completed-report-view .btn.primary {
+  background-color: var(--character-accent);
+  border-color: var(--character-accent);
+  color: #fff;
+}
+
+html[data-character-theme='active'] .analyze-page .btn.primary:hover,
+html[data-character-theme='active'] body:has(.report-mag) .btn.primary:hover,
+html[data-character-theme='active'] .completed-report-view .btn.primary:hover {
+  filter: brightness(.93);
+}
+
+html[data-character-theme='active'] .analyze-page .btn.soft,
+html[data-character-theme='active'] body:has(.report-mag) .btn.soft,
+html[data-character-theme='active'] .completed-report-view .btn.soft {
+  background-color: var(--character-accent-soft);
+  border-color: color-mix(in srgb,var(--character-point) 24%,var(--line));
+  color: var(--ink);
+}
+
+html[data-character-theme='active'] .analyze-page .btn:not(.danger):focus-visible,
+html[data-character-theme='active'] body:has(.report-mag) .btn:not(.danger):focus-visible,
+html[data-character-theme='active'] .completed-report-view .btn:not(.danger):focus-visible {
+  outline: 2px solid var(--character-accent);
+  outline-offset: 3px;
+}
+
+/* Native range controls other than the custom bipolar rail were still using the
+   browser/default accent. */
+html[data-character-theme='active'] .analyze-page input[type='range'] {
+  accent-color: var(--character-accent);
+}
+
+html[data-character-theme='active'] .analyze-page .bipolar-range:focus-visible {
+  outline-color: var(--character-accent);
+}
+
+/* Summary compact/read segmented control: the moving black pill is an action
+   indicator, so it should follow the point color too. */
+html[data-character-theme='active'] .report-mag .summary-view-toggle::before {
+  background: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .summary-view-toggle:focus-within {
+  outline-color: color-mix(in srgb,var(--character-point) 68%,transparent) !important;
+}
+
+/* Cover map cells are rounded information surfaces. They were still fixed white /
+   warm-grey even while the rest of the report used the character palette. */
+html[data-character-theme='active'] .report-mag .map-cell {
+  background: color-mix(in srgb,var(--character-surface) 90%,var(--character-main)) !important;
+  border-color: color-mix(in srgb,var(--character-point) 16%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-mag .map-cell:nth-child(1),
+html[data-character-theme='active'] .report-mag .map-cell:nth-child(6) {
+  background: var(--character-accent-soft) !important;
+  border-color: color-mix(in srgb,var(--character-point) 28%,var(--line)) !important;
+}
+
+/* The final report callout was a fixed graphite block. Keep white copy readable by
+   mixing the character point hue with ink instead of using a raw bright point. */
+html[data-character-theme='active'] .report-mag .end-note {
+  background: color-mix(in srgb,var(--character-accent) 58%,var(--ink)) !important;
+}
+
+/* Page-outline rows are clickable navigation. Active already had a point tint;
+   add the missing hover cue to the inactive rows. */
+html[data-character-theme='active'] .report-mag .page-outline-item:hover {
+  background: color-mix(in srgb,var(--character-accent-soft) 58%,transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-character-theme='active'] .analyze-page .btn,
+  html[data-character-theme='active'] .report-mag .btn,
+  html[data-character-theme='active'] .completed-report-view .btn {
+    transition-duration: .01ms !important;
+  }
+}
