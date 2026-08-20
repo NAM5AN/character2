@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 
 function structuredError(message:string){
   const colon=message.indexOf(':');
@@ -15,6 +16,23 @@ export type ApiErrorPayload = { status: number; body: { error: string; details?:
 // JSON responses and streaming responses report errors identically.
 export function apiErrorPayload(error: unknown): ApiErrorPayload {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+
+  // 잘못된 입력은 서버 잘못이 아니므로 400으로 답합니다. 예전에는 zod 오류가 그대로
+  // 500 + 내부 스키마 덤프로 나가서, 어떤 필드에 어떤 제약이 있는지 공격자에게
+  // 그대로 알려주고 있었습니다. 필드 경로만 남기고 내부 구조는 감춥니다.
+  if (error instanceof ZodError) {
+    const fields = [...new Set(
+      error.issues.map(i => i.path.join('.')).filter(Boolean),
+    )].slice(0, 8).join(', ');
+    return {
+      status: 400,
+      body: { error: 'INVALID_REQUEST', ...(fields ? { details: `확인이 필요한 값: ${fields}` } : {}) },
+    };
+  }
+  if (message.startsWith('REQUEST_TOO_LARGE')) {
+    return { status: 413, body: { error: 'REQUEST_TOO_LARGE', details: '입력이 너무 큽니다. 프로필 분량을 줄여주세요.' } };
+  }
+
   if (message === 'CODE_INVALID' || message.includes('CODE_INVALID')) {
     return { status: 401, body: { error: 'CODE_INVALID' } };
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import { characterDraftSchema } from '@/lib/schemas/character';
 import { interviewQuestionSchema } from '@/lib/schemas/question';
@@ -23,7 +24,7 @@ function responseSchema(firstOptions:string[]){
 export async function POST(request:Request){
   try{
     await assertRateLimit('temporal_option_repair',30,60);
-    const body=requestSchema.parse(await request.json());
+    const body=requestSchema.parse(await readJsonWithinBudget(request));
     if(body.question.responseType!=='temporal_compare')return NextResponse.json({error:'NOT_TEMPORAL_COMPARE'},{status:400});
     const firstOptions=body.question.options.slice(0,4);
     const config=body.question.responseConfig;

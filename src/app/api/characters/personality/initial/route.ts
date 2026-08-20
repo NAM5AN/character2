@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import { characterDraftSchema } from '@/lib/schemas/character';
 import { askOpenAIJson } from '@/lib/ai/openai';
@@ -25,7 +26,7 @@ function normalizeTags(value: unknown): PersonalityTagKey[] {
 export async function POST(request: Request) {
   try {
     await assertRateLimit('personality_initial', 20, 60);
-    const { draft } = requestSchema.parse(await request.json());
+    const { draft } = requestSchema.parse(await readJsonWithinBudget(request));
     const tagGuide = PERSONALITY_TAG_CATALOG.map(tag => ({
       key: tag.key,
       label: tag.label,

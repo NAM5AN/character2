@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import { characterDraftSchema, interviewAnswerSchema } from '@/lib/schemas/character';
 import { interviewQuestionSchema, type InterviewQuestion } from '@/lib/schemas/question';
@@ -190,7 +191,9 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
 export async function POST(request: Request) {
   try {
     await assertRateLimit('question_batch', 30, 60);
-    const raw = await request.json();
+    // 예산 검사를 거친 본문. 아래 보정 로직은 스키마 검증 전 원본을 손봐야 해서
+    // 느슨한 레코드로 다룬다(검증은 바로 뒤 requestSchema.parse 가 담당).
+    const raw = await readJsonWithinBudget(request) as Record<string, any>;
     if (raw && Array.isArray(raw.plannedQuestions)) {
       for (const planned of raw.plannedQuestions) {
         if (planned?.responseType !== 'condition_followup') continue;

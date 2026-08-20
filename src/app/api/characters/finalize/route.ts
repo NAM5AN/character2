@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import {
   characterDraftSchema,
@@ -313,7 +314,7 @@ async function uniqueShareCode(){const sb=getSupabaseServer();for(let i=0;i<8;i+
 export async function POST(request:Request){
   try{
     await assertRateLimit('character_finalize',8,60);
-    const body=requestSchema.parse(await request.json());
+    const body=requestSchema.parse(await readJsonWithinBudget(request));
     const fallbackAdaptive=body.draft.personalityTags.ownerSelected.length?body.draft.personalityTags.ownerSelected:body.draft.personalityTags.aiInitial;
     try{
       const interviewAdaptive=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'personality_interview'},()=>inferInterviewAdaptiveTags(body.draft,body.answers));

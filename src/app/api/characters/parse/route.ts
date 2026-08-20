@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { characterDraftSchema, initialCharacterDraftSchema } from '@/lib/schemas/character';
 import { streamOpenAIJson } from '@/lib/ai/openai';
 import { analyzeAppearanceImages } from '@/lib/ai/appearance';
@@ -250,7 +251,7 @@ function normalizeInferences(items: unknown[], anchors: SourceAnchor[]) {
 export async function POST(request: Request) {
   let body: z.infer<typeof requestSchema>;
   try {
-    body = requestSchema.parse(await request.json());
+    body = requestSchema.parse(await readJsonWithinBudget(request, 4 * 1024 * 1024));
   } catch (error) {
     return apiError(error);
   }

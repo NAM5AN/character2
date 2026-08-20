@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import { characterDraftSchema, interviewAnswerSchema } from '@/lib/schemas/character';
 import { inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
@@ -14,7 +15,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   try {
     await assertRateLimit('personality_adaptive', 12, 60);
-    const body = requestSchema.parse(await request.json());
+    const body = requestSchema.parse(await readJsonWithinBudget(request));
     const tags = await withAiUsageContext(
       { sessionId: body.draft.usageSessionId, stage: 'personality_interview' },
       () => inferInterviewAdaptiveTags(body.draft, body.answers),

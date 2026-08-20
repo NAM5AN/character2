@@ -5,11 +5,35 @@ import {
   type PersonalityTagKey,
 } from '@/lib/personality-tags';
 
+// 이 파일의 스키마는 클라이언트가 통째로 보내는 draft를 검증하고, 그 draft는 그대로
+// AI 프롬프트로 들어갑니다. 상한이 없는 필드는 곧 "요청 하나로 임의의 토큰을 태울 수
+// 있는 구멍"이므로, 프롬프트에 닿는 모든 자유 텍스트·배열·레코드에 상한을 둡니다.
+// 값은 실제 데이터(프로필 최대 6,616자 / draft 상당 데이터 최대 약 17KB)를 기준으로
+// 넉넉하게 잡아, 정상 사용자는 영향을 받지 않습니다.
+
+// 키 개수를 제한한 레코드. z.record 는 키 수를 제한하지 못해 별도 refine 이 필요합니다.
+function boundedRecord<T extends z.ZodTypeAny>(value: T, maxKeys: number) {
+  return z.record(z.string().max(160), value).refine(
+    obj => Object.keys(obj).length <= maxKeys,
+    { message: `항목이 너무 많습니다(최대 ${maxKeys}개).` },
+  );
+}
+
+// confirmedFacts 의 value 는 원래 z.unknown() 이라 크기 제한이 전혀 없었습니다.
+// 실제로 쓰이는 형태(문자열/숫자/불리언/null/짧은 배열)만 허용합니다.
+const boundedFactValue = z.union([
+  z.string().max(2_000),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string().max(600)).max(30),
+]);
+
 export const verdictSchema = z.enum(['confirmed', 'ambiguous', 'rejected', 'unreviewed']);
 
 export const inferenceSchema = z.object({
-  id: z.string(),
-  text: z.string().min(1),
+  id: z.string().max(80),
+  text: z.string().min(1).max(2_000),
   confidence: z.number().min(0).max(100),
   evidenceIds: z.array(z.string().regex(/^fact_\d{3,}$/)).max(4).default([]),
   evidence: z.array(z.string().min(1).max(260)).max(4).default([]),
@@ -19,15 +43,17 @@ export const inferenceSchema = z.object({
 
 export const interviewAnswerSchema = z.object({
   order: z.number().int().min(1).max(20),
-  question: z.string().min(1),
-  answer: z.string().min(1),
+  question: z.string().min(1).max(2_000),
+  answer: z.string().min(1).max(4_000),
   reason: z.string().max(1200).optional(),
-  branchContext: z.record(z.string(), z.unknown()).optional(),
+  // 서버가 쓰는 분기 메타데이터. 클라이언트가 임의로 키를 불려 프롬프트를 부풀리지
+  // 못하도록 키 개수를 제한한다.
+  branchContext: boundedRecord(z.unknown(), 40).optional(),
 });
 
 const traitValueSchema = z.union([z.number().min(0).max(100),z.string(),z.boolean(),z.null()]);
-const confirmedFactSchema = z.object({key:z.string(),value:z.unknown(),source:z.enum(['profile','owner_answer'])});
-const publicBasicProfileSchema = z.object({name:z.string().min(1),age:z.union([z.string(),z.number()]).nullable().optional(),gender:z.string().nullable().optional(),profileText:z.string().min(20)});
+const confirmedFactSchema = z.object({key:z.string().max(160),value:boundedFactValue,source:z.enum(['profile','owner_answer'])});
+const publicBasicProfileSchema = z.object({name:z.string().min(1).max(80),age:z.union([z.string().max(40),z.number()]).nullable().optional(),gender:z.string().max(40).nullable().optional(),profileText:z.string().min(20).max(50_000)});
 
 const personalityTagSchema = z.custom<PersonalityTagKey>(isPersonalityTagKey, {
   message: '지원하지 않는 성격 태그입니다.',
@@ -46,7 +72,7 @@ export const personalityTagStateSchema = z.object({
 }).default(emptyPersonalityTags);
 
 export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),personalityTags:z.unknown().optional(),analysisConfidence:z.unknown().optional()}).passthrough();
-export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:z.record(z.string(),traitValueSchema),relationshipTraits:z.record(z.string(),traitValueSchema),confirmedFacts:z.array(confirmedFactSchema),aiInferences:z.array(inferenceSchema),personalityTags:personalityTagStateSchema,analysisConfidence:z.number().min(0).max(100)});
+export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(50_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:boundedRecord(traitValueSchema,120),relationshipTraits:boundedRecord(traitValueSchema,120),confirmedFacts:z.array(confirmedFactSchema).max(200),aiInferences:z.array(inferenceSchema).max(60),personalityTags:personalityTagStateSchema,analysisConfidence:z.number().min(0).max(100)});
 
 // Public summary: legacy four fields stay required for old passports and compatibility.
 // New teaser-only fields are optional so previously saved characters remain readable.
