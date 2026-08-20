@@ -53,24 +53,71 @@ function hslToHex({h,s,l}:Hsl){
   return `#${part(r)}${part(g)}${part(b)}`.toUpperCase();
 }
 
+function hueDistance(a:number,b:number){
+  const diff=Math.abs(a-b)%360;
+  return Math.min(diff,360-diff);
+}
+
+function isNeutral(hsl:Hsl){return hsl.s<10}
+function isVeryLight(hsl:Hsl){return hsl.l>=82}
+function isVeryDark(hsl:Hsl){return hsl.l<=22}
+function isYellow(hsl:Hsl){return hsl.h>=42&&hsl.h<=76&&hsl.s>=36}
+function isNeon(hsl:Hsl){return hsl.s>=82&&hsl.l>=46}
+function isExtreme(hsl:Hsl){return isNeutral(hsl)||isYellow(hsl)||isNeon(hsl)||isVeryLight(hsl)||isVeryDark(hsl)}
+
+function colorsAreSimilar(a:Hsl,b:Hsl){
+  if(isNeutral(a)&&isNeutral(b))return Math.abs(a.l-b.l)<=28;
+  if(isNeutral(a)!==isNeutral(b))return false;
+  return hueDistance(a.h,b.h)<=18&&Math.abs(a.s-b.s)<=52;
+}
+
+function surfaceSaturation(hsl:Hsl){
+  if(isNeutral(hsl))return 0;
+  if(isNeon(hsl))return clamp(hsl.s*.22,10,20);
+  if(isYellow(hsl))return clamp(hsl.s*.28,10,24);
+  return clamp(hsl.s*.34,8,28);
+}
+
 function surfaceColor(raw:string,lightness:number){
   const hsl=hexToHsl(raw);
-  const saturation=hsl.s<6?0:clamp(hsl.s*.34,8,28);
+  return hslToHex({h:hsl.h,s:surfaceSaturation(hsl),l:lightness});
+}
+
+function accentColor(raw:string,strongSeparation=false){
+  const hsl=hexToHsl(raw);
+  if(isNeutral(hsl)){
+    const lightness=isVeryLight(hsl)?44:isVeryDark(hsl)?30:38;
+    return hslToHex({h:hsl.h,s:0,l:strongSeparation?Math.min(lightness,36):lightness});
+  }
+  const saturation=isNeon(hsl)
+    ? clamp(hsl.s*.62,36,58)
+    : isYellow(hsl)
+      ? clamp(hsl.s*.72,32,58)
+      : clamp(hsl.s,28,66);
+  let lightness=isYellow(hsl)?40:isNeon(hsl)?42:clamp(hsl.l,34,52);
+  if(strongSeparation)lightness=clamp(lightness,32,40);
   return hslToHex({h:hsl.h,s:saturation,l:lightness});
 }
 
-function accentColor(raw:string){
+function accentSoftColor(raw:string,strongSeparation=false){
   const hsl=hexToHsl(raw);
-  const saturation=hsl.s<6?0:clamp(hsl.s,28,66);
-  // Very bright/yellow accents are toned down so SVGs and small UI marks stay visible.
-  const lightness=hsl.s<6?36:clamp(hsl.l,34,52);
+  if(isNeutral(hsl)){
+    return hslToHex({h:hsl.h,s:0,l:strongSeparation?82:isExtreme(hsl)?86:91});
+  }
+  const saturation=isNeon(hsl)
+    ? clamp(hsl.s*.34,18,32)
+    : isYellow(hsl)
+      ? clamp(hsl.s*.4,18,36)
+      : clamp(hsl.s*.56,12,42);
+  const lightness=strongSeparation?82:isExtreme(hsl)?87:91;
   return hslToHex({h:hsl.h,s:saturation,l:lightness});
 }
 
-function accentSoftColor(raw:string){
-  const hsl=hexToHsl(raw);
-  const saturation=hsl.s<6?0:clamp(hsl.s*.56,12,42);
-  return hslToHex({h:hsl.h,s:saturation,l:91});
+function surfaceLightness(raw:Hsl,strongSeparation:boolean){
+  if(strongSeparation)return {main:89,mainSub:98};
+  if(isNeutral(raw))return {main:isVeryLight(raw)?90:89,mainSub:98};
+  if(isYellow(raw)||isNeon(raw))return {main:90,mainSub:97};
+  return {main:92,mainSub:97};
 }
 
 export function deriveThemePalette(
@@ -84,11 +131,17 @@ export function deriveThemePalette(
   if(!mainRaw&&!pointRaw)return undefined;
   const mainBase=mainRaw||pointRaw!;
   const pointBase=pointRaw||mainRaw!;
+  const mainHsl=hexToHsl(mainBase);
+  const pointHsl=hexToHsl(pointBase);
+  // Hair/main and eye/point can legitimately share the same hue. Never invent a
+  // different hue: separate their UI roles with a clearly visible lightness ladder.
+  const strongSeparation=colorsAreSimilar(mainHsl,pointHsl);
+  const surface=surfaceLightness(mainHsl,strongSeparation);
   return themePaletteSchema.parse({
-    main:surfaceColor(mainBase,92),
-    mainSub:surfaceColor(mainBase,97),
-    point:accentColor(pointBase),
-    pointSub:accentSoftColor(pointBase),
+    main:surfaceColor(mainBase,surface.main),
+    mainSub:surfaceColor(mainBase,surface.mainSub),
+    point:accentColor(pointBase,strongSeparation),
+    pointSub:accentSoftColor(pointBase,strongSeparation),
     source,
     confidence:clamp(Math.round(Number.isFinite(confidence)?confidence:65),0,100),
   });
