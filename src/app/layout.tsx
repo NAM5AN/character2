@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { ReportSummaryToggleBridge } from '@/components/ReportSummaryToggleBridge';
 import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshBridge';
 import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
+import { FeedbackReporter } from '@/components/FeedbackReporter';
+import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
 import './globals.css';
 import './bipolar-mobile-fix.css';
+import './feedback.css';
 import './report-pagination.css';
 import './report-readability.css';
 import './report-magazine.css';
@@ -64,6 +67,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ReportSummaryToggleBridge/>
         <AdminTelemetryRefreshBridge/>
         <ReplayResultUrlBridge/>
+        <AdminFeedbackShortcut/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
@@ -77,7 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
         </header>
         {children}
-        <footer className="footer"><div className="container">CHARA LAB · Character Passport v1</div></footer>
+        <footer className="footer"><div className="container"><span>CHARA LAB · Character Passport v1</span><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
       </body>
     </html>
   );
