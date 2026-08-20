@@ -37,7 +37,8 @@ export async function GET(request:Request){
     const requestUrl=new URL(request.url);
     const query=imageQuerySchema.parse({url:requestUrl.searchParams.get('url')||'',index:requestUrl.searchParams.get('index')||''});
     const image=await loadProfileImage(query.url,query.index);
-    return new Response(image.bytes,{
+    const body=Uint8Array.from(image.bytes).buffer;
+    return new Response(body,{
       status:200,
       headers:{
         'content-type':image.contentType,
