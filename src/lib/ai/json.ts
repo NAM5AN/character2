@@ -12,6 +12,16 @@ function imageFilePart(dataUrl:string){
   };
 }
 
+function defaultStructuredAttempts(system:string){
+  // Interview questions are generated one at a time and prefetched while the user
+  // answers the current question. Their strict evidence/option validators can turn a
+  // tiny formatting miss into several full model regenerations, which makes the next
+  // screen wait. Keep one primary attempt here; askOpenAIJson still provides one
+  // fallback-model attempt if the structured result genuinely fails. Other AI stages
+  // keep the existing three-attempt reliability policy.
+  return system.includes('정밀 캐해 인터뷰어')||system.includes('질문 근거(evidence)')?1:3;
+}
+
 export async function generateValidatedJson<T>(args: {
   model: string;
   system: string;
@@ -24,7 +34,7 @@ export async function generateValidatedJson<T>(args: {
   const strictSystem = `${args.system}\n\n응답 규칙:\n- 최종 응답은 반드시 submit_result 도구를 한 번 호출해서 제출하세요.\n- 지정된 구조의 모든 필수 값을 빠짐없이 채우세요.\n- 숫자/불리언/배열/객체 타입을 임의로 문자열로 바꾸지 마세요.\n- 불필요하게 긴 문장이나 항목을 늘리지 말고, 요구된 최소 개수에 가깝게 간결하게 작성하세요.`;
 
   let lastReason = 'AI_STRUCTURED_OUTPUT_FAILED';
-  const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? 3, 3));
+  const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? defaultStructuredAttempts(args.system), 3));
   const images = (args.images ?? []).filter(Boolean);
   // 출력이 상한에 걸려 잘리면(finishReason 'length') 도구 호출 JSON이 미완성이라 반드시 검증에 실패한다.
   // 같은 상한으로 다시 시도하면 똑같이 잘려서 성공할 수 없으므로, 그 경우에만 상한을 올려 재시도한다.
@@ -103,7 +113,7 @@ export async function streamValidatedJson<T>(args: {
 
   const images = (args.images ?? []).filter(Boolean);
   const expectedChars = Math.max(1200, (args.maxOutputTokens ?? 2000) * 3);
-  const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? 3, 3));
+  const maxAttempts = Math.max(1, Math.min(args.maxAttempts ?? defaultStructuredAttempts(args.system), 3));
   let lastReason = 'AI_STRUCTURED_OUTPUT_FAILED';
   // generateValidatedJson과 같은 이유로, 잘린 출력일 때만 상한을 올려 재시도한다.
   let outputCap = args.maxOutputTokens;
