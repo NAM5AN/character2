@@ -1,0 +1,6 @@
+.report-mag .section-chev,
+.report-mag .report-section.is-open .section-chev,
+.report-mag .topic-grid > article.topic.detail-topic-accordion::after,
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+  background-color: var(--report-point) !important;
+}
