@@ -9,6 +9,7 @@ import { AdminThemePaletteAudit } from '@/components/AdminThemePaletteAudit';
 import { AdminFailureDeleteBridge } from '@/components/AdminFailureDeleteBridge';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
+import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -83,6 +84,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminFailureDeleteBridge/>
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
+        <ReportOwnerSaveGate/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
