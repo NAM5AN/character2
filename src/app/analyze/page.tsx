@@ -2,7 +2,6 @@ import { AnalyzeFlow } from '@/components/AnalyzeFlow';
 import { AnalyzeReviewUiPolish } from '@/components/AnalyzeReviewUiPolish';
 import { BipolarFiveLevelUi } from '@/components/BipolarFiveLevelUi';
 import { PersonalityLoadingBridge } from '@/components/PersonalityLoadingBridge';
-import { TemporalSessionRepairBridge } from '@/components/TemporalSessionRepairBridge';
 
 export default function AnalyzePage(){
   return <main className="container page">
@@ -38,7 +37,6 @@ export default function AnalyzePage(){
     `}</style>
     <AnalyzeReviewUiPolish/>
     <PersonalityLoadingBridge/>
-    <TemporalSessionRepairBridge/>
     <BipolarFiveLevelUi/>
     <div className="page-head"><h1 style={{fontSize:'clamp(42px,6vw,72px)'}}>캐릭터 정밀 분석</h1></div>
     <AnalyzeFlow/>

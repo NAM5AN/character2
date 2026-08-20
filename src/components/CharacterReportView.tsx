@@ -304,7 +304,9 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         .save-character-row{grid-template-columns:1fr}
         .save-character-row .btn{width:100%}
         .full-preview-section.preview-index-0,.full-preview-section.preview-index-1{display:none}
-        .full-preview-cta{top:50% !important}
+        /* 모바일에선 미리보기 두 칸이 숨겨져 블록이 짧아지므로 오버레이를 위로 올린다.
+           위치를 잡는 건 버튼이 아니라 감싸는 .full-preview-overlay 다. */
+        .full-preview-overlay{top:50% !important}
       }
     `}</style>
 
@@ -343,7 +345,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>)}
           <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
         </div>
-        <div style={{position:'absolute',left:'50%',top:'60%',transform:'translate(-50%,-50%)',zIndex:5,width:'min(600px,90%)',display:'flex',flexDirection:'column',alignItems:'center',gap:18,pointerEvents:'none'}}>
+        <div className="full-preview-overlay" style={{position:'absolute',left:'50%',top:'60%',transform:'translate(-50%,-50%)',zIndex:5,width:'min(600px,90%)',display:'flex',flexDirection:'column',alignItems:'center',gap:18,pointerEvents:'none'}}>
           {!busy&&<div style={{pointerEvents:'none',textAlign:'center',padding:'18px 22px',borderRadius:18,background:'rgba(255,253,248,.86)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',border:'1px solid var(--line)',boxShadow:'0 12px 34px rgba(23,24,22,.12)'}}>
             <div style={{fontSize:12,fontWeight:900,letterSpacing:'.03em',color:'var(--accent,#b8860b)',marginBottom:9}}>여기까지는 예고편이에요.</div>
             <p style={{margin:0,fontSize:'clamp(14px,2.4vw,16px)',lineHeight:1.75,fontWeight:700}}>아직 못 꺼낸 얘기가 더 많아요. 바로 확인해보세요.</p>
