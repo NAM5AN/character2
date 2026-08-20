@@ -42,9 +42,13 @@ export async function POST(request: Request, context: { params: Promise<{ shareC
     const inputs = record(data);
     if (!inputs.seed) return NextResponse.json({ error: 'DETAIL_SOURCE_NOT_AVAILABLE' }, { status: 409 });
 
-    // 이미 최근에(그리고 같은 버전으로는 stage 1에서 판정) 계산돼 있으면 다시 돌리지 않는다.
+    // 이미 계산돼 있으면 다시 돌리지 않는다. 단 stage 1이 실제로 재사용하는 조건과
+    // 똑같이 판정해야 한다 — 시간만 보고 건너뛰면, 프롬프트/스킬 버전이 올라간 뒤
+    // 여기서는 "이미 있음"이라 넘어가고 stage 1은 버전이 달라 버리기 때문에
+    // 사전 계산이 조용히 무력화되고 사용자만 전체 대기를 하게 된다.
     const precomputedAt = typeof inputs.precomputedAt === 'string' ? Date.parse(inputs.precomputedAt) : NaN;
-    if (Number.isFinite(precomputedAt) && Date.now() - precomputedAt < PRECOMPUTE_FRESH_MS) {
+    const fresh = Number.isFinite(precomputedAt) && Date.now() - precomputedAt < PRECOMPUTE_FRESH_MS;
+    if (fresh && inputs.precomputedVersion === versionTag()) {
       return NextResponse.json({ ok: true, cached: true });
     }
 
