@@ -5,7 +5,6 @@ import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshB
 import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import { FeedbackReporter } from '@/components/FeedbackReporter';
 import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
-import { AdminThemePaletteAudit } from '@/components/AdminThemePaletteAudit';
 import { AdminFailureDeleteBridge } from '@/components/AdminFailureDeleteBridge';
 import { AdminCharacterIdentityEditBridge } from '@/components/AdminCharacterIdentityEditBridge';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
@@ -14,6 +13,7 @@ import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
 import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge';
 import { AdminDeploymentVersionPanel } from '@/components/AdminDeploymentVersionPanel';
 import { AdminConsoleLayoutPolish } from '@/components/AdminConsoleLayoutPolish';
+import { AdminConsoleDataEnhancements } from '@/components/AdminConsoleDataEnhancements';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -93,7 +93,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminTelemetryRefreshBridge/>
         <ReplayResultUrlBridge/>
         <AdminFeedbackShortcut/>
-        <AdminThemePaletteAudit/>
         <AdminFailureDeleteBridge/>
         <AdminCharacterIdentityEditBridge/>
         <DetailReportAccordionBridge/>
@@ -101,6 +100,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ReportOwnerSaveGate/>
         <GlobalScreenMotionBridge/>
         <AdminConsoleLayoutPolish/>
+        <AdminConsoleDataEnhancements/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
