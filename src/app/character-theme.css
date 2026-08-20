@@ -1,0 +1,23 @@
+/* Character-driven palette foundation.
+   These variables intentionally do not replace the existing site tokens yet.
+   Until the profile palette is activated, every screen keeps the current design. */
+:root {
+  --character-main: #f4f1eb;
+  --character-main-sub: #fffdf8;
+  --character-point: #57544c;
+  --character-point-sub: #edeae2;
+
+  --character-page-bg: var(--character-main);
+  --character-surface: var(--character-main-sub);
+  --character-accent: var(--character-point);
+  --character-accent-soft: var(--character-point-sub);
+
+  --character-theme-duration: 900ms;
+  --character-theme-ease: cubic-bezier(.2,.72,.2,1);
+}
+
+/* Later rollout steps opt individual screens into these semantic tokens.
+   Keeping the transition definition here gives every opted-in surface the same motion. */
+[data-character-theme='active'] {
+  --character-theme-ready: 1;
+}
