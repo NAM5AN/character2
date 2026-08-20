@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  async rewrites() {
+    return [{ source: '/favicon.ico', destination: '/favicon.png?v=20260821' }];
+  },
 };
 
 export default nextConfig;
