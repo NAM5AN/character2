@@ -1,20 +1,11 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
+import { REPORT_FIELDS, pickFallbackLead, type ReportField } from '@/lib/report-lead-fallbacks';
+import { logGenRetry } from '@/lib/ai/usage';
 import { applyName } from '@/lib/josa';
 
 type UnknownRecord = Record<string, unknown>;
 
-const REPORT_FIELDS = [
-  'characterOverview',
-  'innerMechanics',
-  'relationshipStyle',
-  'attachmentStyle',
-  'conflictStyleDetailed',
-  'charmAndContradictions',
-  'integratedReport',
-] as const;
-
-type ReportField = typeof REPORT_FIELDS[number];
 type LeadStyle = 'A' | 'C';
 
 type ParagraphItem = {
@@ -167,74 +158,7 @@ function bodyPreview(body: string) {
   return `${compact.slice(0, 420).trimEnd()} … ${compact.slice(-80).trimStart()}`;
 }
 
-const FALLBACK_LEADS: Record<ReportField, string[]> = {
-  characterOverview: [
-    '먼저 이 캐릭터의 전체 인상부터 살펴볼게요.',
-    '겉으로 보이는 모습과 실제 내면은 어떻게 다를까요?',
-    '자기 자신을 바라보는 방식도 조금 더 들여다볼게요.',
-    '타인의 인상과 어디에서 어긋나는지도 볼게요.',
-    '과거 경험이 지금에 무엇을 남겼을까요?',
-    '여러 단서를 이어 숨은 특성도 짚어볼게요.',
-  ],
-  innerMechanics: [
-    '가장 깊은 곳에서 움직이는 욕구부터 볼게요.',
-    '이 캐릭터가 특히 두려워하는 것은 무엇일까요?',
-    '원하는 것과 실제로 필요한 것은 어떻게 다를까요?',
-    '감정이 흔들릴 때 지키려는 기준도 살펴볼게요.',
-    '불편한 감정을 처리하는 방식은 어떻게 나타날까요?',
-    '스스로도 인정하기 어려운 부분을 조금 더 볼게요.',
-    '자기 행동을 납득하는 방식도 이어서 짚어볼게요.',
-  ],
-  relationshipStyle: [
-    '처음 만난 사람을 대하는 태도부터 볼게요.',
-    '관계의 거리는 어떤 조건에서 가까워질까요?',
-    '가까운 사람 앞에서는 무엇이 달라질까요?',
-    '주도권을 주고받는 방식도 살펴볼게요.',
-    '사람을 믿는 기준은 어디에서 생길까요?',
-    '관계를 오래 유지하는 방법도 함께 짚어볼게요.',
-  ],
-  attachmentStyle: [
-    '호감이 시작되는 순간부터 살펴볼게요.',
-    '친밀해질수록 마음은 어떻게 달라질까요?',
-    '사랑받고 있다는 것을 무엇으로 확인할까요?',
-    '가까운 관계에서 상대에게 바라는 것도 볼게요.',
-    '질투하거나 부딪혔을 때는 어떤 반응이 나올까요?',
-    '관계가 오래될수록 달라지는 부분이 있어요.',
-    '이별 뒤 감정을 정리하는 방식도 살펴볼게요.',
-    '어떤 상대와 특히 잘 맞을까요?',
-  ],
-  conflictStyleDetailed: [
-    '갈등을 알아차리는 순간부터 볼게요.',
-    '불편함은 언제 자기 기준의 침범으로 바뀔까요?',
-    '압박이 커질수록 어떤 면이 드러날까요?',
-    '한계에 몰렸을 때의 반응도 살펴볼게요.',
-    '절대 양보하지 않는 기준은 무엇일까요?',
-    '자신과 타인에게 적용하는 잣대도 짚어볼게요.',
-    '극한의 선택에서는 어디로 기울까요?',
-  ],
-  charmAndContradictions: [
-    '먼저 눈에 띄는 매력부터 살펴볼게요.',
-    '상반된 모습은 왜 함께 나타날까요?',
-    '쉽게 오해받는 지점도 조금 더 볼게요.',
-    '같은 특성이 강점과 약점으로 갈리는 부분이에요.',
-    '알고 지낼수록 발견되는 면은 무엇일까요?',
-    '위험하지만 끌리는 부분도 이어서 짚어볼게요.',
-    '여러 단서를 연결하면 무엇이 새롭게 보일까요?',
-  ],
-  integratedReport: [
-    '이제 전체 구조를 하나의 흐름으로 이어볼게요.',
-    '욕구와 두려움은 어떻게 맞물려 있을까요?',
-    '감정과 자기보호가 연결되는 지점도 살펴볼게요.',
-    '관계와 갈등에서는 같은 원리가 어떻게 드러날까요?',
-    '겉보기의 모순이 하나로 이어지는 부분이에요.',
-    '마지막으로 이 캐릭터의 큰 방향을 짚어볼게요.',
-  ],
-};
 
-function fallbackLead(item: ParagraphItem) {
-  const candidates = FALLBACK_LEADS[item.field];
-  return candidates[item.paragraphIndex % candidates.length];
-}
 
 function buildItems(record: UnknownRecord, name: string) {
   const items: ParagraphItem[] = [];
@@ -291,17 +215,34 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
     });
     leads = result.leads.map(item => item.lead.replace(/\s+/gu, ' ').trim());
   } catch (error) {
+    // 이 실패는 조용히 폴백으로 흡수돼 왔습니다. 그 결과 리포트 제목이 통조림 문구로
+    // 바뀌고 중복까지 생겼는데, 콘솔에만 남아 원인을 추적할 수 없었습니다.
+    // 관리자 콘솔에서 보이도록 기록합니다(생성 자체는 폴백으로 계속 진행).
+    const message = error instanceof Error ? error.message : String(error);
     console.error('DETAIL_PARAGRAPH_LEAD_REWRITE_FAILED', error);
-    leads = items.map(fallbackLead);
+    logGenRetry('LEAD_REWRITE_FAILED', `문단 ${items.length}개 / ${message}`);
+    leads = [];
   }
 
-  const leadById = new Map(items.map((item, index) => [item.id, leads[index] || fallbackLead(item)]));
+  // 같은 섹션 안에서 안내문이 겹치지 않게 배정합니다. AI가 겹쳐 쓴 경우와
+  // 폴백이 순환하는 경우 모두 여기서 걸러집니다.
+  const usedByField = new Map<string, Set<string>>();
+  const leadById = new Map(items.map((item, index) => {
+    if (!usedByField.has(item.field)) usedByField.set(item.field, new Set());
+    const used = usedByField.get(item.field)!;
+    const candidate = (leads[index] || '').trim();
+    if (candidate && !used.has(candidate)) { used.add(candidate); return [item.id, candidate] as const; }
+    return [item.id, pickFallbackLead(item.field, item.paragraphIndex, used)] as const;
+  }));
   const rewritten: UnknownRecord = { ...record };
 
   for (const field of REPORT_FIELDS) {
     const valueForField = record[field];
     if (typeof valueForField !== 'string' || !valueForField.trim()) continue;
     const blocks = splitParagraphs(valueForField);
+    // 위에서 배정하며 쓴 문구를 그대로 이어받아, 이 루프에서 고르는 폴백도 겹치지 않게 한다.
+    const used = usedByField.get(field) ?? new Set<string>();
+    usedByField.set(field, used);
     rewritten[field] = blocks.map((block, paragraphIndex) => {
       const body = paragraphBody(block);
       const id = `${field}:${paragraphIndex}`;
@@ -309,10 +250,10 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
       if (!item) {
         // 재작성 대상이 아니었던 문단 = 기존 안내문이 이미 규칙에 맞음 → 그대로 유지
         const existingLead = block.match(/^\*\*(.+?)\*\*/su)?.[1]?.replace(/\s+/gu, ' ').trim();
-        if (existingLead) return `**${existingLead}** ${body}`.trim();
-        return `**${fallbackLead({ id, field, paragraphIndex, sectionTitle: sectionTitle(field, name), body })}** ${body}`.trim();
+        if (existingLead) { used.add(existingLead); return `**${existingLead}** ${body}`.trim(); }
+        return `**${pickFallbackLead(field, paragraphIndex, used)}** ${body}`.trim();
       }
-      const lead = leadById.get(id) || fallbackLead(item);
+      const lead = leadById.get(id) || pickFallbackLead(field, paragraphIndex, used);
       return `**${lead}** ${body}`.trim();
     }).join('\n\n');
   }

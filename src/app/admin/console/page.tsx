@@ -100,6 +100,7 @@ function retryLabel(code: string) {
   if (code === 'RETRY_SUMMARY_TOO_SHORT') return '요약 필드가 너무 짧음';
   if (code === 'RETRY_SUMMARY_FORMAT') return '요약 문단 형식 오류';
   if (code === 'RETRY_INSIGHT_QUALITY') return 'insight 품질 기준 미달';
+  if (code === 'LEAD_REWRITE_FAILED') return '문단 안내문 생성 실패 (제목이 기본 문구로 대체됨)';
   return code;
 }
 
