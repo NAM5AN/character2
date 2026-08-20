@@ -160,6 +160,14 @@ export function AnalyzeCharacterThemeBridge(){
           const payload=await response.clone().json() as Record<string,unknown>;
           const shareCode=typeof payload.shareCode==='string'?payload.shareCode:'';
           const editToken=typeof payload.editToken==='string'?payload.editToken:'';
+
+          // The analyze page intentionally keeps rendering the freshly generated report,
+          // but the address is switched to the durable character route immediately.
+          // A refresh therefore re-opens this character instead of falling back to /analyze.
+          if(shareCode&&window.location.pathname==='/analyze'){
+            window.history.replaceState(window.history.state,'',`/character/${shareCode}`);
+          }
+
           const palette=readStoredPalette();
           if(palette&&shareCode&&editToken){
             await originalFetch(`/api/characters/${shareCode}/theme`,{
