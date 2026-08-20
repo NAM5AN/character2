@@ -6,6 +6,7 @@ html[data-character-theme='active'] .report-mag {
   --report-point: var(--character-accent);
   --report-point-soft: var(--character-accent-soft);
   --mag-paper-2: color-mix(in srgb,var(--character-main) 68%,var(--character-main-sub));
+  --mag-line-dark: color-mix(in srgb,var(--character-point) 22%,var(--line));
 }
 
 html[data-character-theme='active'] body:has(.completed-report-view),
@@ -29,7 +30,9 @@ html[data-character-theme='active'] body:has(.analyze-page .report-mag) .site-he
 .report-mag .end-note,
 .completed-report-view .result-block,
 .save-character-panel,
-.full-preview-section {
+.full-preview-section,
+.full-preview-overlay > div,
+.modal {
   transition:
     background-color var(--character-theme-duration) var(--character-theme-ease),
     border-color var(--character-theme-duration) var(--character-theme-ease),
@@ -126,6 +129,55 @@ html[data-character-theme='active'] .report-mag .topic-grid > article.topic.deta
 
 html[data-character-theme='active'] .report-mag .page-outline {
   border-color: color-mix(in srgb,var(--character-point) 42%,var(--ink));
+}
+
+/* Paid-detail teaser used fixed warm-paper overlays. Preserve the same opacity
+   progression but tint every veil with the character surface instead. */
+html[data-character-theme='active'] .full-preview-section.preview-index-0 > div:last-child {
+  background: color-mix(in srgb,var(--character-surface) 4%,transparent) !important;
+}
+
+html[data-character-theme='active'] .full-preview-section.preview-index-1 > div:last-child {
+  background: color-mix(in srgb,var(--character-surface) 15%,transparent) !important;
+}
+
+html[data-character-theme='active'] .full-preview-section.preview-index-2 > div:last-child {
+  background: color-mix(in srgb,var(--character-surface) 30%,transparent) !important;
+}
+
+html[data-character-theme='active'] .full-preview-sections > div:last-child {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb,var(--character-surface) 8%,transparent) 30%,
+    color-mix(in srgb,var(--character-surface) 30%,transparent) 58%,
+    color-mix(in srgb,var(--character-surface) 72%,transparent) 82%,
+    color-mix(in srgb,var(--character-surface) 90%,transparent) 100%
+  ) !important;
+}
+
+html[data-character-theme='active'] .full-preview-overlay > div {
+  background: color-mix(in srgb,var(--character-surface) 88%,transparent) !important;
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+/* Access-code modal belongs to the report experience, so it should not fall back
+   to the site's warm paper while a character report theme is active. */
+html[data-character-theme='active'] body:has(.report-mag) .modal {
+  background-color: var(--character-surface);
+  border: 1px solid color-mix(in srgb,var(--character-point) 18%,var(--line));
+}
+
+html[data-character-theme='active'] body:has(.report-mag) .modal .input,
+html[data-character-theme='active'] body:has(.report-mag) .modal .textarea {
+  background-color: var(--character-surface);
+  border-color: color-mix(in srgb,var(--character-point) 22%,var(--line));
+}
+
+html[data-character-theme='active'] body:has(.report-mag) .modal .input:focus,
+html[data-character-theme='active'] body:has(.report-mag) .modal .textarea:focus {
+  border-color: var(--character-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb,var(--character-point) 13%,transparent);
 }
 
 @media (prefers-reduced-motion:reduce) {
