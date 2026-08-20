@@ -63,6 +63,14 @@ function bindRange(control:HTMLElement,range:HTMLInputElement,scale:ManagedScale
   scale.__fiveLevelSync=sync;
 }
 
+function setRangeValueForReact(range:HTMLInputElement,value:number){
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
+  if(setter)setter.call(range,String(value));
+  else range.value=String(value);
+  range.dispatchEvent(new Event('input',{bubbles:true}));
+  range.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
 function createScale(control:HTMLElement){
   const scale=document.createElement('div') as ManagedScale;
   scale.className='five-level-scale';
@@ -89,10 +97,9 @@ function createScale(control:HTMLElement){
       if(!currentControl||!currentRange)return;
       currentControl.dataset.fiveLevelTouched='1';
       try{currentRange.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{currentRange.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
-      currentRange.value=String(value);
-      currentRange.dispatchEvent(new Event('input',{bubbles:true}));
-      currentRange.dispatchEvent(new Event('change',{bubbles:true}));
-      syncControl(currentControl,currentRange,scale);
+      setRangeValueForReact(currentRange,value);
+      // React의 controlled value 반영 후 실제 상태값으로 다시 동기화한다.
+      queueMicrotask(()=>syncControl(currentControl,currentRange,scale));
     });
     scale.appendChild(button);
   });
@@ -233,7 +240,7 @@ export function BipolarFiveLevelUi(){
       .five-level-scale::before {
         content:'';
         position:absolute;
-        left:23px;
+        left:26px;
         top:25px;
         bottom:25px;
         width:2px;
