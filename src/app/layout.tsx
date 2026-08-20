@@ -33,6 +33,7 @@ import './character-theme-final-sweep.css';
 import './report-theme-activation-fix.css';
 import './global-button-interactions.css';
 import './admin-console-polish.css';
+import './default-neutral-theme.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
