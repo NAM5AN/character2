@@ -39,3 +39,45 @@ html[data-character-theme='active'] body:has(.report-mag) .summary-type-grid .re
   background: var(--character-surface) !important;
   border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
 }
+
+/* The magazine sheet is a layout wrapper, not a card.  It must stay transparent so
+   the title/card region does not turn into a separate white slab when a character
+   palette is active.  Only real cards/surfaces receive character fills. */
+html[data-character-theme='active'] .report-mag .sheet {
+  background: transparent !important;
+}
+
+/* Paid-detail preview cards previously inherited mainSub directly.  Very light
+   palettes (e.g. #FAFAFA) therefore looked completely unthemed.  Mix in pointSub
+   so the preview remains subtle but visibly belongs to the character palette. */
+html[data-character-theme='active'] .full-preview-section {
+  background: color-mix(in srgb,var(--character-accent-soft) 58%,var(--character-surface)) !important;
+  border-color: color-mix(in srgb,var(--character-point) 24%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .full-preview-overlay > div {
+  background: color-mix(in srgb,var(--character-accent-soft) 72%,var(--character-surface)) !important;
+  border-color: color-mix(in srgb,var(--character-point) 30%,var(--line)) !important;
+}
+
+/* Keep the blur/fade masks in the same hue instead of falling back to warm white. */
+html[data-character-theme='active'] .full-preview-section.preview-index-0 > div:last-child {
+  background: color-mix(in srgb,var(--character-accent-soft) 12%,transparent) !important;
+}
+html[data-character-theme='active'] .full-preview-section.preview-index-1 > div:last-child {
+  background: color-mix(in srgb,var(--character-accent-soft) 24%,transparent) !important;
+}
+html[data-character-theme='active'] .full-preview-section.preview-index-2 > div:last-child {
+  background: color-mix(in srgb,var(--character-accent-soft) 38%,transparent) !important;
+}
+
+html[data-character-theme='active'] .full-preview-sections > div:last-child {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb,var(--character-accent-soft) 10%,transparent) 30%,
+    color-mix(in srgb,var(--character-accent-soft) 30%,transparent) 58%,
+    color-mix(in srgb,var(--character-accent-soft) 68%,transparent) 82%,
+    color-mix(in srgb,var(--character-accent-soft) 88%,var(--character-surface)) 100%
+  ) !important;
+}
