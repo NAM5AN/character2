@@ -22,7 +22,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # AnalyzeFlow: apply the extracted palette as soon as profile parsing finishes.
           p=Path('src/components/AnalyzeFlow.tsx')
           s=p.read_text()
           anchor="import { applyName } from '@/lib/josa';\n"
@@ -57,13 +56,11 @@ jobs:
           elif new not in s: raise SystemExit('parse anchor missing')
           p.write_text(s)
 
-          # Give the analyze route an explicit scope so home/admin pages remain untouched.
           p=Path('src/app/analyze/page.tsx')
           s=p.read_text()
           s=s.replace('<main className="container page">','<main className="container page analyze-page">',1)
           p.write_text(s)
 
-          # Global import for the scoped analyze theme rules.
           p=Path('src/app/layout.tsx')
           s=p.read_text()
           anchor="import './character-theme.css';\n"
@@ -73,133 +70,25 @@ jobs:
               s=s.replace(anchor,anchor+add,1)
           p.write_text(s)
 
-          # Safe, low-saturation analyze-page mapping.
           p=Path('src/app/analyze-character-theme.css')
-          p.write_text(r'''/* Character palette rollout: analyze / Q&A only.
-   Text tokens are intentionally untouched; character color is used only on surfaces,
-   borders, progress/selection accents and graphic controls. */
-
-html,
-body,
-.site-header,
-.analyze-page,
-.analyze-page .card,
-.analyze-page .input,
-.analyze-page .textarea,
-.analyze-page .option,
-.analyze-page .bipolar-control,
-.analyze-page .progress,
-.analyze-page .progress > span,
-.analyze-page .notice,
-.analyze-page .tag,
-.analyze-page .pill,
-.analyze-page .personality-chip {
-  transition:
-    background-color var(--character-theme-duration) var(--character-theme-ease),
-    border-color var(--character-theme-duration) var(--character-theme-ease),
-    box-shadow var(--character-theme-duration) var(--character-theme-ease);
-}
-
-html[data-character-theme='active'],
-html[data-character-theme='active'] body:has(.analyze-page) {
-  background-color: var(--character-page-bg);
-}
-
-html[data-character-theme='active'] body:has(.analyze-page) .site-header {
-  background-color: color-mix(in srgb, var(--character-main) 90%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--character-point) 16%, var(--line));
-}
-
-html[data-character-theme='active'] .analyze-page .card,
-html[data-character-theme='active'] .analyze-page .input,
-html[data-character-theme='active'] .analyze-page .textarea,
-html[data-character-theme='active'] .analyze-page .option,
-html[data-character-theme='active'] .analyze-page .bipolar-control {
-  background-color: var(--character-surface);
-}
-
-html[data-character-theme='active'] .analyze-page .card,
-html[data-character-theme='active'] .analyze-page .input,
-html[data-character-theme='active'] .analyze-page .textarea,
-html[data-character-theme='active'] .analyze-page .option,
-html[data-character-theme='active'] .analyze-page .bipolar-control,
-html[data-character-theme='active'] .analyze-page .inference {
-  border-color: color-mix(in srgb, var(--character-point) 18%, var(--line));
-}
-
-html[data-character-theme='active'] .analyze-page .option:hover,
-html[data-character-theme='active'] .analyze-page .option.selected {
-  background-color: var(--character-accent-soft);
-  border-color: var(--character-accent);
-  color: var(--ink);
-}
-
-html[data-character-theme='active'] .analyze-page .input:focus,
-html[data-character-theme='active'] .analyze-page .textarea:focus {
-  border-color: var(--character-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--character-point) 13%, transparent);
-}
-
-html[data-character-theme='active'] .analyze-page .notice,
-html[data-character-theme='active'] .analyze-page .tag {
-  background-color: var(--character-accent-soft);
-  border-color: var(--character-accent);
-}
-
-html[data-character-theme='active'] .analyze-page .progress {
-  background-color: color-mix(in srgb, var(--character-main) 70%, var(--character-main-sub));
-}
-
-html[data-character-theme='active'] .analyze-page .progress > span {
-  background-color: var(--character-accent);
-}
-
-html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));
-  border-color: color-mix(in srgb, var(--character-point) 20%, var(--line));
-}
-html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-track {
-  background: linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));
-  border-color: color-mix(in srgb, var(--character-point) 20%, var(--line));
-}
-html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-thumb {
-  background-color: var(--character-accent);
-  border-color: var(--character-surface);
-  box-shadow: 0 0 0 2px var(--character-accent),0 4px 12px #0002;
-}
-html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thumb {
-  background-color: var(--character-accent);
-  border-color: var(--character-surface);
-  box-shadow: 0 0 0 2px var(--character-accent),0 4px 12px #0002;
-}
-
-/* Personality selection remains readable: point hue is used as a soft fill/border,
-   never as a saturated text background. */
-html[data-character-theme='active'] .analyze-page .personality-chip[data-selected='true'] {
-  background-color: var(--character-accent-soft) !important;
-  border-color: var(--character-accent) !important;
-  color: var(--ink) !important;
-}
-
-/* Small graphic accents inherit the point hue without recoloring body text. */
-html[data-character-theme='active'] .analyze-page svg [stroke]:not([stroke='none']) {
-  transition: stroke var(--character-theme-duration) var(--character-theme-ease);
-}
-html[data-character-theme='active'] .analyze-page .progress + svg,
-html[data-character-theme='active'] .analyze-page .mini-icon,
-html[data-character-theme='active'] .analyze-page .personality-chip::before {
-  color: var(--character-accent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html,
-  body,
-  .site-header,
-  .analyze-page,
-  .analyze-page * {
-    transition-duration: 0.01ms !important;
-  }
-}
+          p.write_text(r'''/* Character palette rollout: analyze / Q&A only. */
+html,body,.site-header,.analyze-page,.analyze-page .card,.analyze-page .input,.analyze-page .textarea,.analyze-page .option,.analyze-page .bipolar-control,.analyze-page .progress,.analyze-page .progress>span,.analyze-page .notice,.analyze-page .tag,.analyze-page .pill,.analyze-page .personality-chip{transition:background-color var(--character-theme-duration) var(--character-theme-ease),border-color var(--character-theme-duration) var(--character-theme-ease),box-shadow var(--character-theme-duration) var(--character-theme-ease)}
+html[data-character-theme='active'],html[data-character-theme='active'] body:has(.analyze-page){background-color:var(--character-page-bg)}
+html[data-character-theme='active'] body:has(.analyze-page) .site-header{background-color:color-mix(in srgb,var(--character-main) 90%,transparent);border-bottom-color:color-mix(in srgb,var(--character-point) 16%,var(--line))}
+html[data-character-theme='active'] .analyze-page .card,html[data-character-theme='active'] .analyze-page .input,html[data-character-theme='active'] .analyze-page .textarea,html[data-character-theme='active'] .analyze-page .option,html[data-character-theme='active'] .analyze-page .bipolar-control{background-color:var(--character-surface)}
+html[data-character-theme='active'] .analyze-page .card,html[data-character-theme='active'] .analyze-page .input,html[data-character-theme='active'] .analyze-page .textarea,html[data-character-theme='active'] .analyze-page .option,html[data-character-theme='active'] .analyze-page .bipolar-control,html[data-character-theme='active'] .analyze-page .inference{border-color:color-mix(in srgb,var(--character-point) 18%,var(--line))}
+html[data-character-theme='active'] .analyze-page .option:hover,html[data-character-theme='active'] .analyze-page .option.selected{background-color:var(--character-accent-soft);border-color:var(--character-accent);color:var(--ink)}
+html[data-character-theme='active'] .analyze-page .input:focus,html[data-character-theme='active'] .analyze-page .textarea:focus{border-color:var(--character-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--character-point) 13%,transparent)}
+html[data-character-theme='active'] .analyze-page .notice,html[data-character-theme='active'] .analyze-page .tag{background-color:var(--character-accent-soft);border-color:var(--character-accent)}
+html[data-character-theme='active'] .analyze-page .progress{background-color:color-mix(in srgb,var(--character-main) 70%,var(--character-main-sub))}
+html[data-character-theme='active'] .analyze-page .progress>span{background-color:var(--character-accent)}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));border-color:color-mix(in srgb,var(--character-point) 20%,var(--line))}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-track{background:linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));border-color:color-mix(in srgb,var(--character-point) 20%,var(--line))}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-thumb{background-color:var(--character-accent);border-color:var(--character-surface);box-shadow:0 0 0 2px var(--character-accent),0 4px 12px #0002}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thumb{background-color:var(--character-accent);border-color:var(--character-surface);box-shadow:0 0 0 2px var(--character-accent),0 4px 12px #0002}
+html[data-character-theme='active'] .analyze-page .personality-chip[data-selected='true']{background-color:var(--character-accent-soft)!important;border-color:var(--character-accent)!important;color:var(--ink)!important}
+html[data-character-theme='active'] .analyze-page .progress+svg,html[data-character-theme='active'] .analyze-page .mini-icon,html[data-character-theme='active'] .analyze-page .personality-chip::before{color:var(--character-accent)}
+@media(prefers-reduced-motion:reduce){html,body,.site-header,.analyze-page,.analyze-page *{transition-duration:.01ms!important}}
 ''')
           PY
       - name: Commit analyze theme rollout
@@ -210,3 +99,5 @@ html[data-character-theme='active'] .analyze-page .personality-chip::before {
           git diff --cached --quiet && exit 0
           git commit -m "Apply character palette to analyze flow"
           git push origin main
+
+# trigger 2
