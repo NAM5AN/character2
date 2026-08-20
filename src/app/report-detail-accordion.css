@@ -64,15 +64,19 @@
   opacity: .62;
 }
 
-/* Individual paragraph/topic accordion. */
+/* Individual paragraph/topic accordion.
+   Subtopic numbers use a small caption rail above the title instead of a second
+   large left-hand number hierarchy. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion {
   position: relative !important;
   grid-column: span 12 !important;
   display: grid !important;
-  grid-template-columns: 76px minmax(0, 1fr) 48px !important;
-  gap: 18px !important;
+  grid-template-columns: minmax(0, 1fr) 48px !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 20px !important;
+  row-gap: 7px !important;
   align-items: center !important;
-  min-height: 74px;
+  min-height: 84px;
   margin: 0 !important;
   padding: 20px 0 !important;
   border-top: 0 !important;
@@ -86,8 +90,8 @@
 /* Monochrome SVG chevron; centered in the same 48px rail as the parent accordion. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion::after {
   content: '';
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 2;
+  grid-row: 1 / span 2;
   justify-self: center;
   align-self: center;
   width: 22px;
@@ -118,21 +122,36 @@
   position: static !important;
   grid-column: 1 !important;
   grid-row: 1 !important;
-  display: block !important;
-  width: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: max-content !important;
   height: auto !important;
   margin: 0 !important;
   padding: 0 !important;
-  color: #cbc7bd !important;
-  font-size: 30px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #9f9b92 !important;
+  font-size: 12px !important;
   font-weight: 900 !important;
   line-height: 1 !important;
-  letter-spacing: -.06em !important;
+  letter-spacing: .08em !important;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no::after {
+  content: '' !important;
+  display: block !important;
+  width: 34px !important;
+  height: 1px !important;
+  flex: 0 0 34px !important;
+  background: currentColor !important;
+  opacity: .68 !important;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-content {
-  grid-column: 2 !important;
-  grid-row: 1 !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
   display: block !important;
   min-width: 0;
   padding: 0 !important;
@@ -154,17 +173,27 @@
   display: none !important;
 }
 
-/* Expanded topic keeps the title row, then reveals the body underneath. */
+/* Expanded topic keeps the caption + title at left, then reveals the body in the
+   reading column to the right. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 48px !important;
+  grid-template-columns: minmax(220px, .78fr) minmax(0, 1.42fr) 48px !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 30px !important;
+  row-gap: 9px !important;
   align-items: start !important;
   padding: 28px 0 32px !important;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
-  grid-column: 4;
+  grid-column: 3;
+  grid-row: 1 / span 2;
   align-self: start;
   margin-top: 3px;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-no {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content {
@@ -172,15 +201,15 @@
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open h4 {
-  grid-column: 2 !important;
-  grid-row: 1 !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
   white-space: normal;
   text-overflow: clip;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open p {
-  grid-column: 3 !important;
-  grid-row: 1 !important;
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
   display: block !important;
   margin: 0 !important;
   max-width: none !important;
@@ -209,16 +238,18 @@
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion,
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-    grid-template-columns: 46px minmax(0, 1fr) 44px !important;
-    gap: 12px !important;
-    min-height: 70px;
-    padding: 18px 0 !important;
+    grid-template-columns: minmax(0, 1fr) 44px !important;
+    grid-template-rows: auto auto auto !important;
+    column-gap: 12px !important;
+    row-gap: 7px !important;
+    min-height: 76px;
+    padding: 18px 0 22px !important;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion::after,
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 2;
+    grid-row: 1 / span 2;
     justify-self: center;
     align-self: center;
     width: 20px;
@@ -232,18 +263,24 @@
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-no {
     grid-column: 1 !important;
     grid-row: 1 !important;
-    font-size: 24px !important;
+    font-size: 11px !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no::after,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-no::after {
+    width: 28px !important;
+    flex-basis: 28px !important;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-content {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion h4,
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open h4 {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
     font-size: 19px !important;
     line-height: 1.4 !important;
   }
@@ -254,8 +291,8 @@
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open p {
     grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
-    margin-top: 8px !important;
+    grid-row: 3 !important;
+    margin-top: 7px !important;
     font-size: 15px !important;
     line-height: 1.82 !important;
   }
