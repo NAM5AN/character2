@@ -1,0 +1,136 @@
+/* Character-driven report palette.
+   Body/title text stays on the existing ink tokens; character colors only tint
+   backgrounds, cards, lines and graphic accents. */
+
+html[data-character-theme='active'] .report-mag {
+  --report-point: var(--character-accent);
+  --report-point-soft: var(--character-accent-soft);
+  --mag-paper-2: color-mix(in srgb,var(--character-main) 68%,var(--character-main-sub));
+}
+
+html[data-character-theme='active'] body:has(.completed-report-view),
+html[data-character-theme='active'] body:has(.analyze-page .report-mag) {
+  background-color: var(--character-page-bg);
+}
+
+html[data-character-theme='active'] body:has(.completed-report-view) .site-header,
+html[data-character-theme='active'] body:has(.analyze-page .report-mag) .site-header {
+  background-color: color-mix(in srgb,var(--character-main) 90%,transparent);
+  border-bottom-color: color-mix(in srgb,var(--character-point) 16%,var(--line));
+}
+
+.report-mag .cover,
+.report-mag .sheet,
+.report-mag .summary-card,
+.report-mag .summary-expanded,
+.report-mag .study-block,
+.report-mag .compare-grid > div,
+.report-mag .manual-grid > div,
+.report-mag .end-note,
+.completed-report-view .result-block,
+.save-character-panel,
+.full-preview-section {
+  transition:
+    background-color var(--character-theme-duration) var(--character-theme-ease),
+    border-color var(--character-theme-duration) var(--character-theme-ease),
+    box-shadow var(--character-theme-duration) var(--character-theme-ease);
+}
+
+html[data-character-theme='active'] .report-mag .cover,
+html[data-character-theme='active'] .report-mag .sheet,
+html[data-character-theme='active'] .completed-report-view .result-block,
+html[data-character-theme='active'] .save-character-panel,
+html[data-character-theme='active'] .full-preview-section {
+  background-color: var(--character-surface) !important;
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-mag .summary-card {
+  background-color: color-mix(in srgb,var(--character-main-sub) 88%,var(--character-main));
+  border-color: color-mix(in srgb,var(--character-point) 14%,var(--line));
+}
+
+html[data-character-theme='active'] .report-mag .summary-card:hover {
+  border-color: color-mix(in srgb,var(--character-point) 34%,var(--line));
+}
+
+html[data-character-theme='active'] .report-mag .summary-card.is-active {
+  background-color: var(--character-accent-soft);
+  border-color: var(--character-accent);
+}
+
+html[data-character-theme='active'] .report-mag .summary-view-toggle {
+  background-color: color-mix(in srgb,var(--character-main-sub) 80%,transparent);
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line));
+}
+
+html[data-character-theme='active'] .report-mag .summary-view-toggle::before,
+html[data-character-theme='active'] .report-mag .summary-card-no,
+html[data-character-theme='active'] .report-mag .spectrum-track .dot,
+html[data-character-theme='active'] .report-mag .pressure-grid > div > span {
+  background-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .section-kicker,
+html[data-character-theme='active'] .report-mag .sheet-kicker,
+html[data-character-theme='active'] .report-mag .summary-expanded-head > span,
+html[data-character-theme='active'] .report-mag .study-label,
+html[data-character-theme='active'] .report-mag .page-outline-no,
+html[data-character-theme='active'] .report-mag .mini-icon {
+  color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .sheet-page-no {
+  -webkit-text-stroke-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .section-tldr,
+html[data-character-theme='active'] .report-mag .study-block {
+  background-color: var(--character-accent-soft);
+  border-color: color-mix(in srgb,var(--character-point) 26%,var(--line));
+}
+
+html[data-character-theme='active'] .report-mag .compare-grid > div,
+html[data-character-theme='active'] .report-mag .manual-grid > div {
+  background-color: var(--character-surface);
+}
+
+html[data-character-theme='active'] .report-mag .compare-grid .compare-positive {
+  background-color: color-mix(in srgb,var(--character-accent-soft) 78%,var(--character-surface));
+}
+
+html[data-character-theme='active'] .report-mag .spectrum-track,
+html[data-character-theme='active'] .report-mag .spectrum-track::before,
+html[data-character-theme='active'] .report-mag .spectrum-track::after {
+  background-color: color-mix(in srgb,var(--character-point) 28%,var(--mag-line-dark));
+}
+
+html[data-character-theme='active'] .report-mag .spectrum-track .dot {
+  border-color: var(--character-surface);
+  box-shadow: 0 0 0 1px var(--character-accent);
+}
+
+html[data-character-theme='active'] .report-mag .section-tags span,
+html[data-character-theme='active'] .report-mag .tag {
+  background-color: var(--character-accent-soft);
+  border-color: color-mix(in srgb,var(--character-point) 28%,transparent);
+  color: color-mix(in srgb,var(--character-point) 82%,#171816);
+}
+
+html[data-character-theme='active'] .report-mag .section-chev,
+html[data-character-theme='active'] .report-mag .report-section.is-open .section-chev,
+html[data-character-theme='active'] .report-mag .topic-grid > article.topic.detail-topic-accordion::after,
+html[data-character-theme='active'] .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+  background-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .page-outline {
+  border-color: color-mix(in srgb,var(--character-point) 42%,var(--ink));
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .report-mag *,
+  .completed-report-view * {
+    transition-duration: .01ms !important;
+  }
+}
