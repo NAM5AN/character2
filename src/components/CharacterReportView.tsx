@@ -109,6 +109,27 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const inFlightStagesRef=useRef(new Set<number>());
   const precomputeFiredRef=useRef(false);
 
+  // 오너명은 개인정보라 공개 preview에서 빠졌다. 편집 토큰을 가진 오너 본인 화면에서만
+  // 저장된 값을 읽어와 입력칸을 채운다. 제3자에게는 조회되지 않는다.
+  useEffect(()=>{
+    const token=creatorEditToken||(typeof window!=='undefined'?localStorage.getItem(`chara_edit_${preview.shareCode}`)||'':'');
+    if(!token)return;
+    let cancelled=false;
+    void (async()=>{
+      try{
+        const r=await fetch(`/api/characters/${preview.shareCode}/identity`,{
+          method:'POST',headers:{'content-type':'application/json'},
+          body:JSON.stringify({editToken:token}),
+        });
+        const body=await r.json().catch(()=>({}));
+        if(cancelled||!r.ok||typeof body?.ownerName!=='string'||!body.ownerName)return;
+        setOwnerName(body.ownerName);
+        setOwnerNameSaved(true);
+      }catch{}
+    })();
+    return()=>{cancelled=true};
+  },[creatorEditToken,preview.shareCode]);
+
   // 이용코드 모달을 여는 순간(= 결제 의사가 높은 시점), 오너 브라우저에서 무거운 심리모델을 미리 계산해둔다.
   // 결제 직후 stage 1은 이 결과를 재사용해 첫 페이지 대기가 크게 줄어든다. fire-and-forget이라 UI를 막지 않는다.
   useEffect(()=>{
