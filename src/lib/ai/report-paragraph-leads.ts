@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
 import { REPORT_FIELDS, pickFallbackLead, type ReportField } from '@/lib/report-lead-fallbacks';
-import { logGenRetry } from '@/lib/ai/usage';
 import { applyName } from '@/lib/josa';
 
 type UnknownRecord = Record<string, unknown>;
@@ -180,9 +179,7 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
     });
     leads = result.leads.map(item => item.lead.replace(/\s+/gu, ' ').trim());
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     console.error('DETAIL_PARAGRAPH_LEAD_REWRITE_FAILED', error);
-    logGenRetry('LEAD_REWRITE_FAILED', `문단 ${items.length}개 / ${message}`);
     leads = [];
   }
 

@@ -2,17 +2,34 @@ import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { after } from 'next/server';
 import { gateway } from 'ai';
-import { getSupabaseServer } from '@/lib/supabase/server';
+import { getSupabaseServer, getSupabaseTelemetrySecret } from '@/lib/supabase/server';
 
 export type AiUsageContext = {
   sessionId?: string;
   shareCode?: string;
+  characterName?: string;
   stage: string;
 };
 
+export type AiAttemptRef = {
+  attemptId: string;
+  operationId: string;
+  operationSequence: number;
+  localAttempt: number;
+  model: string;
+};
+
+type AiUsageState = AiUsageContext & {
+  operationId: string;
+  nextAttemptSequence: number;
+  lastAttempt?: AiAttemptRef;
+};
+
+type AiAttemptOutcome = 'accepted' | 'retried' | 'failed';
+
 type UnknownRecord = Record<string, unknown>;
 
-const usageStore = new AsyncLocalStorage<AiUsageContext>();
+const usageStore = new AsyncLocalStorage<AiUsageState>();
 
 // Runs `work` inside the usage context and, if it throws, records the failure to
 // character2_gen_failures before re-throwing. Every AI generation call is wrapped in
@@ -20,7 +37,12 @@ const usageStore = new AsyncLocalStorage<AiUsageContext>();
 // (streamOpenAIJson/askOpenAIJson already retry + fall back internally, so a throw here
 // means the whole stage genuinely failed — one row per real user-facing drop-off.)
 export function withAiUsageContext<T>(context: AiUsageContext, work: () => Promise<T>): Promise<T> {
-  return usageStore.run(context, async () => {
+  const state: AiUsageState = {
+    ...context,
+    operationId: crypto.randomUUID(),
+    nextAttemptSequence: 0,
+  };
+  return usageStore.run(state, async () => {
     // Heartbeat: record an in-flight row so a hard process death (300s timeout, OOM)
     // — which never runs our catch/finally in a way that reaches the DB after the kill —
     // still leaves a trace. The row is cleared below on success or caught failure; only
@@ -29,7 +51,7 @@ export function withAiUsageContext<T>(context: AiUsageContext, work: () => Promi
     try {
       return await work();
     } catch (error) {
-      scheduleGenFailureRecord(context, error);
+      scheduleGenFailureRecord(state, error);
       throw error;
     } finally {
       await endInflight(inflightId);
@@ -43,12 +65,15 @@ async function beginInflight(context: AiUsageContext): Promise<string | null> {
   const id = crypto.randomUUID();
   try {
     const sb = getSupabaseServer();
-    await sb.rpc('character2_gen_inflight_begin', {
+    const { error } = await sb.rpc('character2_gen_inflight_begin', {
       p_id: id,
       p_stage: context.stage,
       p_share_code: context.shareCode?.trim() || null,
       p_session_id: safeUuid(context.sessionId),
+      p_character_name: context.characterName?.trim() || null,
+      p_telemetry_secret: getSupabaseTelemetrySecret(),
     });
+    if (error) throw error;
     return id;
   } catch (error) {
     console.warn('GEN_INFLIGHT_BEGIN_FAILED', error instanceof Error ? error.message : String(error));
@@ -62,7 +87,11 @@ async function endInflight(id: string | null) {
   if (!id) return;
   try {
     const sb = getSupabaseServer();
-    await sb.rpc('character2_gen_inflight_end', { p_id: id });
+    const { error } = await sb.rpc('character2_gen_inflight_end', {
+      p_id: id,
+      p_telemetry_secret: getSupabaseTelemetrySecret(),
+    });
+    if (error) throw error;
   } catch (error) {
     console.warn('GEN_INFLIGHT_END_FAILED', error instanceof Error ? error.message : String(error));
   }
@@ -77,17 +106,53 @@ function splitErrorMessage(message: string) {
   return { code, detail };
 }
 
-async function writeGenFailure(args: { context: AiUsageContext; code: string; detail: string; kind?: 'failure' | 'retry' }) {
+function operationContext(state: AiUsageState) {
+  return {
+    sessionId: state.sessionId,
+    shareCode: state.shareCode,
+    characterName: state.characterName,
+    stage: state.stage,
+    operationId: state.operationId,
+  };
+}
+
+function attemptFromUnknown(value: unknown): AiAttemptRef | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const attempt = (value as { aiAttempt?: unknown }).aiAttempt;
+  if (!attempt || typeof attempt !== 'object') return undefined;
+  const item = attempt as Partial<AiAttemptRef>;
+  return typeof item.attemptId === 'string'
+    && typeof item.operationId === 'string'
+    && typeof item.operationSequence === 'number'
+    && typeof item.localAttempt === 'number'
+    && typeof item.model === 'string'
+    ? item as AiAttemptRef
+    : undefined;
+}
+
+async function writeGenFailure(args: {
+  context: ReturnType<typeof operationContext>;
+  code: string;
+  detail: string;
+  kind?: 'failure' | 'retry';
+  attempt?: AiAttemptRef;
+}) {
   try {
     const sb = getSupabaseServer();
-    await sb.rpc('character2_log_gen_failure', {
+    const { error } = await sb.rpc('character2_log_gen_failure', {
       p_stage: args.context.stage,
       p_share_code: args.context.shareCode?.trim() || null,
       p_session_id: safeUuid(args.context.sessionId),
       p_error_code: args.code,
       p_error_detail: args.detail || null,
       p_kind: args.kind || 'failure',
+      p_character_name: args.context.characterName?.trim() || null,
+      p_operation_id: args.context.operationId,
+      p_attempt_id: args.attempt?.attemptId || null,
+      p_model: args.attempt?.model || null,
+      p_telemetry_secret: getSupabaseTelemetrySecret(),
     });
+    if (error) throw error;
   } catch (error) {
     console.warn('GEN_FAILURE_DB_WRITE_FAILED', error instanceof Error ? error.message : String(error));
   }
@@ -97,22 +162,56 @@ async function writeGenFailure(args: { context: AiUsageContext; code: string; de
 // prompt, so they cost as much as the original call — logging why one happened is the
 // only way to find the recurring rule violations worth fixing at the prompt level.
 // Best-effort and never blocks or throws; a no-op outside an AI usage context.
-export function logGenRetry(code: string, detail: string) {
-  const context = currentAiUsageContext();
-  if (!context) return;
-  const snapshot = { context: { ...context }, code, detail: detail.slice(0, 2000), kind: 'retry' as const };
+export function logGenRetry(code: string, detail: string, attempt?: AiAttemptRef) {
+  const state = usageStore.getStore();
+  if (!state) return;
+  const target = attempt ?? state.lastAttempt;
+  const snapshot = {
+    context: operationContext(state),
+    code,
+    detail: detail.slice(0, 2000),
+    kind: 'retry' as const,
+    attempt: target,
+  };
   try {
-    after(async () => { await writeGenFailure(snapshot); });
+    after(async () => {
+      await Promise.all([
+        writeGenFailure(snapshot),
+        target ? writeAttempt({
+          context: snapshot.context,
+          attempt: target,
+          outcome: 'retried',
+          errorCode: code,
+          errorDetail: detail,
+          hasUsage: false,
+        }) : Promise.resolve(),
+      ]);
+    });
   } catch {
-    void writeGenFailure(snapshot);
+    void Promise.all([
+      writeGenFailure(snapshot),
+      target ? writeAttempt({
+        context: snapshot.context,
+        attempt: target,
+        outcome: 'retried',
+        errorCode: code,
+        errorDetail: detail,
+        hasUsage: false,
+      }) : Promise.resolve(),
+    ]);
   }
 }
 
 // Best-effort: schedule the failure write after the response, never block or throw.
-function scheduleGenFailureRecord(context: AiUsageContext, error: unknown) {
+function scheduleGenFailureRecord(state: AiUsageState, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const { code, detail } = splitErrorMessage(message);
-  const snapshot = { context: { ...context }, code, detail };
+  const snapshot = {
+    context: operationContext(state),
+    code,
+    detail,
+    attempt: attemptFromUnknown(error) ?? state.lastAttempt,
+  };
   try {
     after(async () => { await writeGenFailure(snapshot); });
   } catch {
@@ -123,6 +222,25 @@ function scheduleGenFailureRecord(context: AiUsageContext, error: unknown) {
 
 export function currentAiUsageContext() {
   return usageStore.getStore();
+}
+
+export function beginAiAttempt(model: string, localAttempt: number): AiAttemptRef | undefined {
+  const state = usageStore.getStore();
+  if (!state) return undefined;
+  const attempt: AiAttemptRef = {
+    attemptId: crypto.randomUUID(),
+    operationId: state.operationId,
+    operationSequence: state.nextAttemptSequence + 1,
+    localAttempt,
+    model,
+  };
+  state.nextAttemptSequence = attempt.operationSequence;
+  state.lastAttempt = attempt;
+  return attempt;
+}
+
+export function aiAttemptFromError(error: unknown): AiAttemptRef | undefined {
+  return attemptFromUnknown(error);
 }
 
 function asRecord(value: unknown): UnknownRecord {
@@ -156,24 +274,27 @@ async function exactGatewayGeneration(generationId: string) {
   }
 }
 
-async function writeUsage(args: {
-  context: AiUsageContext;
-  model: string;
-  attempt: number;
-  generationId: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  finishReason: string;
+async function writeAttempt(args: {
+  context: ReturnType<typeof operationContext>;
+  attempt: AiAttemptRef;
+  outcome: AiAttemptOutcome;
+  errorCode?: string;
+  errorDetail?: string;
+  hasUsage: boolean;
+  generationId?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  finishReason?: string;
 }) {
-  let inputTokens=args.inputTokens;
-  let outputTokens=args.outputTokens;
-  let totalTokens=args.totalTokens;
+  let inputTokens=args.inputTokens ?? 0;
+  let outputTokens=args.outputTokens ?? 0;
+  let totalTokens=args.totalTokens ?? 0;
   let costUsd:number|null=null;
   let latencyMs:number|null=null;
-  let finishReason=args.finishReason;
+  let finishReason=args.finishReason ?? '';
 
-  if(args.generationId){
+  if(args.hasUsage&&args.generationId){
     const exact=await exactGatewayGeneration(args.generationId);
     if(exact){
       const record=asRecord(exact);
@@ -188,28 +309,45 @@ async function writeUsage(args: {
 
   try{
     const sb=getSupabaseServer();
-    await sb.rpc('character2_log_ai_usage',{
+    const {error}=await sb.rpc('character2_log_ai_attempt',{
+      p_attempt_id:args.attempt.attemptId,
+      p_operation_id:args.attempt.operationId,
+      p_operation_sequence:args.attempt.operationSequence,
       p_usage_session_id:safeUuid(args.context.sessionId),
       p_share_code:args.context.shareCode?.trim()||null,
+      p_character_name:args.context.characterName?.trim()||null,
       p_stage:args.context.stage,
-      p_model:args.model,
+      p_model:args.attempt.model,
       p_generation_id:args.generationId||null,
-      p_attempt:args.attempt,
+      p_local_attempt:args.attempt.localAttempt,
       p_input_tokens:inputTokens,
       p_output_tokens:outputTokens,
       p_total_tokens:totalTokens,
       p_cost_usd:costUsd,
       p_latency_ms:latencyMs,
       p_finish_reason:finishReason||null,
+      p_outcome:args.outcome,
+      p_error_code:args.errorCode?.trim()||null,
+      p_error_detail:args.errorDetail?.slice(0,2000).trim()||null,
+      p_has_usage:args.hasUsage,
+      p_telemetry_secret:getSupabaseTelemetrySecret(),
     });
+    if(error)throw error;
   }catch(error){
     console.warn('AI_USAGE_DB_WRITE_FAILED',error instanceof Error?error.message:String(error));
   }
 }
 
-export function scheduleAiUsageRecord(args:{model:string;attempt:number;response:unknown}){
-  const context=currentAiUsageContext();
-  if(!context)return;
+export function scheduleAiUsageRecord(args:{
+  attempt:AiAttemptRef|undefined;
+  response?:unknown;
+  outcome:AiAttemptOutcome;
+  errorCode?:string;
+  errorDetail?:string;
+  hasUsage?:boolean;
+}){
+  const state=usageStore.getStore();
+  if(!state||!args.attempt)return;
   const response=asRecord(args.response);
   const usage=asRecord(response.usage);
   const providerMetadata=asRecord(response.providerMetadata);
@@ -219,12 +357,25 @@ export function scheduleAiUsageRecord(args:{model:string;attempt:number;response
   const outputTokens=asNumber(usage.outputTokens,usage.completionTokens);
   const totalTokens=asNumber(usage.totalTokens,inputTokens+outputTokens);
   const finishReason=asText(response.finishReason);
-  const snapshot={context:{...context},model:args.model,attempt:args.attempt,generationId,inputTokens,outputTokens,totalTokens,finishReason};
+  const snapshot={
+    context:operationContext(state),
+    attempt:args.attempt,
+    outcome:args.outcome,
+    errorCode:args.errorCode,
+    errorDetail:args.errorDetail,
+    hasUsage:args.hasUsage ?? Boolean(args.response),
+    generationId,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    finishReason,
+  };
 
   try{
-    after(async()=>{await writeUsage(snapshot)});
+    after(async()=>{await writeAttempt(snapshot)});
   }catch(error){
     console.warn('AI_USAGE_AFTER_SCHEDULE_FAILED',error instanceof Error?error.message:String(error));
+    void writeAttempt(snapshot);
   }
 }
 
@@ -244,7 +395,12 @@ export async function attachAiUsageSession(sessionId:string|undefined,shareCode:
   if(!id)return;
   try{
     const sb=getSupabaseServer();
-    await sb.rpc('character2_attach_ai_usage_session',{p_usage_session_id:id,p_share_code:shareCode});
+    const {error}=await sb.rpc('character2_attach_ai_usage_session',{
+      p_usage_session_id:id,
+      p_share_code:shareCode,
+      p_telemetry_secret:getSupabaseTelemetrySecret(),
+    });
+    if(error)throw error;
   }catch(error){
     console.warn('AI_USAGE_ATTACH_FAILED',error instanceof Error?error.message:String(error));
   }
