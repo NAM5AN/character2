@@ -8,6 +8,7 @@ import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 import { ndjsonStream } from '@/lib/ai/stream';
 import { resolveProfileInput } from '@/lib/profile-source';
+import { normalizeConfirmedFactValue } from '@/lib/confirmed-fact-value';
 import {
   isPersonalityTagKey,
   PERSONALITY_TAG_CATALOG,
@@ -115,13 +116,13 @@ function normalizeTraitRecord(value: unknown): Record<string, number | string | 
 function normalizeFacts(items: unknown[]) {
   return items.flatMap((item, index) => {
     if (typeof item === 'string' && item.trim()) {
-      return [{ key: `fact_${index + 1}`, value: item.trim(), source: 'profile' as const }];
+      return [{ key: `fact_${index + 1}`, value: item.trim().slice(0,2_000), source: 'profile' as const }];
     }
     const record = asRecord(item);
     if (!Object.keys(record).length) return [];
-    const key = pickString(record, ['key', 'label', 'name', 'topic', 'field']) || `fact_${index + 1}`;
-    const value = record.value ?? record.text ?? record.fact ?? record.content ?? record.description ?? record.detail;
-    if (value === undefined || value === null || value === '') return [];
+    const key = (pickString(record, ['key', 'label', 'name', 'topic', 'field']) || `fact_${index + 1}`).slice(0,160);
+    const value = normalizeConfirmedFactValue(record.value ?? record.text ?? record.fact ?? record.content ?? record.description ?? record.detail);
+    if (value === undefined || value === null || value === '' || (Array.isArray(value)&&!value.length)) return [];
     return [{ key, value, source: 'profile' as const }];
   }).slice(0, 80);
 }
@@ -281,12 +282,12 @@ export async function POST(request: Request) {
 
     const basic = asRecord(raw.basicProfile);
     const aiInitialPersonalityTags = normalizeInitialPersonalityTags(raw.personalityTags);
-    const draft = characterDraftSchema.parse({
+    const draftResult = characterDraftSchema.safeParse({
       usageSessionId,
       basicProfile: {
         name: body.name,
-        age: basic.age ?? null,
-        gender: typeof basic.gender === 'string' ? basic.gender : null,
+        age: typeof basic.age==='number'&&Number.isFinite(basic.age)?basic.age:typeof basic.age==='string'?basic.age.trim().slice(0,40)||null:null,
+        gender: typeof basic.gender === 'string' ? basic.gender.trim().slice(0,40)||null : null,
         profileText,
         ...(secretProfileText.trim() ? { secretProfileText } : {}),
         ...(appearanceNotes.trim() ? { appearanceNotes } : {}),
@@ -303,6 +304,13 @@ export async function POST(request: Request) {
       },
       analysisConfidence: normalizeScore(raw.analysisConfidence, 65),
     });
+    if(!draftResult.success){
+      console.error('CHARACTER_PARSE_NORMALIZATION_FAILED',{
+        issues:draftResult.error.issues.slice(0,12).map(issue=>({path:issue.path.join('.'),code:issue.code})),
+      });
+      throw new Error('MODEL_OUTPUT_INVALID: 분석 결과를 정리하지 못했어요. 다시 시도해주세요.');
+    }
+    const draft=draftResult.data;
 
     return { draft };
   }, { estimateSeconds: 22 });
