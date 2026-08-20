@@ -1,0 +1,191 @@
+/* Nested accordions for detailed report sections and their individual prose topics. */
+
+/* Top-level detail sections: when closed, keep only the compact heading row. */
+.report-mag .report-section:not(.is-open) .section-tldr,
+.report-mag .report-section:not(.is-open) .section-tags {
+  display: none !important;
+}
+
+.report-mag .report-section:not(.is-open) {
+  padding-bottom: 18px;
+}
+
+.report-mag .report-section:not(.is-open) .section-head {
+  align-items: center;
+}
+
+.report-mag .report-section:not(.is-open) .section-kicker {
+  margin-bottom: 4px;
+}
+
+/* Prevent the initially-open React state from flashing before the bridge closes it. */
+.report-mag .report-section:not([data-detail-section-accordion]) .topic-grid,
+.report-mag .report-section:not([data-detail-section-accordion]) .section-tldr,
+.report-mag .report-section:not([data-detail-section-accordion]) .section-tags {
+  display: none !important;
+}
+
+/* Individual paragraph/topic accordion. */
+.report-mag .topic-grid > article.topic.detail-topic-accordion {
+  position: relative !important;
+  grid-column: span 12 !important;
+  display: grid !important;
+  grid-template-columns: 76px minmax(0, 1fr) 28px !important;
+  gap: 18px !important;
+  align-items: center !important;
+  min-height: 74px;
+  margin: 0 !important;
+  padding: 20px 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid var(--mag-line-dark) !important;
+  background: transparent !important;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion::after {
+  content: '▾';
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  color: var(--muted);
+  font-size: 12px;
+  transform: rotate(0deg);
+  transition: transform .18s ease;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+  transform: rotate(180deg);
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion:focus-visible {
+  box-shadow: 0 0 0 2px var(--ink);
+  border-radius: 8px;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no {
+  position: static !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #cbc7bd !important;
+  font-size: 30px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: -.06em !important;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion .topic-content {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  min-width: 0;
+  padding: 0 !important;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion h4 {
+  display: block !important;
+  margin: 0 !important;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: clamp(20px, 2.5vw, 29px) !important;
+  line-height: 1.35 !important;
+  letter-spacing: -.04em !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion p {
+  display: none !important;
+}
+
+/* Expanded topic keeps the title row, then reveals the body underneath. */
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
+  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 28px !important;
+  align-items: start !important;
+  padding: 28px 0 32px !important;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+  grid-column: 4;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content {
+  display: contents !important;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open h4 {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open p {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  margin: 0 !important;
+  max-width: none !important;
+  color: #44484d !important;
+  font-size: 15.5px !important;
+  line-height: 1.95 !important;
+  letter-spacing: -.008em !important;
+}
+
+.report-mag .topic-grid > .study-block[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .report-mag .topic-grid > article.topic.detail-topic-accordion,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
+    grid-template-columns: 46px minmax(0, 1fr) 22px !important;
+    gap: 12px !important;
+    min-height: 66px;
+    padding: 18px 0 !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion::after,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-no {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    font-size: 24px !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-content {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion h4,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open h4 {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    font-size: 19px !important;
+    line-height: 1.4 !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content {
+    display: contents !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open p {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    margin-top: 8px !important;
+    font-size: 15px !important;
+    line-height: 1.82 !important;
+  }
+}
