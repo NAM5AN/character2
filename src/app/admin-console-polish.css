@@ -1,0 +1,276 @@
+/* Admin console visual cleanup. No operational elements are removed; this only reorganizes hierarchy and density. */
+
+.admin-console-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .72fr);
+  gap: 16px 18px;
+  align-items: start;
+  padding-top: 22px;
+  padding-bottom: 56px;
+}
+
+.admin-console-page > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.admin-console-page .admin-console-head {
+  order: 1;
+  margin: 0 0 4px !important;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+}
+
+.admin-console-page .admin-console-head h1 {
+  margin-top: 7px !important;
+  margin-bottom: 8px !important;
+  font-size: clamp(32px, 4vw, 48px) !important;
+  line-height: 1.05;
+}
+
+.admin-console-page .admin-console-head .eyebrow {
+  font-size: 11px;
+  letter-spacing: .12em;
+}
+
+.admin-console-page .admin-console-head .actions {
+  gap: 8px;
+}
+
+.admin-console-page .admin-ops-balance {
+  order: 2;
+  grid-column: 1;
+}
+
+.admin-console-page .admin-ops-costs {
+  order: 3;
+  grid-column: 2;
+}
+
+.admin-console-page .admin-ops-failures {
+  order: 4;
+}
+
+.admin-console-page .admin-settings-card {
+  order: 5;
+  position: relative;
+  margin-top: 10px !important;
+  padding-top: 28px !important;
+}
+
+.admin-console-page .admin-settings-card::before {
+  content: '운영 설정';
+  position: absolute;
+  left: 0;
+  top: -30px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.admin-console-page .admin-character-search {
+  order: 6;
+  position: relative;
+  max-width: none !important;
+  margin: 34px 0 0 !important;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.admin-console-page .admin-character-search::before {
+  content: '캐릭터 데이터';
+  position: absolute;
+  left: 0;
+  top: -28px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.admin-console-page .admin-character-search .input {
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  border-radius: 12px;
+  background: var(--bg, #fff);
+}
+
+.admin-console-page .admin-console-error,
+.admin-console-page .admin-console-empty {
+  order: 7;
+  margin: 0;
+}
+
+.admin-console-page .admin-character-grid {
+  order: 8;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px !important;
+  margin-top: 0 !important;
+}
+
+.admin-console-page > :not(.admin-console-head):not(.admin-ops-balance):not(.admin-ops-costs):not(.admin-ops-failures):not(.admin-settings-card):not(.admin-character-search):not(.admin-console-error):not(.admin-console-empty):not(.admin-character-grid) {
+  order: 9;
+}
+
+.admin-console-page .card {
+  border-radius: 18px !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .02);
+}
+
+.admin-console-page .admin-ops-balance,
+.admin-console-page .admin-ops-costs {
+  min-height: 132px;
+  height: 100%;
+  padding: 18px 20px !important;
+}
+
+.admin-console-page .admin-ops-failures {
+  padding: 18px 20px !important;
+}
+
+.admin-console-page .admin-settings-card {
+  border-radius: 20px !important;
+  padding: 22px 24px !important;
+}
+
+.admin-console-page .admin-settings-card .field {
+  margin-bottom: 0 !important;
+}
+
+.admin-console-page .admin-settings-card .actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-console-page .admin-character-grid > .card {
+  height: 100%;
+  padding: 18px !important;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.admin-console-page .admin-character-grid > .card:hover {
+  border-color: color-mix(in srgb, var(--fg) 22%, var(--line));
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .045);
+}
+
+.admin-console-page .admin-character-grid > .card strong {
+  line-height: 1.25;
+}
+
+.admin-console-page .admin-character-grid > .card .tag {
+  border-radius: 999px;
+}
+
+.admin-console-page .btn {
+  border-radius: 10px;
+}
+
+.admin-console-page .input,
+.admin-console-page textarea {
+  border-radius: 10px;
+}
+
+.admin-console-page .modal {
+  border-radius: 20px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .16);
+}
+
+.admin-console-page .modal .result-block,
+.admin-console-page .modal .inference {
+  border-radius: 12px;
+}
+
+.admin-deployment-panel {
+  padding-top: 10px !important;
+  padding-bottom: 0;
+}
+
+.admin-deployment-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.admin-deployment-code {
+  padding: 3px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--fg);
+  font-weight: 800;
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .admin-console-page {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding-top: 16px;
+  }
+
+  .admin-console-page .admin-ops-balance,
+  .admin-console-page .admin-ops-costs {
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  .admin-console-page .admin-character-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-console-page .admin-console-head,
+  .admin-console-page .admin-settings-card {
+    padding: 18px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-console-page {
+    padding-bottom: 40px;
+  }
+
+  .admin-console-page .admin-console-head {
+    border-radius: 16px;
+  }
+
+  .admin-console-page .admin-console-head h1 {
+    font-size: 31px !important;
+  }
+
+  .admin-console-page .admin-console-head .actions,
+  .admin-console-page .admin-settings-card .actions {
+    width: 100%;
+  }
+
+  .admin-console-page .admin-console-head .actions .btn,
+  .admin-console-page .admin-settings-card .actions .btn,
+  .admin-console-page .admin-settings-card .actions a.btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .admin-console-page .admin-character-grid > .card {
+    padding: 16px !important;
+  }
+
+  .admin-deployment-row {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console-page .admin-character-grid > .card {
+    transition: none;
+  }
+}
