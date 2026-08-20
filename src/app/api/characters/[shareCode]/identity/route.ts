@@ -29,7 +29,12 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
 
     const ownerName=body.ownerName.replace(/\s+/g,' ').trim();
     const {data,error}=await sb.rpc('character2_set_owner_name',{p_share_code:shareCode,p_edit_token:body.editToken,p_owner_name:ownerName});
-    if(error)throw error;
+    if(error){
+      // 같은 캐릭터명 + 같은 오너명 조합이 이미 있으면 RPC 가 예외를 던진다(오너명 변경 유도).
+      if(typeof error.message==='string'&&error.message.includes('OWNER_NAME_DUPLICATE'))
+        return NextResponse.json({error:'OWNER_NAME_DUPLICATE'},{status:409});
+      throw error;
+    }
     if(data!==true)return NextResponse.json({error:'EDIT_TOKEN_INVALID'},{status:403});
     return NextResponse.json({ok:true,ownerName});
   }catch(error){return apiError(error)}

@@ -173,7 +173,13 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       const body=await r.json().catch(()=>({}));
       if(!r.ok){
         const info=apiErrorInfo(body,r.status);
-        setIdentityError(info.code==='EDIT_TOKEN_INVALID'?'이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.':'저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+        setIdentityError(
+          info.code==='OWNER_NAME_DUPLICATE'
+            ?'같은 캐릭터명·오너명 조합으로 저장된 캐릭터가 이미 있어요. 오너명을 조금 다르게 바꿔서 저장해주세요.'
+            :info.code==='EDIT_TOKEN_INVALID'
+              ?'이 캐릭터를 만든 브라우저의 저장 권한을 확인하지 못했어요.'
+              :'저장하지 못했어요. 잠시 후 다시 시도해주세요.',
+        );
         return;
       }
       setOwnerName(typeof body.ownerName==='string'?body.ownerName:normalized);
