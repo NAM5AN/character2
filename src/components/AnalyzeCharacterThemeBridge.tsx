@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { applyCharacterThemePalette, resetCharacterThemePalette } from '@/lib/character-theme-client';
-import { extractThemeSeedFromText } from '@/lib/character-theme';
-import { deriveThemePalette, themePaletteSchema, type CharacterThemePalette, type ThemeSource } from '@/lib/theme-palette';
+import { deriveCharacterThemeFromSources } from '@/lib/theme-source-extractor';
+import { themePaletteSchema, type CharacterThemePalette } from '@/lib/theme-palette';
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
 const THEME_STORAGE_KEY='chara_lab_character_theme_v1';
@@ -61,23 +61,13 @@ function paletteFromDraft(value:unknown):CharacterThemePalette|null{
   const draft=value as DraftLike;
   const explicit=validPalette(draft.themePalette);
   if(explicit)return explicit;
-
   const basic=draft.basicProfile&&typeof draft.basicProfile==='object'?draft.basicProfile:null;
   if(!basic)return null;
-  const profileText=typeof basic.profileText==='string'?basic.profileText:'';
-  const secretProfileText=typeof basic.secretProfileText==='string'?basic.secretProfileText:'';
-  const appearanceNotes=typeof basic.appearanceNotes==='string'?basic.appearanceNotes:'';
-
-  const imageSeed=appearanceNotes.trim()?extractThemeSeedFromText(appearanceNotes):undefined;
-  const textSeed=(profileText.trim()||secretProfileText.trim())?extractThemeSeedFromText(profileText,secretProfileText):undefined;
-  const main=imageSeed?.mainColor||textSeed?.mainColor||null;
-  const point=imageSeed?.pointColor||textSeed?.pointColor||null;
-  if(!main&&!point)return null;
-
-  const hasImage=Boolean(imageSeed?.mainColor||imageSeed?.pointColor);
-  const hasText=Boolean(textSeed?.mainColor||textSeed?.pointColor);
-  const source:ThemeSource=hasImage&&hasText?'mixed':hasImage?'image':'text';
-  return deriveThemePalette(main,point,source,hasImage&&hasText?82:hasImage?78:70)||null;
+  return deriveCharacterThemeFromSources({
+    profileText:typeof basic.profileText==='string'?basic.profileText:'',
+    secretProfileText:typeof basic.secretProfileText==='string'?basic.secretProfileText:'',
+    appearanceNotes:typeof basic.appearanceNotes==='string'?basic.appearanceNotes:'',
+  })||null;
 }
 
 function paletteFromPayload(payload:unknown):CharacterThemePalette|null{
