@@ -2,11 +2,11 @@
 
 .admin-console-page {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, .72fr);
-  gap: 16px 18px;
+  grid-template-columns: minmax(280px, .46fr) minmax(0, 1.04fr);
+  gap: 14px 16px;
   align-items: start;
-  padding-top: 22px;
-  padding-bottom: 56px;
+  padding-top: 20px;
+  padding-bottom: 52px;
 }
 
 .admin-console-page > * {
@@ -16,17 +16,17 @@
 
 .admin-console-page .admin-console-head {
   order: 1;
-  margin: 0 0 4px !important;
-  padding: 22px 24px;
+  margin: 0 0 2px !important;
+  padding: 20px 22px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--paper);
 }
 
 .admin-console-page .admin-console-head h1 {
-  margin-top: 7px !important;
-  margin-bottom: 8px !important;
-  font-size: clamp(32px, 4vw, 48px) !important;
+  margin-top: 6px !important;
+  margin-bottom: 7px !important;
+  font-size: clamp(31px, 3.7vw, 46px) !important;
   line-height: 1.05;
 }
 
@@ -42,11 +42,17 @@
 .admin-console-page .admin-ops-balance {
   order: 2;
   grid-column: 1;
+  align-self: start;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center !important;
+  gap: 12px !important;
 }
 
 .admin-console-page .admin-ops-costs {
   order: 3;
   grid-column: 2;
+  align-self: start;
 }
 
 .admin-console-page .admin-ops-failures {
@@ -56,15 +62,15 @@
 .admin-console-page .admin-settings-card {
   order: 5;
   position: relative;
-  margin-top: 10px !important;
-  padding-top: 28px !important;
+  margin-top: 8px !important;
+  padding-top: 26px !important;
 }
 
 .admin-console-page .admin-settings-card::before {
   content: '운영 설정';
   position: absolute;
   left: 0;
-  top: -30px;
+  top: -28px;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: .08em;
@@ -75,10 +81,10 @@
   order: 6;
   position: relative;
   max-width: none !important;
-  margin: 34px 0 0 !important;
-  padding: 16px 18px;
+  margin: 32px 0 0 !important;
+  padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 15px;
   background: var(--paper);
 }
 
@@ -86,7 +92,7 @@
   content: '캐릭터 데이터';
   position: absolute;
   left: 0;
-  top: -28px;
+  top: -27px;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: .08em;
@@ -96,8 +102,8 @@
 .admin-console-page .admin-character-search .input {
   width: 100%;
   max-width: none;
-  min-height: 44px;
-  border-radius: 12px;
+  min-height: 42px;
+  border-radius: 11px;
   background: var(--bg, #fff);
 }
 
@@ -120,24 +126,53 @@
 }
 
 .admin-console-page .card {
-  border-radius: 18px !important;
+  border-radius: 17px !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, .02);
 }
 
 .admin-console-page .admin-ops-balance,
 .admin-console-page .admin-ops-costs {
-  min-height: 132px;
-  height: 100%;
-  padding: 18px 20px !important;
+  min-height: 0;
+  height: auto;
+  padding: 16px 18px !important;
+}
+
+.admin-console-page .admin-ops-balance > div:first-child {
+  gap: 8px !important;
+}
+
+.admin-console-page .admin-ops-balance > div:last-child {
+  gap: 6px !important;
+  justify-content: flex-end;
+}
+
+.admin-console-page .admin-ops-balance .btn {
+  padding: 8px 11px !important;
+  white-space: nowrap;
+}
+
+.admin-console-page .admin-ops-costs > div:nth-of-type(2) {
+  height: 82px !important;
+  margin-top: 10px !important;
+}
+
+.admin-console-page .admin-ops-costs > div:nth-of-type(3) {
+  margin-top: 4px !important;
+}
+
+.admin-console-page .admin-ops-costs > p:last-child {
+  margin: 7px 0 0 !important;
+  font-size: 10.5px !important;
+  line-height: 1.45 !important;
 }
 
 .admin-console-page .admin-ops-failures {
-  padding: 18px 20px !important;
+  padding: 16px 18px !important;
 }
 
 .admin-console-page .admin-settings-card {
-  border-radius: 20px !important;
-  padding: 22px 24px !important;
+  border-radius: 18px !important;
+  padding: 20px 22px !important;
 }
 
 .admin-console-page .admin-settings-card .field {
@@ -189,7 +224,7 @@
 }
 
 .admin-deployment-panel {
-  padding-top: 10px !important;
+  padding-top: 8px !important;
   padding-bottom: 0;
 }
 
@@ -212,6 +247,20 @@
   font-size: 11px;
 }
 
+@media (max-width: 1100px) {
+  .admin-console-page {
+    grid-template-columns: minmax(260px, .58fr) minmax(0, 1fr);
+  }
+
+  .admin-console-page .admin-ops-balance {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-console-page .admin-ops-balance > div:last-child {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 900px) {
   .admin-console-page {
     grid-template-columns: 1fr;
@@ -225,6 +274,14 @@
     min-height: 0;
   }
 
+  .admin-console-page .admin-ops-balance {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-console-page .admin-ops-balance > div:last-child {
+    justify-content: flex-end;
+  }
+
   .admin-console-page .admin-character-grid {
     grid-template-columns: 1fr;
   }
@@ -232,6 +289,16 @@
   .admin-console-page .admin-console-head,
   .admin-console-page .admin-settings-card {
     padding: 18px !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-console-page .admin-ops-balance {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-console-page .admin-ops-balance > div:last-child {
+    justify-content: flex-start;
   }
 }
 
