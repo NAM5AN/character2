@@ -1,0 +1,166 @@
+name: Theme palette step 1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/theme-palette-step1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch palette extraction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # character schema
+          p=Path('src/lib/schemas/character.ts')
+          s=p.read_text()
+          anchor="} from '@/lib/personality-tags';\n"
+          if "from '@/lib/theme-palette'" not in s:
+              if anchor not in s: raise SystemExit('character import anchor missing')
+              s=s.replace(anchor, anchor+"import { themePaletteSchema } from '@/lib/theme-palette';\n",1)
+          old="export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),personalityTags:z.unknown().optional(),analysisConfidence:z.unknown().optional()}).passthrough();"
+          new="export const initialCharacterDraftSchema=z.object({basicProfile:z.record(z.string(),z.unknown()).optional().default({}),traits:z.record(z.string(),z.unknown()).optional().default({}),relationshipTraits:z.record(z.string(),z.unknown()).optional().default({}),confirmedFacts:z.array(z.unknown()).optional().default([]),aiInferences:z.array(z.unknown()).optional().default([]),personalityTags:z.unknown().optional(),themePalette:z.unknown().optional(),analysisConfidence:z.unknown().optional()}).passthrough();"
+          if old in s: s=s.replace(old,new,1)
+          elif new not in s: raise SystemExit('initial schema anchor missing')
+          old="export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(20_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:boundedRecord(traitValueSchema,120),relationshipTraits:boundedRecord(traitValueSchema,120),confirmedFacts:z.array(confirmedFactSchema).max(200),aiInferences:z.array(inferenceSchema).max(60),personalityTags:personalityTagStateSchema,analysisConfidence:z.number().min(0).max(100)});"
+          new="export const characterDraftSchema=z.object({usageSessionId:z.string().uuid().optional(),basicProfile:publicBasicProfileSchema.extend({secretProfileText:z.string().max(20_000).optional(),appearanceNotes:z.string().max(8_000).optional()}),traits:boundedRecord(traitValueSchema,120),relationshipTraits:boundedRecord(traitValueSchema,120),confirmedFacts:z.array(confirmedFactSchema).max(200),aiInferences:z.array(inferenceSchema).max(60),personalityTags:personalityTagStateSchema,themePalette:themePaletteSchema.optional(),analysisConfidence:z.number().min(0).max(100)});"
+          if old in s: s=s.replace(old,new,1)
+          elif new not in s: raise SystemExit('draft schema anchor missing')
+          p.write_text(s)
+
+          # appearance image analysis: reuse existing multimodal call, no extra call
+          p=Path('src/lib/ai/appearance.ts')
+          s=p.read_text()
+          old="""  stylingAndMotifs: z.array(z.string()).default([]),
+  visualImpression: z.string(),
+  uncertainties: z.array(z.string()).default([]),"""
+          new="""  stylingAndMotifs: z.array(z.string()).default([]),
+  hairColor: z.string().optional(),
+  eyeColor: z.string().optional(),
+  visualImpression: z.string(),
+  uncertainties: z.array(z.string()).default([]),"""
+          if old in s: s=s.replace(old,new,1)
+          elif 'hairColor: z.string().optional()' not in s: raise SystemExit('appearance schema anchor missing')
+          old="""- stylingAndMotifs: 반복되는 장식, 색, 소재, 소품, 실루엣 등 시각적 모티프
+- visualImpression: 타인이 처음 봤을 때 받을 수 있는 '시각적 인상'만 설명. 내면 성격 단정 금지"""
+          new="""- stylingAndMotifs: 반복되는 장식, 색, 소재, 소품, 실루엣 등 시각적 모티프
+- hairColor: 머리색이 식별되면 가장 가까운 색명과 대표 HEX(#RRGGBB). 조명색이 아니라 캐릭터 자체의 머리색을 우선하세요. 불확실하면 생략하세요.
+- eyeColor: 눈동자색이 식별되면 가장 가까운 색명과 대표 HEX(#RRGGBB). 불확실하면 생략하세요.
+- visualImpression: 타인이 처음 봤을 때 받을 수 있는 '시각적 인상'만 설명. 내면 성격 단정 금지"""
+          if old in s: s=s.replace(old,new,1)
+          elif '- hairColor:' not in s: raise SystemExit('appearance prompt anchor missing')
+          old="""    `전체 외형: ${result.summary}`,
+    ...(result.observableDetails ?? []).slice(0,12).map(item=>`관찰 특징: ${item}`),"""
+          new="""    `전체 외형: ${result.summary}`,
+    ...(result.hairColor?.trim() ? [`머리색 관찰: ${result.hairColor.trim()}`] : []),
+    ...(result.eyeColor?.trim() ? [`눈색 관찰: ${result.eyeColor.trim()}`] : []),
+    ...(result.observableDetails ?? []).slice(0,12).map(item=>`관찰 특징: ${item}`),"""
+          if old in s: s=s.replace(old,new,1)
+          elif '머리색 관찰:' not in s: raise SystemExit('appearance note anchor missing')
+          p.write_text(s)
+
+          # profile parser: extract raw hue candidates in the already-existing parse call
+          p=Path('src/app/api/characters/parse/route.ts')
+          s=p.read_text()
+          anchor="import { resolveProfileInput } from '@/lib/profile-source';\n"
+          if "from '@/lib/theme-palette'" not in s:
+              if anchor not in s: raise SystemExit('parse import anchor missing')
+              s=s.replace(anchor,anchor+"import { deriveThemePalette, type ThemeSource } from '@/lib/theme-palette';\n",1)
+
+          personality_end="""- 이 값은 오너에게 다시 확인받을 AI 최초 제안이며, 절대적 성격 판정이 아닙니다.
+
+어떤 정보도 종류만 보고 중요하거나 중요하지 않다고 단정하지 마세요."""
+          palette_rules="""- 이 값은 오너에게 다시 확인받을 AI 최초 제안이며, 절대적 성격 판정이 아닙니다.
+
+themePalette에는 캐릭터 UI 테마를 위한 대표 원색 후보만 넣으세요.
+- 형식: {\"main\":\"#RRGGBB\",\"point\":\"#RRGGBB\",\"source\":\"image|text|mixed\",\"confidence\":0~100}
+- main은 보통 머리색처럼 캐릭터 외형에서 넓은 면적을 차지하는 대표색을 우선합니다.
+- point는 보통 눈동자색이나 공식 설정에서 반복되는 작은 강조색을 우선합니다.
+- 공개/비밀 프로필에 공식 외관 색이 명시돼 있으면 그 설정을 우선하고, 없을 때 appearance 관찰 메모를 사용하세요.
+- 이미지의 조명·배경·필터색을 캐릭터 고유색으로 착각하지 마세요.
+- 없는 눈색이나 머리색을 새로 창작하지 마세요. 둘 중 하나만 확실하면 다른 후보도 같은 색상 계열을 사용하고 전혀 다른 hue를 발명하지 마세요.
+- 여기서는 실제 설정에 가까운 원색 후보를 출력하세요. UI에 눈부시지 않도록 만드는 명도·채도 보정은 서버가 별도로 수행합니다.
+- source는 appearance 근거만 썼으면 image, 텍스트만 썼으면 text, 둘을 함께 확인했으면 mixed입니다.
+
+어떤 정보도 종류만 보고 중요하거나 중요하지 않다고 단정하지 마세요."""
+          if personality_end in s: s=s.replace(personality_end,palette_rules,1)
+          elif 'themePalette에는 캐릭터 UI 테마' not in s: raise SystemExit('parse palette prompt anchor missing')
+
+          helper_anchor="""function isDocumentMetaInference(text: string) {"""
+          helper="""function normalizeThemePalette(value: unknown, hasAppearanceImages: boolean) {
+  const record = asRecord(value);
+  const rawSource = typeof record.source === 'string' ? record.source : '';
+  const source: ThemeSource = rawSource === 'text'
+    ? 'text'
+    : hasAppearanceImages && rawSource === 'image'
+      ? 'image'
+      : hasAppearanceImages
+        ? 'mixed'
+        : 'text';
+  const confidence = normalizeScore(record.confidence, hasAppearanceImages ? 72 : 62);
+  return deriveThemePalette(
+    record.main ?? record.mainCandidate ?? record.primary ?? record.hairColor,
+    record.point ?? record.pointCandidate ?? record.accent ?? record.eyeColor,
+    source,
+    confidence,
+  );
+}
+
+function isDocumentMetaInference(text: string) {"""
+          if helper_anchor in s and 'function normalizeThemePalette(' not in s:
+              s=s.replace(helper_anchor,helper,1)
+          elif 'function normalizeThemePalette(' not in s: raise SystemExit('parse helper anchor missing')
+
+          old="""JSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, personalityTags, analysisConfidence를 넣으세요."""
+          new="""JSON에는 basicProfile, traits, relationshipTraits, confirmedFacts, aiInferences, personalityTags, themePalette, analysisConfidence를 넣으세요."""
+          if old in s: s=s.replace(old,new,1)
+          elif new not in s: raise SystemExit('parse json list anchor missing')
+
+          old="""    const basic = asRecord(raw.basicProfile);
+    const aiInitialPersonalityTags = normalizeInitialPersonalityTags(raw.personalityTags);
+    const draft = characterDraftSchema.parse({"""
+          new="""    const basic = asRecord(raw.basicProfile);
+    const aiInitialPersonalityTags = normalizeInitialPersonalityTags(raw.personalityTags);
+    const themePalette = normalizeThemePalette(raw.themePalette, body.appearanceImages.length > 0);
+    const draft = characterDraftSchema.parse({"""
+          if old in s: s=s.replace(old,new,1)
+          elif 'const themePalette = normalizeThemePalette' not in s: raise SystemExit('parse palette normalize anchor missing')
+
+          old="""      personalityTags: {
+        aiInitial: aiInitialPersonalityTags,
+        ownerSelected: [],
+        interviewAdaptive: [],
+        finalAdaptive: [],
+      },
+      analysisConfidence:"""
+          new="""      personalityTags: {
+        aiInitial: aiInitialPersonalityTags,
+        ownerSelected: [],
+        interviewAdaptive: [],
+        finalAdaptive: [],
+      },
+      ...(themePalette ? { themePalette } : {}),
+      analysisConfidence:"""
+          if old in s: s=s.replace(old,new,1)
+          elif '...(themePalette ? { themePalette } : {})' not in s: raise SystemExit('parse draft palette anchor missing')
+          p.write_text(s)
+          PY
+      - name: Commit palette extraction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/schemas/character.ts src/lib/ai/appearance.ts src/app/api/characters/parse/route.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "Extract character theme palette during profile parse"
+          git push origin main
