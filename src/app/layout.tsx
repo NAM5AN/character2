@@ -7,6 +7,7 @@ import { FeedbackReporter } from '@/components/FeedbackReporter';
 import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
 import { AdminThemePaletteAudit } from '@/components/AdminThemePaletteAudit';
 import { AdminFailureDeleteBridge } from '@/components/AdminFailureDeleteBridge';
+import { AdminCharacterIdentityEditBridge } from '@/components/AdminCharacterIdentityEditBridge';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminFeedbackShortcut/>
         <AdminThemePaletteAudit/>
         <AdminFailureDeleteBridge/>
+        <AdminCharacterIdentityEditBridge/>
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
         <ReportOwnerSaveGate/>
