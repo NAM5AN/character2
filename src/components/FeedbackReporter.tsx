@@ -128,6 +128,7 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
   const [files,setFiles]=useState<File[]>([]);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
+  const [successToast,setSuccessToast]=useState(false);
   const inputRef=useRef<HTMLInputElement|null>(null);
   const supabase=useMemo(()=>createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false}}),[]);
   const tooShort=content.trim().length<5;
@@ -163,14 +164,15 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
       })});
       const body=await res.json().catch(()=>({}));
       if(!res.ok)throw new Error(body?.error||'FEEDBACK_SAVE_FAILED');
-      setContent('');setFiles([]);setCategory('bug');setMessage('제보가 전달됐어요. 고마워요.');
+      setContent('');setFiles([]);setCategory('bug');setMessage('');setOpen(false);setSuccessToast(true);
+      window.setTimeout(()=>setSuccessToast(false),2200);
     }catch(error){
       setMessage(error instanceof Error?`전송하지 못했어요. ${error.message}`:'전송하지 못했어요.');
     }finally{setBusy(false)}
   }
 
   return <>
-    <button type="button" className="footer-feedback-btn" onClick={()=>{setOpen(true);setMessage('')}}>버그·오류·개선안 제보하기</button>
+    <button type="button" className="footer-feedback-btn" onClick={()=>{setOpen(true);setSuccessToast(false);setMessage('')}}>버그·오류·개선안 제보하기</button>
     {open&&<div className="modal-backdrop feedback-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setOpen(false)}}>
       <div className="modal feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
         <div className="feedback-modal-head"><div><div className="eyebrow">Feedback</div><h3 id="feedback-title">버그·오류·개선안 제보</h3></div><button className="feedback-close" type="button" disabled={busy} onClick={()=>setOpen(false)} aria-label="닫기">×</button></div>
@@ -181,7 +183,7 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
         <div className="field"><label className="label">이미지·영상 첨부 <span className="muted">({files.length}/{MAX_FILES})</span></label><input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={e=>addFiles(e.target.files)} /><button type="button" className="btn" disabled={busy||files.length>=MAX_FILES} onClick={()=>inputRef.current?.click()}>파일 선택</button></div>
         {files.length>0&&<div className="feedback-files">{files.map((file,index)=><div className="feedback-file" key={`${file.name}-${file.size}-${index}`}><span>{file.name}</span><small>{(file.size/1024/1024).toFixed(1)}MB</small><button type="button" disabled={busy} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}>삭제</button></div>)}</div>}
         <p className="muted feedback-env-note">기기·브라우저 환경과 현재 페이지, 화면, 분석 단계, 질문 번호·유형이 자동으로 함께 전달돼요.</p>
-        {message&&<p className={message.startsWith('제보가')?'feedback-success':'error'}>{message}</p>}
+        {message&&<p className="error">{message}</p>}
         <div className="actions feedback-actions">
           <button className="btn" type="button" disabled={busy} onClick={()=>setOpen(false)}>닫기</button>
           <span className={`feedback-submit-wrap${tooShort&&!busy?' is-too-short':''}`} data-tooltip="제보 내용을 5자 이상 작성해주세요.">
@@ -190,5 +192,6 @@ export function FeedbackReporter({deploymentVersion}:{deploymentVersion:string})
         </div>
       </div>
     </div>}
+    {successToast&&<div className="feedback-success-backdrop" role="status" aria-live="polite"><div className="feedback-success-toast">제보가 전달됐어요. 감사합니다.</div></div>}
   </>;
 }
