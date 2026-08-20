@@ -6,6 +6,7 @@ import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import { FeedbackReporter } from '@/components/FeedbackReporter';
 import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
 import { AdminThemePaletteAudit } from '@/components/AdminThemePaletteAudit';
+import { AdminFailureDeleteBridge } from '@/components/AdminFailureDeleteBridge';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import './globals.css';
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ReplayResultUrlBridge/>
         <AdminFeedbackShortcut/>
         <AdminThemePaletteAudit/>
+        <AdminFailureDeleteBridge/>
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
         <header className="site-header">
