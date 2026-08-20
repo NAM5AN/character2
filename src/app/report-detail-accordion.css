@@ -25,12 +25,59 @@
   display: none !important;
 }
 
+/* Make the top-level accordion control unmistakable and touch-friendly. */
+.report-mag .section-head {
+  grid-template-columns: 92px minmax(0,1fr) 44px !important;
+}
+
+.report-mag .section-chev {
+  width: 38px;
+  height: 38px;
+  margin-top: 0 !important;
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  align-self: center;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink) !important;
+  font-size: 0 !important;
+  line-height: 1;
+  transform: none !important;
+  transition: background .16s ease, color .16s ease, transform .16s ease !important;
+}
+
+.report-mag .section-chev::before {
+  content: '+';
+  display: block;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.report-mag .report-section.is-open .section-chev {
+  background: var(--ink);
+  color: #fff !important;
+  transform: none !important;
+}
+
+.report-mag .report-section.is-open .section-chev::before {
+  content: '−';
+  transform: translateY(-2px);
+}
+
+.report-mag .section-head:hover .section-chev {
+  transform: scale(1.06) !important;
+}
+
 /* Individual paragraph/topic accordion. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion {
   position: relative !important;
   grid-column: span 12 !important;
   display: grid !important;
-  grid-template-columns: 76px minmax(0, 1fr) 28px !important;
+  grid-template-columns: 76px minmax(0, 1fr) 44px !important;
   gap: 18px !important;
   align-items: center !important;
   min-height: 74px;
@@ -45,18 +92,35 @@
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion::after {
-  content: '▾';
+  content: '+';
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
-  color: var(--muted);
-  font-size: 12px;
-  transform: rotate(0deg);
-  transition: transform .18s ease;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+  transform: none;
+  transition: background .16s ease, color .16s ease, transform .16s ease;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
-  transform: rotate(180deg);
+  content: '−';
+  background: var(--ink);
+  color: #fff;
+  transform: none;
+}
+
+.report-mag .topic-grid > article.topic.detail-topic-accordion:hover::after {
+  transform: scale(1.06);
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion:focus-visible {
@@ -106,13 +170,14 @@
 
 /* Expanded topic keeps the title row, then reveals the body underneath. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 28px !important;
+  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 44px !important;
   align-items: start !important;
   padding: 28px 0 32px !important;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
   grid-column: 4;
+  align-self: start;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content {
@@ -143,11 +208,25 @@
 }
 
 @media (max-width: 760px) {
+  .report-mag .section-head {
+    grid-template-columns: 58px minmax(0,1fr) 42px !important;
+    gap: 12px !important;
+  }
+
+  .report-mag .section-chev {
+    width: 36px;
+    height: 36px;
+  }
+
+  .report-mag .section-chev::before {
+    font-size: 22px;
+  }
+
   .report-mag .topic-grid > article.topic.detail-topic-accordion,
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-    grid-template-columns: 46px minmax(0, 1fr) 22px !important;
+    grid-template-columns: 46px minmax(0, 1fr) 42px !important;
     gap: 12px !important;
-    min-height: 66px;
+    min-height: 70px;
     padding: 18px 0 !important;
   }
 
@@ -155,6 +234,10 @@
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
     grid-column: 3;
     grid-row: 1;
+    width: 34px;
+    height: 34px;
+    font-size: 21px;
+    align-self: center;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no,
