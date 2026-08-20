@@ -2,9 +2,10 @@ import { AnalyzeFlow } from '@/components/AnalyzeFlow';
 import { AnalyzeReviewUiPolish } from '@/components/AnalyzeReviewUiPolish';
 import { BipolarFiveLevelUi } from '@/components/BipolarFiveLevelUi';
 import { PersonalityLoadingBridge } from '@/components/PersonalityLoadingBridge';
+import { AnalyzeCharacterThemeBridge } from '@/components/AnalyzeCharacterThemeBridge';
 
 export default function AnalyzePage(){
-  return <main className="container page">
+  return <main className="container page analyze-page">
     <style>{`
       .stack > .card:first-child {
         background: transparent;
@@ -35,6 +36,7 @@ export default function AnalyzePage(){
         display: none !important;
       }
     `}</style>
+    <AnalyzeCharacterThemeBridge/>
     <AnalyzeReviewUiPolish/>
     <PersonalityLoadingBridge/>
     <BipolarFiveLevelUi/>
