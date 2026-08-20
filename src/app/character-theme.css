@@ -1,11 +1,11 @@
 /* Character-driven palette foundation.
-   These variables intentionally do not replace the existing site tokens yet.
-   Until the profile palette is activated, every screen keeps the current design. */
+   Before a profile palette is activated, the site stays strictly neutral: white, black and gray.
+   When a character palette is extracted, runtime theme values replace these defaults. */
 :root {
-  --character-main: #f4f1eb;
-  --character-main-sub: #fffdf8;
-  --character-point: #57544c;
-  --character-point-sub: #edeae2;
+  --character-main: #f5f5f5;
+  --character-main-sub: #ffffff;
+  --character-point: #222222;
+  --character-point-sub: #ededed;
 
   --character-page-bg: var(--character-main);
   --character-surface: var(--character-main-sub);
