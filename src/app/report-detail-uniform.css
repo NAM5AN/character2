@@ -1,13 +1,16 @@
 /* 상세 리포트 본문 토픽 레이아웃 통일.
-   hero / feature / wide / timeline 등 변형 클래스가 붙어도 모두 같은
-   3단 편집형(큰 번호 / 제목 / 본문)으로 보이게 한다.
+   hero / feature / wide / timeline 등 변형 클래스가 붙어도 같은 편집형으로 보이게 한다.
+   대항목/중항목과 겹쳐 보이던 큰 소항목 번호는 제거하고,
+   소항목은 제목 위의 작은 캡션 번호 + 짧은 선으로 명확히 구분한다.
    study-block, spectrum, compare/manual/pressure 블록은 건드리지 않는다. */
 
 .report-mag .topic-grid > article.topic {
   grid-column: span 12 !important;
   display: grid !important;
-  grid-template-columns: 92px minmax(230px, .82fr) minmax(0, 1.42fr) !important;
-  gap: 26px !important;
+  grid-template-columns: minmax(230px, .82fr) minmax(0, 1.42fr) !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 34px !important;
+  row-gap: 9px !important;
   align-items: start !important;
   margin: 0 !important;
   padding: 32px 0 34px !important;
@@ -18,19 +21,33 @@
 
 .report-mag .topic-grid > article.topic .topic-no {
   position: static !important;
-  display: block !important;
-  width: auto !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: max-content !important;
   height: auto !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: #cbc7bd !important;
-  font-size: 36px !important;
+  color: #9f9b92 !important;
+  font-size: 12px !important;
   font-weight: 900 !important;
   line-height: 1 !important;
-  letter-spacing: -.06em !important;
+  letter-spacing: .08em !important;
+}
+
+.report-mag .topic-grid > article.topic .topic-no::after {
+  content: '' !important;
+  display: block !important;
+  width: 34px !important;
+  height: 1px !important;
+  flex: 0 0 34px !important;
+  background: currentColor !important;
+  opacity: .68 !important;
 }
 
 .report-mag .topic-grid > article.topic .topic-content {
@@ -39,7 +56,8 @@
 }
 
 .report-mag .topic-grid > article.topic h4 {
-  grid-column: 2 !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
   margin: 0 !important;
   font-size: clamp(22px, 2.9vw, 32px) !important;
   line-height: 1.4 !important;
@@ -47,7 +65,8 @@
 }
 
 .report-mag .topic-grid > article.topic p {
-  grid-column: 3 !important;
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
   margin: 0 !important;
   max-width: none !important;
   color: #44484d !important;
@@ -63,27 +82,34 @@
 
 @media (max-width: 760px) {
   .report-mag .topic-grid > article.topic {
-    grid-template-columns: 48px minmax(0, 1fr) !important;
-    gap: 12px 14px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 8px !important;
     padding: 24px 0 26px !important;
   }
 
   .report-mag .topic-grid > article.topic .topic-no {
     grid-column: 1 !important;
     grid-row: 1 !important;
-    font-size: 28px !important;
+    font-size: 11px !important;
+  }
+
+  .report-mag .topic-grid > article.topic .topic-no::after {
+    width: 28px !important;
+    flex-basis: 28px !important;
   }
 
   .report-mag .topic-grid > article.topic h4 {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
     font-size: 20px !important;
     line-height: 1.45 !important;
   }
 
   .report-mag .topic-grid > article.topic p {
-    grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    margin-top: 5px !important;
     font-size: 15px !important;
     line-height: 1.82 !important;
   }
