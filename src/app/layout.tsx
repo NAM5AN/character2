@@ -12,7 +12,7 @@ import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionB
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
 import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge';
-import { AdminDeploymentVersionBadge } from '@/components/AdminDeploymentVersionBadge';
+import { AdminDeploymentVersionPanel } from '@/components/AdminDeploymentVersionPanel';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -76,7 +76,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       : deploymentUrl
         ? deploymentUrl.split('-').at(-2)?.slice(0, 7) || 'vercel'
         : 'local';
-  const deploymentTitle = deploymentSha || deploymentId || deploymentUrl || 'local development';
 
   return (
     <html lang="ko">
@@ -96,7 +95,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <div className="container nav">
             <div className="brand-wrap">
               <Link href="/" className="brand">CHARA LAB</Link>
-              <AdminDeploymentVersionBadge version={deploymentVersion} title={deploymentTitle}/>
             </div>
             <nav className="nav-links">
               <Link className="nav-link" href="/analyze">캐릭터 분석</Link>
@@ -104,6 +102,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </nav>
           </div>
         </header>
+        <AdminDeploymentVersionPanel/>
         {children}
         <footer className="footer"><div className="container"><span>CHARA LAB · Character Passport v1</span><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
       </body>
