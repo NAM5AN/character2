@@ -65,6 +65,59 @@ html[data-character-theme='active'] .analyze-page .bipolar-range:focus-visible {
   outline-color: var(--character-accent);
 }
 
+/* Loading UI — profile parse uses the default palette until extraction finishes,
+   then every subsequent loading indicator follows the character point palette. */
+html[data-character-theme='active'] .analyze-page .loading .dot,
+html[data-character-theme='active'] body:has(.report-mag) .loading .dot {
+  background: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .analyze-page [role='status'],
+html[data-character-theme='active'] body:has(.report-mag) [role='status'] {
+  background: var(--character-accent-soft) !important;
+  border-color: color-mix(in srgb,var(--character-point) 24%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page [role='status'] > div[aria-hidden='true'],
+html[data-character-theme='active'] body:has(.report-mag) [role='status'] > div[aria-hidden='true'],
+html[data-character-theme='active'] .analyze-page .loading + div > div[aria-hidden='true'] {
+  background: color-mix(in srgb,var(--character-point) 12%,var(--character-surface)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page [role='status'] > div[aria-hidden='true'] > div,
+html[data-character-theme='active'] body:has(.report-mag) [role='status'] > div[aria-hidden='true'] > div,
+html[data-character-theme='active'] .analyze-page .loading + div > div[aria-hidden='true'] > div {
+  background: var(--character-accent) !important;
+}
+
+/* Header/footer are part of the themed page too. */
+html[data-character-theme='active'] body:has(.analyze-page) .nav-link:hover,
+html[data-character-theme='active'] body:has(.report-mag) .nav-link:hover {
+  background: var(--character-accent-soft);
+}
+
+html[data-character-theme='active'] body:has(.analyze-page) .deploy-version,
+html[data-character-theme='active'] body:has(.report-mag) .deploy-version {
+  background: color-mix(in srgb,var(--character-surface) 72%,transparent);
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line));
+}
+
+html[data-character-theme='active'] body:has(.analyze-page) .footer,
+html[data-character-theme='active'] body:has(.report-mag) .footer {
+  border-top-color: color-mix(in srgb,var(--character-point) 16%,var(--line));
+}
+
+/* The small review-chip bullet had a page-local fixed grey override. */
+html[data-character-theme='active'] .analyze-page #personality-tag-picker .personality-chip[data-selected='false']::before {
+  color: var(--character-accent) !important;
+}
+
+/* Ranking rows are answer controls too, not neutral document boxes. */
+html[data-character-theme='active'] .analyze-page .question-card .stack > div {
+  background: var(--character-surface);
+  border-color: color-mix(in srgb,var(--character-point) 20%,var(--line)) !important;
+}
+
 /* Summary compact/read segmented control: the moving black pill is an action
    indicator, so it should follow the point color too. */
 html[data-character-theme='active'] .report-mag .summary-view-toggle::before {
@@ -86,6 +139,85 @@ html[data-character-theme='active'] .report-mag .map-cell:nth-child(1),
 html[data-character-theme='active'] .report-mag .map-cell:nth-child(6) {
   background: var(--character-accent-soft) !important;
   border-color: color-mix(in srgb,var(--character-point) 28%,var(--line)) !important;
+}
+
+/* Summary/report structural lines are visual accents, not body text. */
+html[data-character-theme='active'] .report-mag .summary-explorer-head,
+html[data-character-theme='active'] .report-mag .summary-heading,
+html[data-character-theme='active'] .report-mag .sheet-header {
+  border-bottom-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .page-outline {
+  border-top-color: var(--character-accent) !important;
+  border-bottom-color: color-mix(in srgb,var(--character-point) 24%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-mag .summary-expanded {
+  border-top-color: var(--character-accent) !important;
+  border-bottom-color: color-mix(in srgb,var(--character-point) 20%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-mag .summary-expanded-body .summary-paragraph,
+html[data-character-theme='active'] .report-mag .summary-note,
+html[data-character-theme='active'] .report-mag .page-outline-item {
+  border-color: color-mix(in srgb,var(--character-point) 16%,var(--line)) !important;
+}
+
+/* Decorative numbering should inherit the character hue while staying pale. */
+html[data-character-theme='active'] .report-mag .section-number,
+html[data-character-theme='active'] .report-mag .topic-no,
+html[data-character-theme='active'] .report-mag .topic-grid > article.topic .topic-no,
+html[data-character-theme='active'] .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no {
+  color: color-mix(in srgb,var(--character-point) 28%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-mag .topic-grid > article.topic.detail-topic-accordion:focus-visible {
+  box-shadow: 0 0 0 2px var(--character-accent) !important;
+}
+
+/* Structured report boxes: their fills and rules were still default paper/grey. */
+html[data-character-theme='active'] .report-mag .manual-grid > div,
+html[data-character-theme='active'] .report-block .compare-2 .col,
+html[data-character-theme='active'] .report-block .manual-3 .bucket,
+html[data-character-theme='active'] .report-block .progression,
+html[data-character-theme='active'] .report-block .progression .step {
+  background: var(--character-surface) !important;
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .report-block .compare-2 .col.pos {
+  background: var(--character-accent-soft) !important;
+  border-color: color-mix(in srgb,var(--character-point) 34%,var(--line)) !important;
+}
+
+/* Legacy detailed-report containers can still render for old saved characters. */
+html[data-character-theme='active'] body:has(.report-mag) #paid-detail-report .card:has(.topics) > h2,
+html[data-character-theme='active'] body:has(.report-mag) #paid-detail-report .card:has(> div > div > p > strong:first-child) > h2 {
+  border-bottom-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] body:has(.report-mag) #paid-detail-report details.topic,
+html[data-character-theme='active'] body:has(.report-mag) #paid-detail-report .topic-toolbar button,
+html[data-character-theme='active'] body:has(.report-mag) .summary-type-grid .result-block {
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] body:has(.report-mag) .summary-type-grid .result-block,
+html[data-character-theme='active'] body:has(.report-mag) .report-block .compare-2 .col,
+html[data-character-theme='active'] body:has(.report-mag) .report-block .manual-3 .bucket,
+html[data-character-theme='active'] body:has(.report-mag) .report-block .progression .step {
+  background: var(--character-surface) !important;
+}
+
+/* Save/report teaser panels had inline warm-white backgrounds with higher specificity. */
+html[data-character-theme='active'] body:has(.report-mag) .save-character-panel {
+  background: color-mix(in srgb,var(--character-surface) 88%,transparent) !important;
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] body:has(.report-mag) .full-preview-overlay > div > div:first-child {
+  color: var(--character-accent) !important;
 }
 
 /* The final report callout was a fixed graphite block. Keep white copy readable by
