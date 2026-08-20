@@ -53,7 +53,7 @@ function clearStoredPalette(){
 }
 
 function visibleCharacterStage(){
-  return Boolean(document.querySelector('#personality-tag-picker,.question-card,.report-mag'));
+  return Boolean(document.querySelector('#personality-tag-picker,.question-card,.report-mag,.analyze-page .card > .loading'));
 }
 
 function paletteFromDraft(value:unknown):CharacterThemePalette|null{
