@@ -77,6 +77,26 @@ html[data-character-theme='active'] .analyze-page .progress > span {
   background-color: var(--character-accent);
 }
 
+/* Summary-generation screen used fixed graphite progress colors and also lacked a
+   marker that kept the character theme alive. When a character palette is active,
+   keep the loading dots and progress meter on the character point color. */
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) .loading .dot {
+  background-color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] {
+  background: color-mix(in srgb, var(--character-accent) 14%, var(--character-surface)) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] > div {
+  background: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] + p,
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] ~ p {
+  border-color: color-mix(in srgb, var(--character-accent) 16%, transparent);
+}
+
 html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-runnable-track {
   background: linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));
   border-color: color-mix(in srgb, var(--character-point) 20%, var(--line));
