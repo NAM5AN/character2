@@ -1,0 +1,116 @@
+/* Character palette rollout: analyze / Q&A only.
+   Text colors are intentionally untouched. Character colors are limited to surfaces,
+   borders, progress/selection accents and graphic controls. */
+
+html,
+body,
+.site-header,
+.analyze-page,
+.analyze-page .card,
+.analyze-page .input,
+.analyze-page .textarea,
+.analyze-page .option,
+.analyze-page .bipolar-control,
+.analyze-page .progress,
+.analyze-page .progress > span,
+.analyze-page .notice,
+.analyze-page .tag,
+.analyze-page .personality-chip {
+  transition:
+    background-color var(--character-theme-duration) var(--character-theme-ease),
+    border-color var(--character-theme-duration) var(--character-theme-ease),
+    box-shadow var(--character-theme-duration) var(--character-theme-ease);
+}
+
+html[data-character-theme='active'],
+html[data-character-theme='active'] body:has(.analyze-page) {
+  background-color: var(--character-page-bg);
+}
+
+html[data-character-theme='active'] body:has(.analyze-page) .site-header {
+  background-color: color-mix(in srgb, var(--character-main) 90%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--character-point) 16%, var(--line));
+}
+
+html[data-character-theme='active'] .analyze-page .card,
+html[data-character-theme='active'] .analyze-page .input,
+html[data-character-theme='active'] .analyze-page .textarea,
+html[data-character-theme='active'] .analyze-page .option,
+html[data-character-theme='active'] .analyze-page .bipolar-control {
+  background-color: var(--character-surface);
+}
+
+html[data-character-theme='active'] .analyze-page .card,
+html[data-character-theme='active'] .analyze-page .input,
+html[data-character-theme='active'] .analyze-page .textarea,
+html[data-character-theme='active'] .analyze-page .option,
+html[data-character-theme='active'] .analyze-page .bipolar-control,
+html[data-character-theme='active'] .analyze-page .inference {
+  border-color: color-mix(in srgb, var(--character-point) 18%, var(--line));
+}
+
+html[data-character-theme='active'] .analyze-page .option:hover,
+html[data-character-theme='active'] .analyze-page .option.selected {
+  background-color: var(--character-accent-soft);
+  border-color: var(--character-accent);
+}
+
+html[data-character-theme='active'] .analyze-page .input:focus,
+html[data-character-theme='active'] .analyze-page .textarea:focus {
+  border-color: var(--character-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--character-point) 13%, transparent);
+}
+
+html[data-character-theme='active'] .analyze-page .notice,
+html[data-character-theme='active'] .analyze-page .tag {
+  background-color: var(--character-accent-soft);
+  border-color: var(--character-accent);
+}
+
+html[data-character-theme='active'] .analyze-page .progress {
+  background-color: color-mix(in srgb, var(--character-main) 70%, var(--character-main-sub));
+}
+
+html[data-character-theme='active'] .analyze-page .progress > span {
+  background-color: var(--character-accent);
+}
+
+html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));
+  border-color: color-mix(in srgb, var(--character-point) 20%, var(--line));
+}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-track {
+  background: linear-gradient(90deg,var(--character-accent-soft),var(--character-main) 50%,var(--character-main-sub));
+  border-color: color-mix(in srgb, var(--character-point) 20%, var(--line));
+}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-thumb {
+  background-color: var(--character-accent);
+  border-color: var(--character-surface);
+  box-shadow: 0 0 0 2px var(--character-accent),0 4px 12px #0002;
+}
+html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thumb {
+  background-color: var(--character-accent);
+  border-color: var(--character-surface);
+  box-shadow: 0 0 0 2px var(--character-accent),0 4px 12px #0002;
+}
+
+/* Keep the existing chip text/fill treatment; only add character-color emphasis. */
+html[data-character-theme='active'] .analyze-page .personality-chip[data-selected='true'] {
+  border-color: var(--character-accent) !important;
+  box-shadow: 0 0 0 2px var(--character-accent-soft);
+}
+
+html[data-character-theme='active'] .analyze-page .personality-chip::before,
+html[data-character-theme='active'] .analyze-page .mini-icon {
+  color: var(--character-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  .site-header,
+  .analyze-page,
+  .analyze-page * {
+    transition-duration: .01ms !important;
+  }
+}
