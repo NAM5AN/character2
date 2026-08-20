@@ -83,10 +83,10 @@ type StuckRow = {
   id: string; startedAt: string; stage: string; shareCode: string | null;
   minutesStuck: number; characterName: string | null; ownerName: string | null;
 };
-type RetryGroup = { stage: string; errorCode: string; count: number; lastSeen: string; sampleDetail: string | null };
+type RetryRow = FailureRow;
 type FailuresData = {
   total24h: number; total7d: number; rollup: FailureGroup[]; recent: FailureRow[]; stuck: StuckRow[];
-  retry24h?: number; retries?: RetryGroup[];
+  retry24h?: number; retries?: RetryRow[];
 };
 type FailuresState =
   | { state: 'loading' }
@@ -143,6 +143,11 @@ function fmtAgo(value: string): string {
   if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
   if (sec < 86400) return `${Math.floor(sec / 3600)}시간 전`;
   return new Date(value).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function characterLabel(name: string | null, ownerName: string | null, shareCode: string | null): string {
+  if (name) return ownerName ? `${name} (${ownerName})` : name;
+  return shareCode ? '캐릭터 이름 확인 불가' : '캐릭터 저장 전';
 }
 
 // gpt-5.6-luna 단가 (Vercel 게이트웨이 = OpenAI, 마크업 없음). 단가 바뀌면 여기만 고치면 됨.
@@ -357,7 +362,7 @@ export default function AdminConsolePage() {
 
   // AI 생성 실패 로그(사용자 이탈과 직결되는 지점).
   const [failures, setFailures] = useState<FailuresState>({ state: 'loading' });
-  const [showRecentFailures, setShowRecentFailures] = useState(false);
+  const [showRecentFailures, setShowRecentFailures] = useState(true);
 
   const loadFailures = useCallback(async () => {
     try {
@@ -690,7 +695,7 @@ export default function AdminConsolePage() {
               {failures.data.stuck.map(k => (
                 <div key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
                   <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(k.stage)}</span>
-                  {k.characterName && <span className="muted">· {k.characterName}{k.ownerName ? ` (${k.ownerName})` : ''}</span>}
+                  <span className="muted">· {characterLabel(k.characterName, k.ownerName, k.shareCode)}</span>
                   {k.shareCode && <span className="tag" style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '.06em' }}>{k.shareCode}</span>}
                   <span className="muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{k.minutesStuck}분째 · {fmtAgo(k.startedAt)} 시작</span>
                 </div>
@@ -702,21 +707,22 @@ export default function AdminConsolePage() {
         {failures.state === 'ready' && (failures.data.retries?.length ?? 0) > 0 && (
           <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <strong style={{ fontSize: 13 }}>🔁 재시도 사유 · 7일</strong>
+              <strong style={{ fontSize: 13 }}>🔁 재시도 기록 · 최근 7일 · 최신순</strong>
               <span className="muted" style={{ fontSize: 12 }}>
                 재시도는 프롬프트를 통째로 다시 보내 비용이 두 배가 돼요{typeof failures.data.retry24h === 'number' ? ` · 24시간 ${failures.data.retry24h}건` : ''}
               </span>
             </div>
             <div className="stack" style={{ gap: 6, marginTop: 8 }}>
               {failures.data.retries!.map(r => (
-                <div key={`${r.stage}:${r.errorCode}`} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg,#fff)' }}>
+                <div key={r.id} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg,#fff)' }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
                     <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(r.stage)}</span>
                     <strong style={{ fontSize: 12 }}>{retryLabel(r.errorCode)}</strong>
-                    <span style={{ fontSize: 12, fontWeight: 900 }}>{r.count}회</span>
-                    <span className="muted" style={{ marginLeft: 'auto', fontSize: 11, whiteSpace: 'nowrap' }}>{fmtAgo(r.lastSeen)}</span>
+                    <span className="muted">· {characterLabel(r.characterName, r.ownerName, r.shareCode)}</span>
+                    {r.shareCode && <span className="tag" style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '.06em' }}>{r.shareCode}</span>}
+                    <span className="muted" style={{ marginLeft: 'auto', fontSize: 11, whiteSpace: 'nowrap' }}>{fmtAgo(r.createdAt)}</span>
                   </div>
-                  {r.sampleDetail && <p className="muted" style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.5, wordBreak: 'break-word' }}>{r.sampleDetail}</p>}
+                  {r.errorDetail && <p className="muted" style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.5, wordBreak: 'break-word' }}>{r.errorDetail}</p>}
                 </div>
               ))}
             </div>
@@ -753,7 +759,7 @@ export default function AdminConsolePage() {
               style={{ padding: '6px 12px', marginTop: 12 }}
               onClick={() => setShowRecentFailures(v => !v)}
             >
-              {showRecentFailures ? '개별 기록 접기' : `개별 기록 보기 (${failures.data.recent.length})`}
+              {showRecentFailures ? '개별 실패 기록 접기' : `개별 실패 기록 보기 (${failures.data.recent.length} · 최신순)`}
             </button>
 
             {showRecentFailures && (
@@ -763,7 +769,7 @@ export default function AdminConsolePage() {
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(r.stage)}</span>
                       <code style={{ fontSize: 11, color: '#c0392b' }}>{r.errorCode}</code>
-                      {r.characterName && <span className="muted" style={{ fontSize: 12 }}>· {r.characterName}{r.ownerName ? ` (${r.ownerName})` : ''}</span>}
+                      <span className="muted" style={{ fontSize: 12 }}>· {characterLabel(r.characterName, r.ownerName, r.shareCode)}</span>
                       {r.shareCode && <span className="tag" style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: '.06em' }}>{r.shareCode}</span>}
                       <span className="muted" style={{ fontSize: 11, marginLeft: 'auto', whiteSpace: 'nowrap' }}>{fmtAgo(r.createdAt)}</span>
                     </div>
