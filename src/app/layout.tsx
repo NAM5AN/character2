@@ -104,7 +104,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
-              <Link href="/" className="brand">CHARA LAB</Link>
+              <Link href="/" className="brand">CHA-LAB</Link>
             </div>
             <nav className="nav-links">
               <Link className="nav-link" href="/analyze">캐릭터 분석</Link>
@@ -114,7 +114,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <AdminDeploymentVersionPanel/>
         {children}
-        <footer className="footer"><div className="container"><span>CHARA LAB · Character Passport v1</span><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
+        <footer className="footer"><div className="container"><span>CHA-LAB</span><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
       </body>
     </html>
   );
