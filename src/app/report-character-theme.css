@@ -69,7 +69,7 @@ html[data-character-theme='active'] .report-mag .summary-view-toggle {
 
 html[data-character-theme='active'] .report-mag .summary-view-toggle::before,
 html[data-character-theme='active'] .report-mag .summary-card-no,
-html[data-character-theme='active'] .report-mag .spectrum-track .dot,
+html[data-character-theme='active'] .report-mag .spectrum-track .spectrum-dot,
 html[data-character-theme='active'] .report-mag .pressure-grid > div > span {
   background-color: var(--character-accent) !important;
 }
@@ -108,9 +108,14 @@ html[data-character-theme='active'] .report-mag .spectrum-track::after {
   background-color: color-mix(in srgb,var(--character-point) 28%,var(--mag-line-dark));
 }
 
-html[data-character-theme='active'] .report-mag .spectrum-track .dot {
+html[data-character-theme='active'] .report-mag .spectrum-track .spectrum-dot {
   border-color: var(--character-surface);
   box-shadow: 0 0 0 1px var(--character-accent);
+}
+
+/* 본문 핵심 해석 하이라이트도 캐릭터 포인트컬러를 따라간다. */
+html[data-character-theme='active'] .report-mag mark {
+  background: linear-gradient(transparent 58%,color-mix(in srgb,var(--character-accent) 28%,transparent) 58%);
 }
 
 html[data-character-theme='active'] .report-mag .section-tags span,

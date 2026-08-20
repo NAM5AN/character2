@@ -27,6 +27,16 @@ function splitTopics(text: string) {
     });
 }
 
+// 본문 안의 **강조** 표기를 포인트컬러 하이라이트(mark)로 렌더한다.
+// 문단 첫 안내문은 splitTopics 가 이미 떼어내므로, 여기 들어오는 건 본문 강조뿐이다.
+// 짝이 맞지 않는 별표는 화면에 그대로 새지 않도록 지운다.
+function renderInline(text: string): ReactNode {
+  if (!text.includes('**')) return text;
+  return text.split(/\*\*(.+?)\*\*/g).map((part, index) => (
+    index % 2 === 1 ? <mark key={index}>{part}</mark> : part.replace(/\*\*/g, '')
+  ));
+}
+
 function topicClass(index: number, total: number, key: string) {
   if (index === 0) return 'topic topic--hero';
   if (key === 'integratedReport') return 'topic topic--timeline';
@@ -59,7 +69,7 @@ function SpectrumStudy({ items, label }: { items: SpectrumItem[]; label: string 
   if (!items.length) return null;
   return <aside className="study-block"><div className="study-label">{label}</div><div className="spectrums">{items.map((s, i) => <div className="spectrum-item" key={i}>
     <span className={`lbl left${s.value < 45 ? ' on' : ''}`}>{s.left}</span>
-    <div className="spectrum-track"><span className="dot" style={{ left: `${Math.max(0, Math.min(100, s.value))}%` }} /></div>
+    <div className="spectrum-track"><span className="spectrum-dot" style={{ left: `${Math.max(0, Math.min(100, s.value))}%` }} /></div>
     <span className={`lbl right${s.value > 55 ? ' on' : ''}`}>{s.right}</span>
   </div>)}</div></aside>;
 }
@@ -113,7 +123,7 @@ function MagazineSection({ meta, name, analysis }: { meta: SectionMeta; name: st
       {topics.map((topic, index) => <Fragment key={`${index}-${topic.lead.slice(0, 10)}`}>
         <article className={topicClass(index, total, String(meta.key))}>
           <div className="topic-no">{String(index + 1).padStart(2, '0')}</div>
-          <div className="topic-content"><h4>{topic.lead}</h4>{topic.body ? <p>{topic.body}</p> : null}</div>
+          <div className="topic-content"><h4>{topic.lead}</h4>{topic.body ? <p>{renderInline(topic.body)}</p> : null}</div>
         </article>
         {blocks.filter(b => b.after === index).map((b, bi) => <Fragment key={`blk-${index}-${bi}`}>{b.node}</Fragment>)}
       </Fragment>)}
@@ -172,7 +182,7 @@ function SummaryFullText({ index, label, text }: { index: number; label: string;
   return <div className="summary-expanded">
     <div className="summary-expanded-head"><span>{String(index + 1).padStart(2, '0')}</span><h3>{label}</h3></div>
     <div className="summary-expanded-body">
-      {paras.map((p, i) => <div className="summary-paragraph" key={i}><h4>{p.lead}</h4>{p.body ? <p>{p.body}</p> : null}</div>)}
+      {paras.map((p, i) => <div className="summary-paragraph" key={i}><h4>{p.lead}</h4>{p.body ? <p>{renderInline(p.body)}</p> : null}</div>)}
     </div>
   </div>;
 }
@@ -203,7 +213,7 @@ export function SummaryNotes({ preview }: { preview: CharacterReportPreview }) {
           const selected = activeKey === card.key;
           return <button type="button" className={`summary-card${selected ? ' is-active' : ''}`} key={card.key} onClick={() => setActiveKey(selected ? null : card.key)} aria-expanded={selected}>
             <div className="summary-card-top"><span className="summary-card-no">{String(index + 1).padStart(2, '0')}</span><h3>{card.label}</h3></div>
-            <p className="summary-card-preview">{cardLine}</p>
+            <p className="summary-card-preview">{renderInline(cardLine)}</p>
             <span className="summary-card-hint">{selected ? '접기 ↑' : '자세히 보기 ↓'}</span>
           </button>;
         })}

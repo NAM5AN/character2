@@ -7,7 +7,8 @@
 }
 
 .report-mag { word-break: keep-all; overflow-wrap: break-word; }
-.report-mag mark { background: linear-gradient(transparent 62%, color-mix(in srgb, var(--report-point) 20%, transparent) 62%); color: inherit; padding: 0 1px; }
+/* 본문 안의 핵심 해석 강조. 글자를 덮지 않도록 아래쪽만 포인트컬러로 칠하는 형광펜 스타일. */
+.report-mag mark { background: linear-gradient(transparent 58%, color-mix(in srgb, var(--report-point) 28%, transparent) 58%); color: inherit; font-weight: 700; padding: 0 1px; border-radius: 1px; }
 
 /* cover */
 .report-mag .cover { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(320px,.95fr); gap: 44px; padding: 48px; background: var(--paper); border: 1px solid var(--mag-line-dark); border-radius: 24px; box-shadow: var(--shadow); }
@@ -101,7 +102,14 @@
 .report-mag .spectrum-track::before, .report-mag .spectrum-track::after { content: ""; position: absolute; top: 50%; width: 2px; height: 8px; background: var(--mag-line-dark); transform: translateY(-50%); }
 .report-mag .spectrum-track::before { left: 0; }
 .report-mag .spectrum-track::after { right: 0; }
-.report-mag .spectrum-track .dot { position: absolute; top: 50%; width: 13px; height: 13px; border-radius: 50%; background: var(--report-point); border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--report-point); transform: translate(-50%,-50%); }
+/* 로딩 점(.dot)과 클래스를 분리한다. 같은 이름을 쓰면 globals 의 pulse 애니메이션이
+   transform 을 덮어써서 점이 위아래로 움직이고 트랙 중앙에서 어긋난다. */
+.report-mag .spectrum-track .spectrum-dot { position: absolute; top: 50%; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--report-point); border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--report-point); transform: translate(-50%,-50%); animation: spectrum-dot-glow 1.6s ease-in-out infinite alternate; }
+/* 제자리에서 은은하게만 아른거리도록 opacity 만 변화시킨다(transform 은 건드리지 않음). */
+@keyframes spectrum-dot-glow { from { opacity: .6; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .report-mag .spectrum-track .spectrum-dot { animation: none; }
+}
 
 /* page outline + controls */
 .report-mag .page-outline { margin: 20px 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--mag-line-dark); }
