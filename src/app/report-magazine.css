@@ -63,26 +63,11 @@
 .report-mag .topic-content { padding-left: 24px; }
 .report-mag .topic h4 { margin: 0 0 12px; font-size: 19px; line-height: 1.45; letter-spacing: -.03em; }
 .report-mag .topic p { margin: 0; color: #44484d; font-size: 15px; line-height: 1.9; letter-spacing: -.008em; }
-.report-mag .topic--hero { grid-column: span 12; display: grid; grid-template-columns: minmax(230px,.8fr) minmax(0,1.6fr); gap: 40px; padding: 32px 0 38px; border-top: 0; border-bottom: 1px solid var(--mag-line-dark); }
-.report-mag .topic--hero .topic-no { position: static; display: flex; align-items: center; justify-content: center; width: 54px; height: 54px; border: 1px solid var(--report-point); border-radius: 50%; font-size: 14px; }
-.report-mag .topic--hero .topic-content { display: contents; padding-left: 0; }
-.report-mag .topic--hero h4 { grid-column: 1; margin: 0; font-size: clamp(23px,2.8vw,33px); line-height: 1.34; letter-spacing: -.05em; }
-.report-mag .topic--hero p { grid-column: 2; font-size: 16px; line-height: 1.95; }
-.report-mag .topic--feature { grid-column: span 12; display: grid; grid-template-columns: 72px minmax(230px,.82fr) minmax(0,1.42fr); gap: 26px; align-items: start; margin: 8px 0 4px; padding: 30px 0 34px; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--mag-line-dark); }
-.report-mag .topic--feature .topic-no { position: static; width: auto; color: #cbc7bd; font-size: 36px; line-height: 1; }
-.report-mag .topic--feature .topic-content { display: contents; padding: 0; }
-.report-mag .topic--feature h4 { grid-column: 2; margin: 0; font-size: clamp(22px,2.9vw,32px); line-height: 1.4; }
-.report-mag .topic--feature p { grid-column: 3; max-width: none; font-size: 15.5px; line-height: 1.95; }
-.report-mag .topic--wide { grid-column: span 12; display: grid; grid-template-columns: minmax(230px,.72fr) minmax(0,1.3fr); gap: 34px; padding: 32px 0 0; border-top: 2px solid var(--ink); }
-.report-mag .topic--wide .topic-no { position: static; width: auto; font-size: 36px; color: #cbc7bd; }
-.report-mag .topic--wide .topic-content { display: contents; padding: 0; }
-.report-mag .topic--wide h4 { grid-column: 1; margin-top: 4px; font-size: 25px; }
-.report-mag .topic--wide p { grid-column: 2; font-size: 15.5px; }
-.report-mag .topic--timeline { grid-column: span 12; display: grid; grid-template-columns: 82px minmax(230px,.75fr) minmax(0,1.4fr); gap: 22px; padding: 28px 0; border-top: 1px solid var(--line); }
-.report-mag .topic--timeline .topic-no { position: static; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 13px; }
-.report-mag .topic--timeline .topic-content { display: contents; padding: 0; }
-.report-mag .topic--timeline h4 { grid-column: 2; margin-top: 2px; font-size: 21px; }
-.report-mag .topic--timeline p { grid-column: 3; }
+/* .topic--hero / --feature / --wide / --timeline 변형 규칙은 제거했습니다.
+   report-detail-uniform.css 가 .report-mag .topic-grid > article.topic 에 !important 로
+   같은 속성을 전부 덮어써서, 데스크톱과 모바일 모두에서 네 변형과 기본 .topic 의
+   계산 스타일이 완전히 동일했습니다(브라우저로 실측 확인). 변형을 되살리려면
+   uniform.css 의 !important 부터 걷어내야 합니다. */
 
 /* study blocks (구조화 블록) */
 .report-mag .study-block { grid-column: span 12; margin: 12px 0 20px; padding: 26px; border: 1px solid color-mix(in srgb, var(--report-point) 26%, transparent); border-radius: 18px; background: var(--report-point-soft); }
@@ -145,9 +130,6 @@
   .report-mag .section-chev { position: absolute; right: 0; top: 0; }
   .report-mag .report-section { position: relative; }
   .report-mag .sheet-page-no { font-size: 54px; }
-  .report-mag .topic--hero, .report-mag .topic--wide, .report-mag .topic--timeline, .report-mag .topic--feature { grid-template-columns: 1fr; gap: 14px; }
-  .report-mag .topic--hero .topic-content, .report-mag .topic--wide .topic-content, .report-mag .topic--timeline .topic-content, .report-mag .topic--feature .topic-content { display: block; }
-  .report-mag .topic--hero h4, .report-mag .topic--hero p, .report-mag .topic--wide h4, .report-mag .topic--wide p, .report-mag .topic--timeline h4, .report-mag .topic--timeline p, .report-mag .topic--feature h4, .report-mag .topic--feature p { grid-column: 1; }
   .report-mag .topic { grid-column: span 12; padding-left: 2px; }
   .report-mag .topic-content { padding-left: 26px; }
   .report-mag .compare-grid, .report-mag .manual-grid, .report-mag .pressure-grid { grid-template-columns: 1fr; }

@@ -121,23 +121,31 @@ textarea[placeholder^="예:"]::placeholder { color: transparent; }
 .lookup .input { text-transform:uppercase; letter-spacing:.1em; font-family:monospace; font-weight:800; }
 .footer { padding:36px 0 60px; color:var(--muted); border-top:1px solid var(--line); font-size:13px; }
 
-/* Requested cleanup: remove auxiliary captions and helper copy while keeping controls and primary content. */
+/* Requested cleanup: remove auxiliary captions and helper copy while keeping controls
+   and primary content. These hide markup that AnalyzeFlow still renders, so each entry
+   is annotated with what it targets — the selectors are positional (:first-child,
+   :nth-child) and will silently hide the wrong element if that JSX is reordered.
+   (Four more selectors targeting .result-hero / .result-grid were removed: the report
+   components render no .eyebrow at all, so they matched nothing.) */
+/* 프로필 입력 카드의 공개/비밀 프로필 안내문 */
 .page > .card > .notice,
+/* 프로필 해석 중 진행률 패널 — 진행률은 버튼 라벨에만 남는다 */
 .page > .card[aria-busy="true"] > [role="status"],
+/* 검수 화면 1번 카드: "첫 해석" 라벨 / 분석 정밀도·확인된 설정 / 진행 바 */
 .stack > .card:first-child > .eyebrow,
 .stack > .card:first-child > .two-col,
 .stack > .card:first-child > .progress,
+/* 검수 화면 2번 카드: "첫 해석 확인" 제목과 그 아래 설명문 */
 .stack > .card:nth-child(2) > h3,
 .stack > .card:nth-child(2) > h3 + .muted,
+/* 첫 5문항 준비 중 안내 카드 */
 .stack > .card[role="status"],
+/* 추론 카드의 근거 태그 묶음 */
 .inference > div:has(> .tags),
+/* 문항 카드: 응답 유형 배지 / 이유 입력칸 아래 설명문 */
 .question-card .q-meta > span:nth-child(2),
 .question-card .field > textarea + .muted,
-.loading + p.muted,
-.result-hero > div:first-child > .eyebrow,
-.result-hero + div > .eyebrow,
-.result-hero + div > p.muted,
-.result-grid + .card > .eyebrow {
+.loading + p.muted {
   display: none !important;
 }
 

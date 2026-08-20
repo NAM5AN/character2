@@ -27,9 +27,9 @@
 }
 
 .report-mag .summary-view-toggle {
-  display: inline-flex;
+  /* display/gap 은 report-summary-polish.css 가 grid/0 으로 덮어씁니다(실측 확인).
+     여기서는 나머지 박스 스타일만 담당합니다. */
   flex: 0 0 auto;
-  gap: 4px;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -46,8 +46,9 @@
   font-weight: 800;
 }
 
+/* .is-active 의 배경은 report-summary-polish.css 가 transparent !important 로 덮고
+   실제 강조는 그쪽 ::before 슬라이더가 그립니다. 여기서는 글자색만 지정합니다. */
 .report-mag .summary-view-toggle button.is-active {
-  background: var(--ink);
   color: #fff;
 }
 
