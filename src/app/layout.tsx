@@ -8,6 +8,7 @@ import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import './globals.css';
 import './character-theme.css';
+import './analyze-character-theme.css';
 import './bipolar-mobile-fix.css';
 import './feedback.css';
 import './report-pagination.css';
