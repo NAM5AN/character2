@@ -247,6 +247,51 @@ function summaryFormatIssues(summary:SummaryAnalysisGeneration['summary']){
     return bad>=0?[`${key}: ${bad+1}문단 굵은 안내문 누락`]:[];
   });
 }
+// 내용은 멀쩡한데 문단 형식만 어긋난 응답을 프롬프트 재전송 없이 코드로 고친다.
+// 재생성은 비용이 두 배가 되므로, 글을 새로 쓰지 않고 형식만 맞출 수 있으면 여기서 맞춘다.
+// 문장을 창작하지 않는다: 이미 있는 문장을 나누거나 첫 문장을 안내문으로 감쌀 뿐이다.
+function repairSummaryParagraphs(value:string){
+  const blocks=value.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean)
+    // 한 문단 안에서 별표 짝이 안 맞으면(열린 채 끝나는 등) 그 문단의 별표는 걷어낸다.
+    // 깨진 별표를 그대로 두면 아래 안내문 판정이 계속 실패한다.
+    .map(block=>(block.match(/\*\*/gu)?.length??0)%2===0?block:block.replace(/\*\*/gu,'').trim())
+    .filter(Boolean);
+  // 문단이 하나로 붙어 나온 경우: 문장 경계에서 최대한 균형 있게 두 덩이로 나눈다.
+  if(blocks.length===1){
+    const sentences=blocks[0].match(/[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/gu)?.map(x=>x.trim()).filter(Boolean)||[];
+    if(sentences.length>=4){
+      // 굵은 안내문이 이미 있으면 그 문장은 첫 문단에 남긴다.
+      const half=Math.round(sentences.length/2);
+      blocks.splice(0,1,sentences.slice(0,half).join(' '),sentences.slice(half).join(' '));
+    }
+  }
+  // 문단이 셋 이상이면 뒤쪽을 두 번째 문단으로 합친다.
+  if(blocks.length>2)blocks.splice(1,blocks.length-1,blocks.slice(1).join(' '));
+  if(blocks.length!==2)return '';
+  const repaired=blocks.map(block=>{
+    if(/^\*\*[^*]+\*\*\s*\S/u.test(block))return block;
+    // 별표가 깨진 형태(한쪽만 있거나 전부 감쌈)는 걷어내고 다시 붙인다.
+    const plain=block.replace(/\*\*/gu,'').trim();
+    const match=plain.match(/^([^.!?。！？]+[.!?。！？]+)\s*(\S[\s\S]*)$/u);
+    if(!match)return '';
+    return `**${match[1].trim()}** ${match[2].trim()}`;
+  });
+  return repaired.every(Boolean)?repaired.join('\n\n'):'';
+}
+function repairSummaryFormat(summary:SummaryAnalysisGeneration['summary']){
+  const out={...summary};
+  let changed=false;
+  for(const key of teaserKeys){
+    const value=out[key];
+    if(!value)continue;
+    const paragraphs=value.split(/\n{2,}/).map(x=>x.trim()).filter(Boolean);
+    const needsFix=paragraphs.length!==2||paragraphs.some(p=>!/^\*\*[^*]+\*\*\s*\S/u.test(p));
+    if(!needsFix)continue;
+    const fixed=repairSummaryParagraphs(value);
+    if(fixed){out[key]=fixed;changed=true}
+  }
+  return changed?out:null;
+}
 function summaryQualityPass(insight:z.infer<typeof summaryInsightSchema>){
   const q=insight.quality;
   const total=q.evidenceStrength+q.specificity+q.latentDepth+q.counterEvidenceRobustness+q.inferenceDistance+q.predictiveValue;
@@ -291,6 +336,14 @@ async function generateSummary(input:string,src:SummarySource):Promise<SummaryAn
       const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:5000,maxAttempts:2,input:`${input}${retry}`,allowFallback:true});
       const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,src));
       if(parsed.success){
+        // 형식만 어긋났다면 재생성 대신 코드로 고쳐서 그대로 통과시킨다(비용 두 배 방지).
+        if(summaryFormatIssues(parsed.data.summary).length){
+          const repaired=repairSummaryFormat(parsed.data.summary);
+          if(repaired&&!summaryFormatIssues(repaired).length){
+            logGenRetry('REPAIR_SUMMARY_FORMAT','문단 형식 자동 보정(재생성 없음)');
+            parsed.data.summary=repaired;
+          }
+        }
         const shortFields=shortSummaryFields(parsed.data.summary);
         const formatIssues=summaryFormatIssues(parsed.data.summary);
         if((shortFields.length||formatIssues.length)&&attempt===0){

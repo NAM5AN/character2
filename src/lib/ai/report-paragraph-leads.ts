@@ -30,11 +30,36 @@ function topicTitleReason(value: string) {
   return '';
 }
 
+// 제목이 규칙에서 조금 벗어났을 때, 배치 전체를 다시 생성하지 않고 코드로 다듬는다.
+// 재생성은 프롬프트를 통째로 다시 보내 비용이 두 배가 되므로, 뜻을 바꾸지 않고
+// 고칠 수 있는 위반(문장부호, 별표, 안내문 종결, 길이)은 여기서 처리한다.
+// 새 제목을 창작하지는 않는다 — 고칠 수 없으면 빈 문자열을 돌려 폴백 제목이 쓰이게 한다.
+export function repairTopicTitle(value: string) {
+  let title = value.replace(/\*\*/gu, '').replace(/\s+/gu, ' ').trim();
+  if (!title) return '';
+  // 끝의 문장부호를 먼저 떼어내야 "~일까요?" 같은 종결 패턴이 잡힌다.
+  title = title.replace(/[.!?。！？]+\s*$/u, '').trim();
+  // 안내문 종결·질문형을 명사형으로 되돌린다: "~를 살펴볼게요" → "~"
+  title = title
+    .replace(/(?:도|를|을|은|는|이|가)?\s*(?:한번\s*)?(?:같이\s*)?(?:살펴|들여다|짚어|이어|확인해|생각해|알아)(?:볼게요|볼까요|보도록\s*할게요|봅니다|보죠|보자)\s*$/u, '')
+    .replace(/(?:이|일|할|될|볼)?까요\s*$/u, '')
+    .trim();
+  // 남은 문장부호 제거(제목에는 쓰지 않는다).
+  title = title.replace(/[,，;；:：.!?。！？]+/gu, ' ').replace(/\s+/gu, ' ').trim();
+  // 어절이 너무 길면 앞쪽 10어절만 남긴다.
+  const words = title.split(/\s+/u);
+  if (words.length > 10) title = words.slice(0, 10).join(' ');
+  if (title.length > 40) title = title.slice(0, 40).trim();
+  return topicTitleReason(title) ? '' : title;
+}
+
 const topicTitleSchema = z.object({
   lead: z.string(),
-}).superRefine((value, context) => {
-  const reason = topicTitleReason(value.lead);
-  if (reason) context.addIssue({ code: 'custom', path: ['lead'], message: reason });
+}).transform(value => {
+  // 규칙에 맞으면 그대로, 아니면 보정해서 통과시킨다. 보정 불가면 빈 문자열이 되고
+  // 호출부에서 폴백 제목으로 대체되므로, 이 단계 때문에 재생성이 발생하지 않는다.
+  const lead = value.lead.replace(/\s+/gu, ' ').trim();
+  return { lead: topicTitleReason(lead) ? repairTopicTitle(lead) : lead };
 });
 
 function leadBatchSchema(length: number) {
@@ -176,7 +201,10 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
       prompt: promptForItems(name, items),
       schema: leadBatchSchema(items.length),
       maxOutputTokens: Math.max(700, Math.min(2600, 220 + items.length * 65)),
-      maxAttempts: 2,
+      // 제목 위반은 이제 스키마 단계에서 보정되고, 보정 불가면 폴백 제목이 쓰인다.
+      // 그래서 형식 때문에 다시 생성할 이유가 없다(타입/도구 실패만 남는데 그건 재시도해도
+      // 같은 결과일 확률이 높고, 실패해도 폴백으로 리포트가 완성된다).
+      maxAttempts: 1,
     });
     leads = result.leads.map(item => item.lead.replace(/\s+/gu, ' ').trim());
   } catch (error) {

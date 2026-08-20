@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { askClaudeJson, rewriteReportLeads } from '@/lib/ai/anthropic';
+import { lenientArray, lenientStringArray } from '@/lib/ai/lenient';
 import {
   analysisTypeSummarySchema,
   characterEvidencePackSchema,
@@ -61,8 +62,9 @@ const qualityScoreSchema = z.object({
 const validatedInsightSchema = z.object({
   conclusion: z.string(),
   mechanism: z.string(),
-  evidenceAnchors: z.array(z.string()).min(2),
-  counterEvidence: z.array(z.string()).default([]),
+  // 배열 자리에 문자열이 오면 재생성 대신 항목 배열로 펴서 받는다(비용 두 배 방지).
+  evidenceAnchors: lenientStringArray(z.array(z.string()).min(2)),
+  counterEvidence: lenientStringArray(z.array(z.string())).default([]),
   confidence: z.string(),
   prediction: z.string(),
   quality: qualityScoreSchema,
@@ -77,9 +79,10 @@ const psychologicalModelSchema = z.object({
   intimacyLogic: z.string(),
   conflictLogic: z.string(),
   selfNarrative: z.string(),
-  validatedInsights: z.array(validatedInsightSchema).min(4),
-  tensions: z.array(validatedInsightSchema).default([]),
-  uncertainties: z.array(z.string()).default([]),
+  validatedInsights: lenientArray(z.array(validatedInsightSchema).min(4)),
+  tensions: lenientArray(z.array(validatedInsightSchema)).default([]),
+  // 로그에서 실제로 관측된 실패: uncertainties 자리에 문자열이 옴.
+  uncertainties: lenientStringArray(z.array(z.string())).default([]),
 });
 
 const reportDossierSchema = z.object({
@@ -94,20 +97,20 @@ const reportDossierSchema = z.object({
   validatedInsights:z.array(z.object({
     conclusion:z.string(),
     mechanism:z.string(),
-    evidenceAnchors:z.array(z.string()),
-    counterEvidence:z.array(z.string()),
+    evidenceAnchors:lenientStringArray(z.array(z.string())),
+    counterEvidence:lenientStringArray(z.array(z.string())),
     confidence:z.string(),
     prediction:z.string(),
   })),
   tensions:z.array(z.object({
     conclusion:z.string(),
     mechanism:z.string(),
-    evidenceAnchors:z.array(z.string()),
-    counterEvidence:z.array(z.string()),
+    evidenceAnchors:lenientStringArray(z.array(z.string())),
+    counterEvidence:lenientStringArray(z.array(z.string())),
     confidence:z.string(),
     prediction:z.string(),
   })),
-  uncertainties:z.array(z.string()),
+  uncertainties:lenientStringArray(z.array(z.string())),
 });
 
 export type ReportDossier = z.infer<typeof reportDossierSchema>;
