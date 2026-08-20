@@ -3,6 +3,7 @@ import type { InterviewQuestion } from '@/lib/schemas/question';
 export const QUESTION_EVIDENCE_INSTRUCTIONS = `질문 근거(evidence) 규칙 — 매우 중요:
 - 새로 생성하는 모든 문항은 evidence에 1~2개의 원문 발췌를 넣으세요.
 - evidence는 질문의 소재가 실제로 나온 공개 프로필, 비밀 프로필, 오너 검수 메모, 이전 인터뷰 질문·답변·이유 중에서 연속된 구절을 그대로 복사한 것입니다. 요약하거나 문장을 새로 만들지 마세요.
+- evidence는 보통 12~120자 정도의 짧은 연속 발췌로 충분합니다. 필요한 구절만 짧게 복사하고 문단 전체를 길게 넣지 마세요.
 - 프로필의 서로 다른 위치에 있는 사실·대사·행동을 원문에서 연결되지 않았는데 하나의 사건, 문답, 인과관계처럼 합치면 실패입니다.
 - 특히 “A라는 질문에 B라고 답했다”, “A라고 말한 뒤 B했다”처럼 두 발화나 행동의 직접 관계를 질문에 넣으려면, 그 관계가 실제로 드러나는 하나의 연속된 evidence 발췌 안에 두 요소가 함께 있어야 합니다.
 - 질문에 따옴표로 원문 대사나 표현을 인용하면 그 인용문은 evidence에도 실제로 존재해야 합니다. 서로 다른 문단에서 따로 가져온 두 인용문을 한 문답처럼 엮지 마세요.
@@ -39,7 +40,17 @@ export function questionEvidenceSources(args: {
 function evidenceExistsInSources(evidence: string, sources: string[]) {
   const needle = normalizeSpace(evidence);
   if (!needle) return false;
-  return sources.some(source => source.includes(needle));
+
+  // Fast path: exact contiguous source excerpt after whitespace normalization.
+  if (sources.some(source => source.includes(needle))) return true;
+
+  // Models frequently preserve the exact words but normalize quotation marks,
+  // bullets or punctuation. Treat those formatting-only differences as the same
+  // contiguous excerpt instead of regenerating the entire interview question.
+  // Word/character order still has to match, so paraphrases remain invalid.
+  const looseNeedle = normalizeLoose(needle);
+  if (looseNeedle.length < 4) return false;
+  return sources.some(source => normalizeLoose(source).includes(looseNeedle));
 }
 
 function quotedPhrases(question: string) {
