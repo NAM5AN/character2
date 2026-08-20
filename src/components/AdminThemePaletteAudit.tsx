@@ -52,6 +52,7 @@ function Swatch({label,color}:{label:string;color:string}){
 
 export function AdminThemePaletteAudit(){
   const pathname=usePathname();
+  const [authorized,setAuthorized]=useState(false);
   const [open,setOpen]=useState(false);
   const [loading,setLoading]=useState(false);
   const [rows,setRows]=useState<PaletteItem[]>([]);
@@ -63,22 +64,23 @@ export function AdminThemePaletteAudit(){
     setLoading(true);setError('');
     try{
       const response=await fetch('/api/admin/data',{cache:'no-store'});
-      if(response.status===401){setRows([]);return}
+      if(response.status===401){setAuthorized(false);setRows([]);return}
       const body=await response.json().catch(()=>({}));
-      if(!response.ok){setError('팔레트 데이터를 불러오지 못했어요.');return}
+      if(!response.ok){setAuthorized(false);setError('팔레트 데이터를 불러오지 못했어요.');return}
+      setAuthorized(true);
       setRows(parseRows(body));
-    }catch{setError('팔레트 데이터를 불러오지 못했어요.')}
+    }catch{setAuthorized(false);setError('팔레트 데이터를 불러오지 못했어요.')}
     finally{setLoading(false)}
   },[active]);
 
   useEffect(()=>{
-    if(!active){setOpen(false);setRows([]);return}
+    if(!active){setAuthorized(false);setOpen(false);setRows([]);return}
     void load();
   },[active,load]);
 
   const withPalette=useMemo(()=>rows.filter(row=>row.palette),[rows]);
   const missing=rows.length-withPalette.length;
-  if(!active)return null;
+  if(!active||!authorized)return null;
 
   return <>
     <button
