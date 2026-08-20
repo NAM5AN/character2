@@ -3,9 +3,9 @@ import { REPORT_FIELDS, pickFallbackLead, type ReportField } from '@/lib/report-
 
 type UnknownRecord = Record<string, unknown>;
 
-
-const BANNED_META = /(?:이 문단|다음 항목|분석해보면|리포트상)/u;
-
+const BANNED_META = /(?:이 문단|다음 항목|분석해보면|리포트상|결론은|핵심은)/u;
+const SENTENCE_LIKE_ENDING = /(?:볼게요|살펴볼게요|들여다볼게요|짚어볼게요|이어볼게요|확인해볼게요|생각해볼게요|해요|보여요|있어요|없어요|돼요|이에요|예요|할까요|일까요|될까요|볼까요|합니다|습니다|한다|이다|했다|된다)$/u;
+const GUIDE_VERBS = /(?:살펴볼|들여다볼|짚어볼|이어볼|확인해볼|생각해볼|알아볼|보도록|살펴보)/u;
 
 function asRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -22,30 +22,28 @@ function splitParagraphs(text: string) {
     .filter(Boolean);
 }
 
-function isShortGuideSentence(value: string) {
-  const lead = value.replace(/\s+/gu, ' ').trim();
-  // 생성 측(LEAD_EDITOR_SYSTEM)이 8~52자로 만들므로 여기서도 같은 범위를 받아들입니다.
-  // 예전에는 32자로 잘라서, AI가 제대로 쓴 33~52자 안내문이 통조림 문구로 바뀌었습니다.
-  if (lead.length < 6 || lead.length > 52) return false;
-  if (/[,，;；:：]/u.test(lead) || BANNED_META.test(lead)) return false;
-  const ending = lead.at(-1);
-  if (ending !== '.' && ending !== '?') return false;
-  return !/[.!?。！？]/u.test(lead.slice(0, -1));
+function isShortTopicTitle(value: string) {
+  const title = value.replace(/\s+/gu, ' ').trim();
+  if (title.length < 2 || title.length > 40) return false;
+  if (title.split(/\s+/u).length > 10) return false;
+  if (/[,，;；:：.!?。！？]/u.test(title) || BANNED_META.test(title)) return false;
+  if (SENTENCE_LIKE_ENDING.test(title) || GUIDE_VERBS.test(title)) return false;
+  return true;
 }
-
 
 function normalizeParagraph(block: string, field: ReportField, paragraphIndex: number, used: Set<string>) {
   const match = block.match(/^\*\*(.+?)\*\*\s*(.*)$/su);
   if (match) {
     const oldLead = match[1].replace(/\s+/gu, ' ').trim();
     const rest = match[2].trim();
-    // 이미 쓴 안내문과 겹치면 그대로 두지 않고 폴백에서 새 문구를 받습니다.
-    if (isShortGuideSentence(oldLead) && !used.has(oldLead)) {
+    // 이미 짧은 명사형 소항목 제목이면 그대로 유지한다.
+    if (isShortTopicTitle(oldLead) && !used.has(oldLead)) {
       used.add(oldLead);
       return `**${oldLead}**${rest ? ` ${rest}` : ''}`;
     }
 
-    // 긴 결론형 굵은 문장은 버리지 않고 일반 본문 첫 문장으로 되돌립니다.
+    // 예전 문장형 안내문이나 긴 굵은 문장은 버리지 않고 본문 첫 문장으로 되돌리고,
+    // 제목 자리에는 짧은 명사형 폴백 제목을 사용한다.
     const body = `${oldLead} ${rest}`.replace(/\s+/gu, ' ').trim();
     return `**${pickFallbackLead(field, paragraphIndex, used)}** ${body}`;
   }
@@ -61,7 +59,6 @@ export function normalizeStoredDetailParagraphGuides(value: unknown): unknown {
   for (const field of REPORT_FIELDS) {
     const text = record[field];
     if (typeof text !== 'string' || !text.trim()) continue;
-    // 섹션 안에서 같은 안내문이 두 번 나오지 않도록 사용한 문구를 추적합니다.
     const used = new Set<string>();
     normalized[field] = splitParagraphs(text)
       .map((block, paragraphIndex) => normalizeParagraph(block, field, paragraphIndex, used))
