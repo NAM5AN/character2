@@ -77,7 +77,7 @@ const detailSchema=z.object({
   accessCode:z.string().min(1).optional(),
   editToken:z.string().min(16).optional(),
   stage:z.coerce.number().int().min(1).max(3).optional().default(1),
-  // dossier가 준비된 뒤 남은 두 페이지(2,3)를 한 요청에서 병렬 생성해 한 번에 저장한다.
+  // 배포 전 화면을 열어둔 구버전 클라이언트의 호환용. 새 화면은 stage 2→3을 각각 요청·저장한다.
   finishRemaining:z.boolean().optional().default(false),
 });
 
@@ -187,7 +187,7 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       return respond({detail:{analysis:publicAnalysis,stageReady:1,complete:false,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
     }
 
-    // 남은 두 페이지(2,3)를 병렬로 한 번에 생성. dossier만 있으면 되므로 stage 2 저장을 기다리지 않는다.
+    // 구버전 클라이언트 호환 경로. 새 클라이언트는 아래의 단계별 생성 경로를 사용한다.
     if(body.finishRemaining){
       if(!currentVersion||currentStage<1){
         return respond({error:'DETAIL_STAGE_NOT_READY',details:`먼저 첫 페이지 생성이 필요해요. 현재 준비 단계: ${currentStage}`},409);

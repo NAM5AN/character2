@@ -6,6 +6,7 @@ import type { CharacterReportPreview } from '@/lib/character-report';
 import { AccessCodeModal } from '@/components/AccessCodeModal';
 import { useRotatingFlavor } from '@/lib/loading-flavor';
 import { ReportCover, SummaryNotes, DetailMagazinePage } from '@/components/ReportMagazine';
+import { ReportNextPageButton } from '@/components/ReportNextPageButton';
 
 type DetailPayload={
   analysis:FinalAnalysis;
@@ -199,33 +200,41 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     }:incoming);
   }
 
-  // 남은 두 페이지(2,3)를 서버에서 병렬 생성해 한 번에 받아온다. 순차 요청(2→3)보다 대기가 짧다.
+  // 현재 페이지 다음 단계부터 순서대로 생성한다. 각 단계는 서버에 바로 저장되므로
+  // stage 2가 끝나는 즉시 버튼을 열고, 사용자가 이동했는지와 무관하게 stage 3을 이어서 만든다.
   async function requestRemaining(){
     if(stageReadyRef.current>=3)return;
     if(inFlightStagesRef.current.has(2)||inFlightStagesRef.current.has(3))return;
     const code=codeRef.current;
     const token=tokenRef.current;
     if(!code||!token)return;
-    inFlightStagesRef.current.add(2);inFlightStagesRef.current.add(3);
     setPrefetchBusy(true);
     setPrefetchError('');
     try{
-      const r=await fetch(`/api/characters/${preview.shareCode}`,{
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify({accessCode:code,editToken:token,finishRemaining:true}),
-      });
-      const body=await r.json().catch(()=>({}));
-      if(!r.ok){
-        const apiError=apiErrorInfo(body,r.status);
-        setPrefetchError(formatError('다음 페이지를 준비하지 못했어요.',apiError.code,apiError.details));
-        return;
+      for(const stage of [2,3] as const){
+        if(stageReadyRef.current>=stage)continue;
+        inFlightStagesRef.current.add(stage);
+        try{
+          const r=await fetch(`/api/characters/${preview.shareCode}`,{
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body:JSON.stringify({accessCode:code,editToken:token,stage}),
+          });
+          const body=await r.json().catch(()=>({}));
+          if(!r.ok){
+            const apiError=apiErrorInfo(body,r.status);
+            setPrefetchError(formatError('다음 페이지를 준비하지 못했어요.',apiError.code,apiError.details));
+            return;
+          }
+          // stage 2를 먼저 반영해 2페이지를 즉시 열고, 다음 반복에서 stage 3 생성을 시작한다.
+          mergeDetail(body.detail);
+        }finally{
+          inFlightStagesRef.current.delete(stage);
+        }
       }
-      mergeDetail(body.detail);
     }catch{
       setPrefetchError('다음 페이지를 준비하지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{
-      inFlightStagesRef.current.delete(2);inFlightStagesRef.current.delete(3);
       setPrefetchBusy(inFlightStagesRef.current.size>0);
     }
   }
@@ -262,7 +271,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
       requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'smooth',block:'start'}));
 
       const ready=body.detail.stageReady||0;
-      // 첫 페이지를 보여준 직후, 남은 두 페이지를 병렬로 미리 생성한다.
+      // 첫 페이지를 보여준 직후 stage 2를 만들고, 저장 완료 즉시 stage 3을 이어서 만든다.
       if(token&&ready<3)void requestRemaining();
     }catch{
       setError('상세 리포트를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
@@ -274,7 +283,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   function changeReportPage(next:1|2|3){
     setReportPage(next);
     requestAnimationFrame(()=>document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'}));
-    // 아직 완결 전이라면 남은 페이지를 병렬로 마저 준비한다.
+    // 아직 완결 전이라면 다음 단계를 순서대로 마저 준비한다.
     if(stageReadyRef.current<3)void requestRemaining();
   }
 
@@ -290,6 +299,9 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
   const nextStage=reportPage===1?2:reportPage===2?3:3;
   const nextPageReady=reportPage===3||stageReady>=nextStage;
+  const nextPageWaitingMessage=prefetchError
+    ? '다음 페이지 준비가 멈췄어요. 위의 다시 준비하기를 눌러주세요.'
+    : '다음 페이지를 만들고 있어요 잠시만 기다려주세요';
   const isPagedReport=Boolean(detail?.analysis.characterOverview);
   const canEditIdentity=Boolean(creatorEditToken);
 
@@ -425,14 +437,19 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         {detail.analysis.detailedReport&&<section className="card" style={{marginTop:22,padding:'32px'}}><h2 style={{fontSize:'clamp(28px,4vw,42px)',marginTop:0}}>통합 상세 해석</h2><div style={{fontSize:17}}><ParagraphText text={detail.analysis.detailedReport}/></div></section>}
       </>}
 
-      {isPagedReport?<div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>
+      {isPagedReport?<div className="actions report-pagination-actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',alignItems:'center'}}>
         <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0}}>
           <button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button>
           <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
         </div>
         <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0,marginLeft:'auto'}}>
           {reportPage>1&&<button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>changeReportPage((reportPage-1) as 1|2)}>← 이전 페이지</button>}
-          {reportPage<3&&<button className="btn primary" style={{whiteSpace:'nowrap'}} disabled={!nextPageReady} onClick={()=>changeReportPage((reportPage+1) as 2|3)}>다음 페이지 →</button>}
+          {reportPage<3&&<ReportNextPageButton
+            disabled={!nextPageReady}
+            busy={prefetchBusy}
+            waitingMessage={nextPageWaitingMessage}
+            onClick={()=>changeReportPage((reportPage+1) as 2|3)}
+          />}
         </div>
       </div>:<div className="actions" style={{marginTop:24,flexWrap:'nowrap',overflowX:'auto'}}>
         <button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>↑ 요약으로 올라가기</button>

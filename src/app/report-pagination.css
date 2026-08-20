@@ -1,3 +1,77 @@
+/* Disabled controls do not reliably emit mouse events, so the wrapper owns
+   the loading tooltip while the next detailed-report page is generated. */
+.report-next-page-wrap {
+  position: relative;
+  display: inline-flex;
+  overflow: visible;
+}
+
+.report-pagination-actions {
+  overflow: visible;
+}
+
+.report-next-page-wrap.is-waiting {
+  cursor: not-allowed;
+}
+
+.report-next-page-wrap.is-waiting .btn {
+  pointer-events: none;
+}
+
+.report-next-page-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 30;
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  box-shadow: 0 8px 24px #0003;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+
+.report-next-page-wrap::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  z-index: 30;
+  border: 6px solid transparent;
+  border-top-color: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity .14s ease;
+}
+
+.report-next-page-wrap.is-waiting:hover .report-next-page-tooltip,
+.report-next-page-wrap.is-waiting:focus-visible .report-next-page-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.report-next-page-wrap.is-waiting:hover::before,
+.report-next-page-wrap.is-waiting:focus-visible::before {
+  opacity: 1;
+}
+
+.report-next-page-wrap:focus-visible {
+  border-radius: 12px;
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
 @media (max-width: 760px) {
   /* Keep the detailed-report pager visible instead of placing it off-screen
      inside the horizontally scrolling utility-action row. */
@@ -20,6 +94,14 @@
   #paid-detail-report > .actions > div:last-child .btn {
     flex: 1 1 0;
     text-align: center;
+  }
+
+  #paid-detail-report > .actions > div:last-child .report-next-page-wrap {
+    flex: 1 1 0;
+  }
+
+  #paid-detail-report > .actions > div:last-child .report-next-page-wrap .btn {
+    width: 100%;
   }
 
   #paid-detail-report > .actions > div:first-child {

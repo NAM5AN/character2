@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { ReportCover, SummaryNotes, DetailMagazinePage } from '@/components/ReportMagazine';
+import { ReportNextPageButton } from '@/components/ReportNextPageButton';
 
 export type CompletedDetailPayload={
   analysis:FinalAnalysis;
@@ -37,6 +38,8 @@ function LegacySection({title,text}:{title:string;text?:string}){
 export function CompletedCharacterReportView({preview,detail}:{preview:CharacterReportPreview;detail:CompletedDetailPayload}){
   const [reportPage,setReportPage]=useState<1|2|3>(1);
   const [savedDetail,setSavedDetail]=useState(detail);
+  const [resumeBusy,setResumeBusy]=useState(()=>Boolean(detail.canResume&&Math.max(1,Math.min(3,detail.stageReady||3))<3));
+  const [resumeError,setResumeError]=useState('');
   const resumeAttempts=useRef(new Set<number>());
   const analysis=savedDetail.analysis;
   const isPaged=Boolean(analysis.characterOverview?.trim());
@@ -52,14 +55,23 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
           method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({stage:nextStage}),
         });
         const body=await r.json().catch(()=>({}));
-        if(!r.ok||!body?.detail)return;
+        if(!r.ok||!body?.detail){
+          setResumeError('다음 페이지를 준비하지 못했어요. 새로고침하면 다시 시도해요.');
+          setResumeBusy(false);
+          return;
+        }
+        const returnedStage=Math.max(nextStage,Number(body.detail.stageReady)||0);
         setSavedDetail(current=>({
           ...current,
           ...body.detail,
           canResume:true,
           analysis:{...current.analysis,...body.detail.analysis},
         }));
-      }catch{}
+        setResumeBusy(returnedStage<3);
+      }catch{
+        setResumeError('다음 페이지를 준비하지 못했어요. 새로고침하면 다시 시도해요.');
+        setResumeBusy(false);
+      }
     })();
   },[isPaged,preview.shareCode,savedDetail.canResume,stageReady]);
 
@@ -69,6 +81,11 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
     document.getElementById('paid-detail-report')?.scrollIntoView({behavior:'auto',block:'start'});
   }
 
+  const nextStage=reportPage===1?2:reportPage===2?3:3;
+  const nextPageReady=reportPage<3&&stageReady>=nextStage;
+  const showNextPage=reportPage<3&&(nextPageReady||Boolean(savedDetail.canResume));
+  const nextPageWaitingMessage=resumeError||'다음 페이지를 만들고 있어요 잠시만 기다려주세요';
+
   return <div className="completed-report-view">
     <ReportCover preview={preview}/>
     <div className="completed-summary-notes"><SummaryNotes preview={preview}/></div>
@@ -77,11 +94,16 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
       {isPaged?<>
         <DetailMagazinePage page={reportPage} name={preview.name} analysis={analysis} endNote={analysis.oneLineSummary}/>
 
-        <div className="actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',overflowX:'auto',alignItems:'center'}}>
+        <div className="actions report-pagination-actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',alignItems:'center'}}>
           <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
           <div style={{display:'flex',gap:10,flexWrap:'nowrap',flexShrink:0,marginLeft:'auto'}}>
             {reportPage>1&&<button className="btn" style={{whiteSpace:'nowrap'}} onClick={()=>changePage((reportPage-1) as 1|2)}>← 이전 페이지</button>}
-            {reportPage<stageReady&&<button className="btn primary" style={{whiteSpace:'nowrap'}} onClick={()=>changePage((reportPage+1) as 2|3)}>다음 페이지 →</button>}
+            {showNextPage&&<ReportNextPageButton
+              disabled={!nextPageReady}
+              busy={resumeBusy}
+              waitingMessage={nextPageWaitingMessage}
+              onClick={()=>changePage((reportPage+1) as 2|3)}
+            />}
           </div>
         </div>
       </>:<>
