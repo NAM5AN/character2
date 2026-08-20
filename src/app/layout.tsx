@@ -5,6 +5,7 @@ import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshB
 import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import { FeedbackReporter } from '@/components/FeedbackReporter';
 import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
+import { AdminThemePaletteAudit } from '@/components/AdminThemePaletteAudit';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import './globals.css';
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminTelemetryRefreshBridge/>
         <ReplayResultUrlBridge/>
         <AdminFeedbackShortcut/>
+        <AdminThemePaletteAudit/>
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
         <header className="site-header">
