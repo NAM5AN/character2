@@ -5,6 +5,11 @@ import { characterDraftSchema, interviewAnswerSchema } from '@/lib/schemas/chara
 import { interviewQuestionSchema, type InterviewQuestion } from '@/lib/schemas/question';
 import { askOpenAIJson } from '@/lib/ai/openai';
 import { QUESTION_INSTRUCTIONS } from '@/lib/ai/prompts';
+import {
+  QUESTION_EVIDENCE_INSTRUCTIONS,
+  questionEvidenceIssues,
+  questionEvidenceSources,
+} from '@/lib/question-evidence';
 import { withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
@@ -126,7 +131,7 @@ function buildHistory(answers: z.infer<typeof interviewAnswerSchema>[]) {
   });
 }
 
-function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>) {
+function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>, evidenceSources: string[]) {
   const specMap = new Map(specs.map(spec => [spec.order, spec.responseType]));
   return z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
     const seenOrders = new Set<number>();
@@ -137,6 +142,11 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>)
       const expectedType = specMap.get(question.order);
       if(!expectedType) ctx.addIssue({code:'custom',path:['questions',index,'order'],message:'요청하지 않은 문항 번호입니다.'});
       else if(question.responseType!==expectedType) ctx.addIssue({code:'custom',path:['questions',index,'responseType'],message:`responseType은 ${expectedType}여야 합니다.`});
+
+      for (const issue of questionEvidenceIssues(question, evidenceSources)) {
+        ctx.addIssue({code:'custom',path:['questions',index,...issue.path],message:issue.message});
+      }
+
       if(question.responseType==='dialogue_choice'){
         const speaker=question.responseConfig.prompt2;
         if(speaker!=='speaker:character'&&speaker!=='speaker:counterparty'){
@@ -227,6 +237,13 @@ export async function POST(request: Request) {
       .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
       .map(x => x.ownerFeedback!.trim());
 
+    const evidenceSources = questionEvidenceSources({
+      publicProfile: body.draft.basicProfile.profileText,
+      secretProfile: body.draft.basicProfile.secretProfileText,
+      ownerReview: body.draft.aiInferences.map(item => item.ownerFeedback || '').filter(Boolean),
+      answers: body.answers.map(item => ({question:item.question,answer:item.answer,reason:item.reason})),
+    });
+
     const compactDraft = {
       basicProfile: body.draft.basicProfile,
       traits: body.draft.traits,
@@ -269,7 +286,7 @@ export async function POST(request: Request) {
       virtualHistory.push({responseType,targetHook:`planned-${order}`});
     }
 
-    const batchSchema = makeBatchSchema(specs);
+    const batchSchema = makeBatchSchema(specs, evidenceSources);
     const adaptiveTarget = history.length ? Math.min(batchCount, Math.max(1, Math.ceil(batchCount * .6))) : 0;
     const usedHooks = coveredQuestions.map(item=>item.targetHook).filter(Boolean);
     const specText = specs.map(spec=>({
@@ -280,7 +297,7 @@ export async function POST(request: Request) {
     }));
 
     const generated = await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:`questions_${startOrder}_${startOrder+batchCount-1}`},()=>askOpenAIJson({
-      instructions: `${QUESTION_INSTRUCTIONS}\n\n이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
+      instructions: `${QUESTION_INSTRUCTIONS}\n\n${QUESTION_EVIDENCE_INSTRUCTIONS}\n\n이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
       schema: batchSchema,
       maxOutputTokens: Math.max(2200, batchCount * 1250),
       input: `생성할 문항 배치: ${startOrder}~${startOrder+batchCount-1} / 20
@@ -336,7 +353,8 @@ ${JSON.stringify(specText)}
 출력 형식:
 - 최상위 키는 questions 하나만 사용하세요.
 - questions에는 정확히 ${batchCount}개를 넣으세요.
-- 각 문항 키는 order, category, mode, format, responseType, responseConfig, targetHook, hypothesis, question, options, allowCustom, rationale만 사용하세요.`,
+- 각 문항 키는 order, category, mode, format, responseType, responseConfig, targetHook, hypothesis, question, options, allowCustom, evidence, rationale만 사용하세요.
+- evidence는 반드시 1~2개의 실제 연속 원문 발췌를 넣으세요.`,
     }));
 
     const questions = generated.questions.slice().sort((a,b)=>a.order-b.order) as InterviewQuestion[];
