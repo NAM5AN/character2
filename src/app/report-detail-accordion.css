@@ -25,51 +25,43 @@
   display: none !important;
 }
 
-/* Make the top-level accordion control unmistakable and touch-friendly. */
+/* Both accordion levels use the same centered icon rail. */
 .report-mag .section-head {
-  grid-template-columns: 92px minmax(0,1fr) 44px !important;
+  grid-template-columns: 92px minmax(0,1fr) 48px !important;
 }
 
+/* The existing text glyph is visually replaced by a monochrome SVG chevron. */
 .report-mag .section-chev {
-  width: 38px;
-  height: 38px;
-  margin-top: 0 !important;
-  display: grid;
-  place-items: center;
-  justify-self: end;
-  align-self: center;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  background: var(--paper);
-  color: var(--ink) !important;
+  width: 24px;
+  height: 24px;
+  margin: 0 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: var(--ink) !important;
+  color: transparent !important;
   font-size: 0 !important;
-  line-height: 1;
-  transform: none !important;
-  transition: background .16s ease, color .16s ease, transform .16s ease !important;
+  line-height: 0 !important;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 8.5 12 14.75 18.25 8.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 8.5 12 14.75 18.25 8.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+  transform: rotate(0deg) !important;
+  transform-origin: center;
+  transition: transform .2s ease, opacity .15s ease !important;
 }
 
 .report-mag .section-chev::before {
-  content: '+';
-  display: block;
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1;
-  transform: translateY(-1px);
+  content: none !important;
 }
 
 .report-mag .report-section.is-open .section-chev {
-  background: var(--ink);
-  color: #fff !important;
-  transform: none !important;
-}
-
-.report-mag .report-section.is-open .section-chev::before {
-  content: '−';
-  transform: translateY(-2px);
+  background-color: var(--ink) !important;
+  color: transparent !important;
+  transform: rotate(180deg) !important;
 }
 
 .report-mag .section-head:hover .section-chev {
-  transform: scale(1.06) !important;
+  opacity: .62;
 }
 
 /* Individual paragraph/topic accordion. */
@@ -77,7 +69,7 @@
   position: relative !important;
   grid-column: span 12 !important;
   display: grid !important;
-  grid-template-columns: 76px minmax(0, 1fr) 44px !important;
+  grid-template-columns: 76px minmax(0, 1fr) 48px !important;
   gap: 18px !important;
   align-items: center !important;
   min-height: 74px;
@@ -91,36 +83,30 @@
   outline: none;
 }
 
+/* Monochrome SVG chevron; centered in the same 48px rail as the parent accordion. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion::after {
-  content: '+';
+  content: '';
   grid-column: 3;
   grid-row: 1;
-  justify-self: end;
+  justify-self: center;
   align-self: center;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 1;
-  transform: none;
-  transition: background .16s ease, color .16s ease, transform .16s ease;
+  width: 22px;
+  height: 22px;
+  background-color: var(--ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 8.5 12 14.75 18.25 8.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 8.5 12 14.75 18.25 8.5' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 22px 22px no-repeat;
+  transform: rotate(0deg);
+  transform-origin: center;
+  transition: transform .2s ease, opacity .15s ease;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
-  content: '−';
-  background: var(--ink);
-  color: #fff;
-  transform: none;
+  background-color: var(--ink);
+  transform: rotate(180deg);
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion:hover::after {
-  transform: scale(1.06);
+  opacity: .62;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion:focus-visible {
@@ -170,7 +156,7 @@
 
 /* Expanded topic keeps the title row, then reveals the body underneath. */
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 44px !important;
+  grid-template-columns: 76px minmax(220px, .78fr) minmax(0, 1.42fr) 48px !important;
   align-items: start !important;
   padding: 28px 0 32px !important;
 }
@@ -178,6 +164,7 @@
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
   grid-column: 4;
   align-self: start;
+  margin-top: 3px;
 }
 
 .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content {
@@ -209,22 +196,20 @@
 
 @media (max-width: 760px) {
   .report-mag .section-head {
-    grid-template-columns: 58px minmax(0,1fr) 42px !important;
+    grid-template-columns: 58px minmax(0,1fr) 44px !important;
     gap: 12px !important;
   }
 
   .report-mag .section-chev {
-    width: 36px;
-    height: 36px;
-  }
-
-  .report-mag .section-chev::before {
-    font-size: 22px;
+    width: 22px;
+    height: 22px;
+    -webkit-mask-size: 22px 22px;
+    mask-size: 22px 22px;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion,
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
-    grid-template-columns: 46px minmax(0, 1fr) 42px !important;
+    grid-template-columns: 46px minmax(0, 1fr) 44px !important;
     gap: 12px !important;
     min-height: 70px;
     padding: 18px 0 !important;
@@ -234,10 +219,13 @@
   .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
     grid-column: 3;
     grid-row: 1;
-    width: 34px;
-    height: 34px;
-    font-size: 21px;
+    justify-self: center;
     align-self: center;
+    width: 20px;
+    height: 20px;
+    margin-top: 0;
+    -webkit-mask-size: 20px 20px;
+    mask-size: 20px 20px;
   }
 
   .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no,
