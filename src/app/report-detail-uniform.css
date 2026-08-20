@@ -75,9 +75,13 @@
   letter-spacing: -.008em !important;
 }
 
-/* 구조화 블록은 기존 배치와 스타일을 그대로 유지한다. */
+/* 구조화 블록은 기존 배치와 내용은 유지하고 eyebrow 라벨만 숨긴다. */
 .report-mag .topic-grid > .study-block {
   grid-column: span 12;
+}
+
+.report-mag .study-block > .study-label {
+  display: none !important;
 }
 
 @media (max-width: 760px) {
