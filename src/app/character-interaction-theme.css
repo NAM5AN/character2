@@ -220,12 +220,6 @@ html[data-character-theme='active'] body:has(.report-mag) .full-preview-overlay 
   color: var(--character-accent) !important;
 }
 
-/* The final report callout was a fixed graphite block. Keep white copy readable by
-   mixing the character point hue with ink instead of using a raw bright point. */
-html[data-character-theme='active'] .report-mag .end-note {
-  background: color-mix(in srgb,var(--character-accent) 58%,var(--ink)) !important;
-}
-
 /* Page-outline rows are clickable navigation. Active already had a point tint;
    add the missing hover cue to the inactive rows. */
 html[data-character-theme='active'] .report-mag .page-outline-item:hover {

@@ -27,7 +27,6 @@ html[data-character-theme='active'] body:has(.analyze-page .report-mag) .site-he
 .report-mag .study-block,
 .report-mag .compare-grid > div,
 .report-mag .manual-grid > div,
-.report-mag .end-note,
 .completed-report-view .result-block,
 .save-character-panel,
 .full-preview-section,
@@ -115,7 +114,7 @@ html[data-character-theme='active'] .report-mag .spectrum-track .spectrum-dot {
 
 /* 본문 핵심 해석 하이라이트도 캐릭터 포인트컬러를 따라간다. */
 html[data-character-theme='active'] .report-mag mark {
-  background: linear-gradient(transparent 58%,color-mix(in srgb,var(--character-accent) 28%,transparent) 58%);
+  background: linear-gradient(transparent 43%,color-mix(in srgb,var(--character-accent) 28%,transparent) 43%,color-mix(in srgb,var(--character-accent) 28%,transparent) 94%,transparent 94%);
 }
 
 /* 투톤 머리·오드아이처럼 색을 둘 이상 가진 캐릭터는 두 색을 다 지니는 것 자체가

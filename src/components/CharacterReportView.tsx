@@ -391,7 +391,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
       {isPagedReport ? <>
-        <DetailMagazinePage page={reportPage} name={preview.name} analysis={detail.analysis} endNote={detail.analysis.oneLineSummary}/>
+        <DetailMagazinePage page={reportPage} name={preview.name} analysis={detail.analysis}/>
 
         {prefetchError&&reportPage<3&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>
           {prefetchError}

@@ -7,8 +7,8 @@
 }
 
 .report-mag { word-break: keep-all; overflow-wrap: break-word; }
-/* 본문 안의 핵심 해석 강조. 글자를 덮지 않도록 아래쪽만 포인트컬러로 칠하는 형광펜 스타일. */
-.report-mag mark { background: linear-gradient(transparent 58%, color-mix(in srgb, var(--report-point) 28%, transparent) 58%); color: inherit; font-weight: 700; padding: 0 1px; border-radius: 1px; }
+/* 핵심 문장의 글자 중심을 지나도록 칠해 얇은 밑줄이나 체크 표시처럼 보이지 않게 한다. */
+.report-mag mark { background: linear-gradient(transparent 43%, color-mix(in srgb, var(--report-point) 28%, transparent) 43%, color-mix(in srgb, var(--report-point) 28%, transparent) 94%, transparent 94%); color: inherit; font-weight: 700; padding: 0 1px; border-radius: 1px; }
 
 /* cover */
 .report-mag .cover { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(320px,.95fr); gap: 44px; padding: 48px; background: var(--paper); border: 1px solid var(--mag-line-dark); border-radius: 24px; box-shadow: var(--shadow); }
@@ -122,9 +122,6 @@
 .report-mag .page-outline-item.is-active .page-outline-no { color: var(--report-point); }
 .report-mag .page-outline-item.is-active .page-outline-copy strong { color: var(--ink); }
 
-.report-mag .end-note { margin-top: 20px; padding: 34px 40px; border-radius: 20px; background: var(--ink); color: #fff; display: grid; grid-template-columns: 130px 1fr; gap: 26px; align-items: center; }
-.report-mag .end-note small { color: #c9c4b6; font-size: 11px; font-weight: 900; letter-spacing: .13em; }
-.report-mag .end-note p { margin: 0; font-size: clamp(19px,2.6vw,30px); line-height: 1.55; font-weight: 750; letter-spacing: -.03em; }
 
 @media (max-width: 900px) {
   .report-mag .cover { grid-template-columns: 1fr; padding: 36px; }

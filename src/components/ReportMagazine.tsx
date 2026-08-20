@@ -3,6 +3,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import type { FinalAnalysis } from '@/lib/schemas/character';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { applyName } from '@/lib/josa';
+import { reportHighlightSegments } from '@/lib/report-highlights';
 
 type UnknownRecord = Record<string, unknown>;
 type SpectrumItem = { left: string; right: string; value: number };
@@ -27,13 +28,11 @@ function splitTopics(text: string) {
     });
 }
 
-// 본문 안의 **강조** 표기를 포인트컬러 하이라이트(mark)로 렌더한다.
-// 문단 첫 안내문은 splitTopics 가 이미 떼어내므로, 여기 들어오는 건 본문 강조뿐이다.
-// 짝이 맞지 않는 별표는 화면에 그대로 새지 않도록 지운다.
-function renderInline(text: string): ReactNode {
-  if (!text.includes('**')) return text;
-  return text.split(/\*\*(.+?)\*\*/g).map((part, index) => (
-    index % 2 === 1 ? <mark key={index}>{part}</mark> : part.replace(/\*\*/g, '')
+// AI 강조를 완결된 핵심 주장 한 곳으로 정리한다. 강조가 없는 구버전 본문에는
+// 내용상 가장 직접적인 답 한 곳을 골라 모든 요약·상세 문단에 1회씩 보장한다.
+function renderInline(text: string, ensureHighlight = true): ReactNode {
+  return reportHighlightSegments(text,{ensure:ensureHighlight}).map((segment,index)=>(
+    segment.highlighted?<mark key={index}>{segment.text}</mark>:segment.text
   ));
 }
 
@@ -137,7 +136,7 @@ const PAGES: { no: string; kicker: string; heading: string; secs: number[] }[] =
   { no: '03', kicker: 'CHARM / INTEGRATED', heading: '{name}의 모순과 방향을 함께 봅니다', secs: [5, 6] },
 ];
 
-export function DetailMagazinePage({ page, name, analysis, endNote }: { page: number; name: string; analysis: FinalAnalysis; endNote?: string }) {
+export function DetailMagazinePage({ page, name, analysis }: { page: number; name: string; analysis: FinalAnalysis }) {
   const p = PAGES[page - 1];
   if (!p) return null;
   return <div className="report-mag"><article className="sheet">
@@ -146,7 +145,6 @@ export function DetailMagazinePage({ page, name, analysis, endNote }: { page: nu
       <div><div className="sheet-kicker">{p.kicker}</div><h2>{applyName(p.heading, name)}</h2></div>
     </header>
     {p.secs.map(si => <MagazineSection key={String(SECTION_META[si].key)} meta={SECTION_META[si]} name={name} analysis={analysis} />)}
-    {page >= 3 && endNote?.trim() ? <section className="end-note"><small>FINAL SENTENCE</small><p>{endNote}</p></section> : null}
   </article></div>;
 }
 
@@ -213,7 +211,7 @@ export function SummaryNotes({ preview }: { preview: CharacterReportPreview }) {
           const selected = activeKey === card.key;
           return <button type="button" className={`summary-card${selected ? ' is-active' : ''}`} key={card.key} onClick={() => setActiveKey(selected ? null : card.key)} aria-expanded={selected}>
             <div className="summary-card-top"><span className="summary-card-no">{String(index + 1).padStart(2, '0')}</span><h3>{card.label}</h3></div>
-            <p className="summary-card-preview">{renderInline(cardLine)}</p>
+            <p className="summary-card-preview">{renderInline(cardLine,false)}</p>
             <span className="summary-card-hint">{selected ? '접기 ↑' : '자세히 보기 ↓'}</span>
           </button>;
         })}

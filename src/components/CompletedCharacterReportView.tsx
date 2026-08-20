@@ -92,7 +92,7 @@ export function CompletedCharacterReportView({preview,detail}:{preview:Character
 
     <div id="paid-detail-report" style={{marginTop:38,scrollMarginTop:90}}>
       {isPaged?<>
-        <DetailMagazinePage page={reportPage} name={preview.name} analysis={analysis} endNote={analysis.oneLineSummary}/>
+        <DetailMagazinePage page={reportPage} name={preview.name} analysis={analysis}/>
 
         <div className="actions report-pagination-actions" style={{justifyContent:'space-between',marginTop:24,flexWrap:'nowrap',alignItems:'center'}}>
           <Link className="btn" style={{whiteSpace:'nowrap'}} href="/analyze">다른 캐릭터 분석</Link>
