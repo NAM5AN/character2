@@ -11,6 +11,8 @@ import { AdminCharacterIdentityEditBridge } from '@/components/AdminCharacterIde
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
+import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge';
+import { AdminDeploymentVersionBadge } from '@/components/AdminDeploymentVersionBadge';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -89,11 +91,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
         <ReportOwnerSaveGate/>
+        <GlobalScreenMotionBridge/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
               <Link href="/" className="brand">CHARA LAB</Link>
-              <span className="deploy-version" title={deploymentTitle}>배포 {deploymentVersion}</span>
+              <AdminDeploymentVersionBadge version={deploymentVersion} title={deploymentTitle}/>
             </div>
             <nav className="nav-links">
               <Link className="nav-link" href="/analyze">캐릭터 분석</Link>
