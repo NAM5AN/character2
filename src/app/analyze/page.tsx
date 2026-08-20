@@ -3,6 +3,7 @@ import { AnalyzeReviewUiPolish } from '@/components/AnalyzeReviewUiPolish';
 import { BipolarFiveLevelUi } from '@/components/BipolarFiveLevelUi';
 import { PersonalityLoadingBridge } from '@/components/PersonalityLoadingBridge';
 import { AnalyzeCharacterThemeBridge } from '@/components/AnalyzeCharacterThemeBridge';
+import { CustomOptionInputPolish } from '@/components/CustomOptionInputPolish';
 
 export default function AnalyzePage(){
   return <main className="container page analyze-page">
@@ -70,6 +71,7 @@ export default function AnalyzePage(){
     <AnalyzeReviewUiPolish/>
     <PersonalityLoadingBridge/>
     <BipolarFiveLevelUi/>
+    <CustomOptionInputPolish/>
     <div className="page-head"><h1 style={{fontSize:'clamp(42px,6vw,72px)'}}>캐릭터 정밀 분석</h1></div>
     <AnalyzeFlow/>
   </main>
