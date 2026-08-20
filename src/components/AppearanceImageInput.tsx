@@ -1,20 +1,44 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 type AppearanceImagePayload = {
   name: string;
   dataUrl: string;
+  origin?: 'manual' | 'document';
+  sourceUrl?: string;
+  sourceIndex?: number;
+};
+
+type DiscoveredSource={
+  url:string;
+  kind:'google_docs'|'postype'|'notion';
+  images:{index:number;name:string}[];
 };
 
 const MAX_IMAGES = 4;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_DATA_URL_CHARS = 700_000;
-const ALLOWED_TYPES = new Set(['image/jpeg','image/png','image/webp']);
+const MANUAL_TYPES = new Set(['image/jpeg','image/png','image/webp']);
+const REMOTE_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif']);
 const CLEAR_EVENT = 'chara-appearance-clear';
 const STORAGE_KEY = 'chara_appearance_images_v1';
 
 let currentImages: AppearanceImagePayload[] = [];
+
+function normalizeStoredImage(item:unknown):AppearanceImagePayload|null{
+  if(!item||typeof item!=='object')return null;
+  const raw=item as AppearanceImagePayload;
+  if(typeof raw.name!=='string'||typeof raw.dataUrl!=='string'||!raw.dataUrl.startsWith('data:image/'))return null;
+  const origin=raw.origin==='document'?'document':'manual';
+  return {
+    name:raw.name,
+    dataUrl:raw.dataUrl,
+    origin,
+    ...(origin==='document'&&typeof raw.sourceUrl==='string'?{sourceUrl:raw.sourceUrl}:{}),
+    ...(origin==='document'&&Number.isInteger(raw.sourceIndex)?{sourceIndex:raw.sourceIndex}:{}),
+  };
+}
 
 function readStoredImages() {
   if (currentImages.length) return currentImages.map(image=>({...image}));
@@ -24,10 +48,7 @@ function readStoredImages() {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    const restored = parsed
-      .filter((item): item is AppearanceImagePayload => !!item && typeof item === 'object' && typeof (item as AppearanceImagePayload).name === 'string' && typeof (item as AppearanceImagePayload).dataUrl === 'string' && (item as AppearanceImagePayload).dataUrl.startsWith('data:image/'))
-      .slice(0,MAX_IMAGES)
-      .map(image=>({...image}));
+    const restored = parsed.map(normalizeStoredImage).filter((item):item is AppearanceImagePayload=>!!item).slice(0,MAX_IMAGES);
     currentImages = restored;
     return restored.map(image=>({...image}));
   } catch {
@@ -49,7 +70,9 @@ function storeImages(images: AppearanceImagePayload[]) {
 
 export function getAppearanceImagesForRequest() {
   if (!currentImages.length) readStoredImages();
-  return currentImages.map(image=>({...image}));
+  // origin/source metadata is UI-only; the appearance analysis API receives the
+  // same compact payload it has always accepted.
+  return currentImages.map(image=>({name:image.name,dataUrl:image.dataUrl}));
 }
 
 export function clearAppearanceImages() {
@@ -75,8 +98,9 @@ function imageFromDataUrl(dataUrl:string) {
   });
 }
 
-async function compressImage(file:File):Promise<AppearanceImagePayload>{
-  if(!ALLOWED_TYPES.has(file.type))throw new Error('JPG, PNG, WEBP 이미지만 첨부할 수 있어요.');
+async function compressImage(file:File,allowRemoteTypes=false):Promise<AppearanceImagePayload>{
+  const allowed=allowRemoteTypes?REMOTE_TYPES:MANUAL_TYPES;
+  if(!allowed.has(file.type))throw new Error('JPG, PNG, WEBP 이미지만 첨부할 수 있어요.');
   if(file.size>MAX_SOURCE_BYTES)throw new Error('이미지 한 장은 10MB 이하로 올려주세요.');
 
   const source=await fileAsDataUrl(file);
@@ -100,24 +124,67 @@ async function compressImage(file:File):Promise<AppearanceImagePayload>{
     dataUrl=canvas.toDataURL('image/jpeg',quality);
   }
   if(dataUrl.length>MAX_DATA_URL_CHARS)throw new Error('이미지 용량을 줄인 뒤 다시 첨부해주세요.');
-  return {name:file.name||'appearance.jpg',dataUrl};
+  return {name:file.name||'appearance.jpg',dataUrl,origin:'manual'};
+}
+
+function supportedDocumentLink(value:string){
+  const trimmed=value.trim();
+  if(!/^https?:\/\/\S+$/iu.test(trimmed))return'';
+  try{
+    const url=new URL(trimmed);
+    const host=url.hostname.toLowerCase();
+    const sub=(domain:string)=>host===domain||host.endsWith(`.${domain}`);
+    if(host==='docs.google.com'&&/^\/document\/d\/[a-zA-Z0-9_-]+/u.test(url.pathname))return url.toString();
+    if(sub('postype.com'))return url.toString();
+    if(sub('notion.so')||sub('notion.site')||host==='app.notion.com')return url.toString();
+  }catch{}
+  return'';
+}
+
+function documentLinksOnPage(){
+  if(typeof document==='undefined')return[];
+  const values=[...document.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>('textarea,input[type="text"],input[type="url"]')]
+    .map(field=>supportedDocumentLink(field.value))
+    .filter(Boolean);
+  return [...new Set(values)].slice(0,2);
+}
+
+function remoteImageUrl(sourceUrl:string,index:number){
+  const params=new URLSearchParams({url:sourceUrl,index:String(index)});
+  return `/api/characters/profile-images?${params.toString()}`;
 }
 
 export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
   const inputId=useId();
   const [images,setImages]=useState<AppearanceImagePayload[]>(()=>readStoredImages());
+  const imagesRef=useRef<AppearanceImagePayload[]>(images);
+  const loadedDocumentSources=useRef(new Set<string>());
+  const lastDocumentSignature=useRef('');
+  const documentGeneration=useRef(0);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
-  const blocked=disabled||busy||images.length>=MAX_IMAGES;
+  const [documentBusy,setDocumentBusy]=useState(false);
+  const [documentStatus,setDocumentStatus]=useState('');
+  const manualCount=images.filter(image=>image.origin!=='document').length;
+  // A full set of auto images must not block a user from choosing their own image.
+  // Manual images always win and push document images out of the last slots.
+  const blocked=disabled||busy||manualCount>=MAX_IMAGES;
 
   useEffect(()=>{
-    const clear=()=>{setImages([]);setError('')};
+    const clear=()=>{
+      imagesRef.current=[];
+      loadedDocumentSources.current.clear();
+      lastDocumentSignature.current='';
+      documentGeneration.current+=1;
+      setImages([]);setError('');setDocumentStatus('');setDocumentBusy(false);
+    };
     window.addEventListener(CLEAR_EVENT,clear);
     return()=>window.removeEventListener(CLEAR_EVENT,clear);
   },[]);
 
   const commit=useCallback((next:AppearanceImagePayload[])=>{
     const normalized=next.slice(0,MAX_IMAGES).map(image=>({...image}));
+    imagesRef.current=normalized;
     storeImages(normalized);
     setImages(normalized);
   },[]);
@@ -126,7 +193,10 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
     const incoming=files?Array.from(files):[];
     if(!incoming.length||disabled||busy)return;
     setError('');
-    const available=MAX_IMAGES-images.length;
+    const current=imagesRef.current;
+    const manuals=current.filter(image=>image.origin!=='document');
+    const automatic=current.filter(image=>image.origin==='document');
+    const available=MAX_IMAGES-manuals.length;
     if(available<=0){setError(`외관 자료는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`);return}
     const selected=incoming.slice(0,available);
     if(incoming.length>available)setError(`외관 자료는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`);
@@ -134,18 +204,20 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
     try{
       const converted:AppearanceImagePayload[]=[];
       for(const file of selected)converted.push(await compressImage(file));
-      commit([...images,...converted]);
+      commit([...manuals,...converted,...automatic].slice(0,MAX_IMAGES));
     }catch(cause){setError(cause instanceof Error?cause.message:String(cause))}
     finally{setBusy(false)}
-  },[busy,commit,disabled,images]);
+  },[busy,commit,disabled]);
 
   useEffect(()=>{
     const paste=(event:ClipboardEvent)=>{
-      if(disabled||busy||images.length>=MAX_IMAGES)return;
+      const current=imagesRef.current;
+      const manuals=current.filter(image=>image.origin!=='document');
+      if(disabled||busy||manuals.length>=MAX_IMAGES)return;
       const clipboard=event.clipboardData;
       if(!clipboard)return;
       const pastedFiles=Array.from(clipboard.items)
-        .filter(item=>item.kind==='file'&&ALLOWED_TYPES.has(item.type))
+        .filter(item=>item.kind==='file'&&MANUAL_TYPES.has(item.type))
         .map(item=>item.getAsFile())
         .filter((file):file is File=>!!file);
       if(!pastedFiles.length)return;
@@ -154,9 +226,94 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
     };
     window.addEventListener('paste',paste);
     return()=>window.removeEventListener('paste',paste);
-  },[addFiles,busy,disabled,images.length]);
+  },[addFiles,busy,disabled]);
 
-  function removeAt(index:number){commit(images.filter((_,i)=>i!==index))}
+  useEffect(()=>{
+    let timer=0;
+    let disposed=false;
+
+    const sync=async()=>{
+      if(disposed||disabled)return;
+      const links=documentLinksOnPage();
+      const signature=links.join('\n');
+      if(signature===lastDocumentSignature.current)return;
+      lastDocumentSignature.current=signature;
+      const generation=++documentGeneration.current;
+
+      for(const source of [...loadedDocumentSources.current]){
+        if(!links.includes(source))loadedDocumentSources.current.delete(source);
+      }
+
+      const retained=imagesRef.current.filter(image=>image.origin!=='document'||(image.sourceUrl&&links.includes(image.sourceUrl)));
+      if(retained.length!==imagesRef.current.length)commit(retained);
+
+      if(!links.length){setDocumentStatus('');setDocumentBusy(false);return}
+      const pending=links.filter(link=>!loadedDocumentSources.current.has(link));
+      if(!pending.length)return;
+
+      setDocumentBusy(true);
+      setDocumentStatus('문서 이미지 불러오는 중…');
+      try{
+        const response=await fetch('/api/characters/profile-images',{
+          method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({urls:pending}),
+        });
+        const body=await response.json().catch(()=>({}));
+        if(disposed||generation!==documentGeneration.current)return;
+        for(const link of pending)loadedDocumentSources.current.add(link);
+        if(!response.ok)throw new Error(typeof body?.error==='string'?body.error:'PROFILE_IMAGE_DISCOVERY_FAILED');
+        const sources=Array.isArray(body?.sources)?body.sources as DiscoveredSource[]:[];
+        let added=0;
+        for(const source of sources){
+          if(!links.includes(source.url))continue;
+          for(const item of Array.isArray(source.images)?source.images:[]){
+            if(disposed||generation!==documentGeneration.current)return;
+            const current=imagesRef.current;
+            if(current.length>=MAX_IMAGES)break;
+            if(current.some(image=>image.origin==='document'&&image.sourceUrl===source.url&&image.sourceIndex===item.index))continue;
+            try{
+              const imageResponse=await fetch(remoteImageUrl(source.url,item.index),{cache:'no-store'});
+              if(!imageResponse.ok)continue;
+              const blob=await imageResponse.blob();
+              if(!REMOTE_TYPES.has(blob.type))continue;
+              const file=new File([blob],item.name||`document-image-${item.index+1}`,{type:blob.type});
+              const converted=await compressImage(file,true);
+              if(disposed||generation!==documentGeneration.current)return;
+              const latest=imagesRef.current;
+              if(latest.length>=MAX_IMAGES)break;
+              if(latest.some(image=>image.origin==='document'&&image.sourceUrl===source.url&&image.sourceIndex===item.index))continue;
+              commit([...latest,{...converted,origin:'document',sourceUrl:source.url,sourceIndex:item.index}]);
+              added+=1;
+            }catch{}
+          }
+          if(imagesRef.current.length>=MAX_IMAGES)break;
+        }
+        setDocumentStatus(added?`문서 이미지 ${added}장 자동 추가됨`:'문서에서 첨부할 이미지를 찾지 못했어요.');
+      }catch{
+        if(!disposed&&generation===documentGeneration.current)setDocumentStatus('문서 이미지를 자동으로 불러오지 못했어요. 직접 첨부할 수 있어요.');
+      }finally{
+        if(!disposed&&generation===documentGeneration.current)setDocumentBusy(false);
+      }
+    };
+
+    const schedule=()=>{
+      window.clearTimeout(timer);
+      timer=window.setTimeout(()=>{void sync()},520);
+    };
+    schedule();
+    document.addEventListener('input',schedule,true);
+    document.addEventListener('change',schedule,true);
+    const interval=window.setInterval(schedule,900);
+    return()=>{
+      disposed=true;
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+      document.removeEventListener('input',schedule,true);
+      document.removeEventListener('change',schedule,true);
+      documentGeneration.current+=1;
+    };
+  },[commit,disabled]);
+
+  function removeAt(index:number){commit(imagesRef.current.filter((_,i)=>i!==index))}
 
   return <div className="field">
     <label className="label" htmlFor={inputId}>외관 자료 <span className="muted">(선택)</span></label>
@@ -167,8 +324,10 @@ export function AppearanceImageInput({disabled=false}:{disabled?:boolean}){
       <input id={inputId} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" disabled={blocked} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value=''}}/>
       <span className="muted" style={{display:'inline-block',marginLeft:12,fontSize:13}}>또는 이미지 복사 후 Ctrl+V</span>
     </div>
-    {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
+    {(documentBusy||documentStatus)&&<div className="muted" style={{fontSize:12,lineHeight:1.5,marginTop:8}}>{documentBusy?'문서 이미지 불러오는 중…':documentStatus}</div>}
+    {images.length>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(108px,1fr))',gap:10,maxWidth:520}}>{images.map((image,index)=><div key={`${image.name}-${image.sourceUrl||'manual'}-${image.sourceIndex??index}`} style={{position:'relative',aspectRatio:'1 / 1',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden',background:'white'}}>
       <img src={image.dataUrl} alt={`외관 자료 ${index+1}`} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+      {image.origin==='document'&&<span style={{position:'absolute',left:6,bottom:6,padding:'3px 6px',borderRadius:999,background:'rgba(23,24,22,.72)',color:'#fff',fontSize:9,fontWeight:800,lineHeight:1}}>문서</span>}
       <button type="button" aria-label={`${index+1}번째 이미지 삭제`} disabled={disabled||busy} onClick={()=>removeAt(index)} style={{position:'absolute',top:6,right:6,width:28,height:28,borderRadius:999,border:'1px solid rgba(0,0,0,.2)',background:'rgba(255,255,255,.92)',fontWeight:900,fontSize:18,lineHeight:1}}>×</button>
     </div>)}</div>}
     {error&&<p className="error" style={{margin:0}}>{error}</p>}
