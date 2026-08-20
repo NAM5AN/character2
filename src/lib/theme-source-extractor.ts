@@ -87,13 +87,20 @@ function seedFromText(text:string):Seed|undefined{
 }
 
 export function deriveCharacterThemeFromSources(input:{profileText?:string;secretProfileText?:string;appearanceNotes?:string}):CharacterThemePalette|undefined{
+  // Profile text is the owner's official setting. Image analysis is observational and
+  // only fills a role that the text did not specify; it must never overwrite text.
   const textSeed=seedFromText([input.profileText||'',input.secretProfileText||''].filter(Boolean).join('\n'));
   const imageSeed=seedFromText(input.appearanceNotes||'');
-  const main=imageSeed?.mainColor||textSeed?.mainColor;
-  const point=imageSeed?.pointColor||textSeed?.pointColor;
+  const main=textSeed?.mainColor||imageSeed?.mainColor;
+  const point=textSeed?.pointColor||imageSeed?.pointColor;
   if(!main&&!point)return undefined;
-  const hasImage=Boolean(imageSeed?.mainColor||imageSeed?.pointColor);
-  const hasText=Boolean(textSeed?.mainColor||textSeed?.pointColor);
-  const source:ThemeSource=hasImage&&hasText?'mixed':hasImage?'image':'text';
-  return deriveThemePalette(main,point,source,hasImage&&hasText?84:hasImage?80:72);
+
+  const usedText=Boolean(textSeed?.mainColor||textSeed?.pointColor);
+  const usedImage=Boolean(
+    (!textSeed?.mainColor&&imageSeed?.mainColor)||
+    (!textSeed?.pointColor&&imageSeed?.pointColor),
+  );
+  const source:ThemeSource=usedText&&usedImage?'mixed':usedText?'text':'image';
+  const confidence=source==='text'?90:source==='mixed'?86:80;
+  return deriveThemePalette(main,point,source,confidence);
 }
