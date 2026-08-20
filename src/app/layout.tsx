@@ -39,11 +39,17 @@ const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
 const metadataDescription = '프로필과 20문항으로 만드는 공유 가능한 Character Passport';
 const metadataThumbnail = '/metadata-thumbnail.png';
+const faviconPath = '/favicon.png';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: metadataTitle,
   description: metadataDescription,
+  icons: {
+    icon: faviconPath,
+    shortcut: faviconPath,
+    apple: faviconPath,
+  },
   openGraph: {
     type: 'website',
     locale: 'ko_KR',
