@@ -22,8 +22,8 @@ const appearanceImageSchema = z.object({
 
 const requestSchema = z.object({
   name: z.string().min(1).max(80),
-  profileText: z.string().min(1).max(50_000),
-  secretProfileText: z.string().max(50_000).optional().default(''),
+  profileText: z.string().min(1).max(20_000),
+  secretProfileText: z.string().max(20_000).optional().default(''),
   appearanceImages: z.array(appearanceImageSchema).max(4).optional().default([]),
 });
 

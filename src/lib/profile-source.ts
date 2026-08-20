@@ -11,8 +11,45 @@ type ResolvedProfileInput = {
   kind?: ProfileLinkKind;
 };
 
-const MAX_PROFILE_CHARS = 50_000;
+// 붙여넣은 텍스트와 링크로 읽어온 본문에 같은 상한을 적용합니다. 한쪽만 막으면
+// 링크로 우회할 수 있어 의미가 없습니다. 실제 프로필은 최대 6,616자였으므로
+// 2만 자는 그 3배로, 정상 사용자는 닿지 않습니다.
+const MAX_PROFILE_CHARS = 20_000;
 const FETCH_TIMEOUT_MS = 12_000;
+// 본문을 통째로 메모리에 받기 전에 끊는 다운로드 상한. 남이 만든 문서를 우리가 받아오는
+// 구조라 문서 크기를 우리가 통제할 수 없습니다. HTML 마크업 오버헤드를 감안해 넉넉히 잡되,
+// 수백 MB짜리를 그대로 받아 함수가 죽는 일은 없게 합니다.
+const MAX_FETCH_BYTES = 3 * 1024 * 1024;
+
+function tooLongError(chars: number) {
+  return new Error(`PROFILE_TEXT_TOO_LONG: 프로필이 너무 길어요(${chars.toLocaleString('ko-KR')}자). ${MAX_PROFILE_CHARS.toLocaleString('ko-KR')}자 이내로 줄여주세요.`);
+}
+
+// 응답 본문을 스트리밍으로 읽되 상한을 넘으면 즉시 중단합니다. response.text() 는
+// 전체를 받아버리므로 상한이 있어도 다운로드 자체를 막지 못합니다.
+async function readBodyCapped(response: Response, maxBytes = MAX_FETCH_BYTES) {
+  const body = response.body;
+  if (!body) return await response.text();
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error('PROFILE_LINK_TOO_LARGE: 문서가 너무 커서 읽지 못했어요. 분량을 줄이거나 본문을 직접 붙여넣어 주세요.');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return new TextDecoder('utf-8').decode(Buffer.concat(chunks.map(c => Buffer.from(c))));
+}
 
 function hostMatches(hostname: string, domain: string) {
   return hostname === domain || hostname.endsWith(`.${domain}`);
@@ -153,6 +190,8 @@ async function readNotionProfileUrl(url: URL) {
     else if (type === 'quote') line = `> ${text}`;
 
     if (lines.at(-1) !== line) lines.push(line);
+    // 거대한 페이지를 끝까지 순회하지 않고 상한에서 바로 끊는다.
+    if (lines.reduce((n, l) => n + l.length + 1, 0) > MAX_PROFILE_CHARS) break;
   }
 
   let text = lines.join('\n').replace(/\n{3,}/gu, '\n\n').replace(/\u0000/gu, '').trim();
@@ -167,7 +206,7 @@ async function readNotionProfileUrl(url: URL) {
     throw new Error('PROFILE_LINK_UNREADABLE: 이 노션 링크에서는 공개된 프로필 본문을 읽지 못했어요. 노션에서 웹 공개된 페이지 링크를 사용해주세요.');
   }
 
-  if (text.length > MAX_PROFILE_CHARS) text = text.slice(0, MAX_PROFILE_CHARS).trimEnd();
+  if (text.length > MAX_PROFILE_CHARS) throw tooLongError(text.length);
   return text;
 }
 
@@ -206,14 +245,14 @@ async function readProfileUrl(url: URL, kind: ProfileLinkKind) {
   }
 
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
-  const raw = await response.text();
+  const raw = await readBodyCapped(response);
   let text = contentType.includes('text/html') ? htmlToReadableText(raw) : raw.replace(/\r\n?/gu, '\n').trim();
   text = text.replace(/\u0000/gu, '').trim();
 
   if (text.length < 20) {
     throw new Error('PROFILE_LINK_UNREADABLE: 문서 내용이 비어 있거나 읽을 수 없어요. 공개 링크인지 확인해주세요.');
   }
-  if (text.length > MAX_PROFILE_CHARS) text = text.slice(0, MAX_PROFILE_CHARS).trimEnd();
+  if (text.length > MAX_PROFILE_CHARS) throw tooLongError(text.length);
   return text;
 }
 
@@ -237,7 +276,8 @@ export async function resolveProfileInput(input: string, required = false): Prom
   const url = parseUrlOnlyInput(trimmed);
   if (!url) {
     if (required && trimmed.length < 20) throw new Error('PROFILE_TEXT_TOO_SHORT: 공개 프로필을 조금 더 입력해주세요.');
-    return { text: trimmed.slice(0, MAX_PROFILE_CHARS) };
+    if (trimmed.length > MAX_PROFILE_CHARS) throw tooLongError(trimmed.length);
+    return { text: trimmed };
   }
 
   const kind = kindForUrl(url);

@@ -32,6 +32,16 @@ export function apiErrorPayload(error: unknown): ApiErrorPayload {
   if (message.startsWith('REQUEST_TOO_LARGE')) {
     return { status: 413, body: { error: 'REQUEST_TOO_LARGE', details: '입력이 너무 큽니다. 프로필 분량을 줄여주세요.' } };
   }
+  if (message.startsWith('PROFILE_LINK_TOO_LARGE')) {
+    const { code, details } = structuredError(message);
+    return { status: 413, body: { error: code, ...(details ? { details } : {}) } };
+  }
+  // 프로필 입력·링크 관련 오류는 모두 사용자가 고칠 수 있는 문제이므로 400으로 답하고,
+  // 안내 문구는 그대로 보여줍니다(길이 초과 시 실제 글자수를 알려주기 위함).
+  if (message.startsWith('PROFILE_')) {
+    const { code, details } = structuredError(message);
+    return { status: 400, body: { error: code, ...(details ? { details } : {}) } };
+  }
 
   if (message === 'CODE_INVALID' || message.includes('CODE_INVALID')) {
     return { status: 401, body: { error: 'CODE_INVALID' } };
