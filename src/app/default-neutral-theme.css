@@ -1,0 +1,41 @@
+/* Default site palette before a character profile theme is available.
+   Keep the base UI strictly monochrome; extracted character palettes still take over on active themed screens. */
+:root {
+  --bg: #f5f5f5;
+  --paper: #ffffff;
+  --ink: #111111;
+  --muted: #6f6f6f;
+  --line: #d9d9d9;
+  --accent: #222222;
+  --accent-soft: #ededed;
+  --shadow: 0 16px 40px rgba(0, 0, 0, .07);
+}
+
+html:not([data-character-theme='active']) .site-header {
+  background: rgba(245, 245, 245, .92);
+}
+
+html:not([data-character-theme='active']) .home-lookup {
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .07);
+}
+
+html:not([data-character-theme='active']) .option:hover,
+html:not([data-character-theme='active']) .option.selected {
+  background: #f1f1f1;
+}
+
+html:not([data-character-theme='active']) .progress {
+  background: #dedede;
+}
+
+html:not([data-character-theme='active']) .bipolar-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, var(--accent-soft), var(--line) 50%, #e8e8e8);
+}
+
+html:not([data-character-theme='active']) .bipolar-range::-moz-range-track {
+  background: linear-gradient(90deg, var(--accent-soft), var(--line) 50%, #e8e8e8);
+}
+
+html:not([data-character-theme='active']) .modal-backdrop {
+  background: rgba(0, 0, 0, .55);
+}
