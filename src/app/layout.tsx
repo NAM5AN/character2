@@ -27,6 +27,7 @@ import './report-detail-chevron-point.css';
 import './report-character-theme.css';
 import './character-interaction-theme.css';
 import './character-theme-final-sweep.css';
+import './report-theme-activation-fix.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
