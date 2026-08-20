@@ -11,6 +11,10 @@
   --character-surface: var(--character-main-sub);
   --character-accent: var(--character-point);
   --character-accent-soft: var(--character-point-sub);
+  /* 투톤 머리·오드아이처럼 색이 더 있는 캐릭터에서만 --character-alt 가 채워진다.
+     단색 캐릭터에서는 포인트색으로 자연스럽게 접혀서 어디서 써도 안전하다. */
+  --character-accent-alt: var(--character-alt, var(--character-point));
+  --character-accent-alt-soft: var(--character-alt-sub, var(--character-point-sub));
 
   --character-theme-duration: 900ms;
   --character-theme-ease: cubic-bezier(.2,.72,.2,1);

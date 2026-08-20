@@ -13,6 +13,9 @@ const appearanceAnalysisSchema = z.object({
   stylingAndMotifs: z.array(z.string()).default([]),
   hairColor: z.string().optional(),
   eyeColor: z.string().optional(),
+  // 투톤 머리·오드아이처럼 색이 둘인 캐릭터를 한 색으로 뭉개지 않기 위한 보조 슬롯.
+  hairColorSecondary: z.string().optional(),
+  eyeColorSecondary: z.string().optional(),
   visualImpression: z.string(),
   uncertainties: z.array(z.string()).default([]),
 });
@@ -35,6 +38,8 @@ const APPEARANCE_SYSTEM = `당신은 자캐커뮤니티의 캐릭터 외관 자�
 - stylingAndMotifs: 반복되는 장식, 색, 소재, 소품, 실루엣 등 시각적 모티프
 - hairColor: 머리색이 식별되면 가장 가까운 한국어 색명과 대표 HEX(#RRGGBB)를 함께 작성. 예: "검은색 #202124". 불확실하면 생략
 - eyeColor: 눈동자색이 식별되면 가장 가까운 한국어 색명과 대표 HEX(#RRGGBB)를 함께 작성. 예: "푸른색 #4E75A4". 불확실하면 생략
+- hairColorSecondary: 투톤·브릿지·인너컬러처럼 머리에 두 번째 색이 뚜렷하면 그 색을 같은 형식으로 작성. hairColor에는 면적이 넓은 베이스 색을 쓰세요. 단색이면 생략
+- eyeColorSecondary: 오드아이처럼 좌우 눈 색이 다르면 반대쪽 눈 색을 같은 형식으로 작성. 같은 색이면 생략
 - visualImpression: 타인이 처음 봤을 때 받을 수 있는 '시각적 인상'만 설명. 내면 성격 단정 금지
 - uncertainties: 자료마다 다르거나 연출 가능성이 높아 확정하기 어려운 점`;
 
@@ -55,6 +60,9 @@ export async function analyzeAppearanceImages(images: AppearanceImageInput[]) {
     `전체 외형: ${result.summary}`,
     ...(result.hairColor?.trim() ? [`머리색 관찰: ${result.hairColor.trim()}`] : []),
     ...(result.eyeColor?.trim() ? [`눈동자색 관찰: ${result.eyeColor.trim()}`] : []),
+    // "부분색"·"한쪽"이라는 꼬리표가 있어야 테마 추출이 이 색을 베이스로 오해하지 않는다.
+    ...(result.hairColorSecondary?.trim() ? [`머리색 보조 관찰: ${result.hairColorSecondary.trim()} (부분색)`] : []),
+    ...(result.eyeColorSecondary?.trim() ? [`눈동자색 보조 관찰: ${result.eyeColorSecondary.trim()} (한쪽)`] : []),
     ...(result.observableDetails ?? []).slice(0,12).map(item=>`관찰 특징: ${item}`),
     ...(result.stylingAndMotifs ?? []).slice(0,8).map(item=>`시각 모티프: ${item}`),
     `첫 시각 인상: ${result.visualImpression}`,

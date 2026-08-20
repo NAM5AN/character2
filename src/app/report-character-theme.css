@@ -118,6 +118,18 @@ html[data-character-theme='active'] .report-mag mark {
   background: linear-gradient(transparent 58%,color-mix(in srgb,var(--character-accent) 28%,transparent) 58%);
 }
 
+/* 투톤 머리·오드아이처럼 색을 둘 이상 가진 캐릭터는 두 색을 다 지니는 것 자체가
+   캐릭터성이다. 표지에서만 은은한 두 색 그라데이션으로 드러내고, 단색 캐릭터에는
+   적용되지 않는다(--character-theme-alt 가 켜졌을 때만). */
+html[data-character-theme='active'][data-character-theme-alt='on'] .report-mag .cover {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb,var(--character-accent) 9%,transparent) 0%,
+    transparent 46%,
+    color-mix(in srgb,var(--character-accent-alt) 13%,transparent) 100%
+  );
+}
+
 html[data-character-theme='active'] .report-mag .section-tags span,
 html[data-character-theme='active'] .report-mag .tag {
   background-color: var(--character-accent-soft);

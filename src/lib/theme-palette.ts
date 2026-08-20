@@ -7,6 +7,10 @@ export const themePaletteSchema=z.object({
   mainSub:z.string().regex(HEX_RE),
   point:z.string().regex(HEX_RE),
   pointSub:z.string().regex(HEX_RE),
+  // 투톤 머리·오드아이처럼 캐릭터가 색을 더 가진 경우의 두 번째 포인트색.
+  // 예전에 저장된 팔레트에는 없으므로 optional.
+  alt:z.string().regex(HEX_RE).optional(),
+  altSub:z.string().regex(HEX_RE).optional(),
   source:themeSourceSchema,
   confidence:z.number().min(0).max(100),
 });
@@ -72,6 +76,17 @@ function colorsAreSimilar(a:Hsl,b:Hsl){
   return hueDistance(a.h,b.h)<=18&&Math.abs(a.s-b.s)<=52;
 }
 
+// 두 색이 화면에서 얼마나 잘 구분되는지의 대략적 점수(클수록 잘 구분됨).
+// 오드아이처럼 후보가 여럿일 때 "배경과 가장 잘 구분되는 색"을 고르는 데 쓴다.
+export function colorSeparationScore(a:string,b:string){
+  const first=normalizeHexColor(a),second=normalizeHexColor(b);
+  if(!first||!second)return 0;
+  const x=hexToHsl(first),y=hexToHsl(second);
+  // 무채색이 끼면 색상환 거리는 의미가 없으므로 명도·채도 차이로만 판단한다.
+  const hue=isNeutral(x)||isNeutral(y)?0:hueDistance(x.h,y.h)/180*100;
+  return Math.abs(x.l-y.l)+hue*.8+Math.abs(x.s-y.s)*.2;
+}
+
 function surfaceSaturation(hsl:Hsl){
   if(isNeutral(hsl))return 0;
   if(isNeon(hsl))return clamp(hsl.s*.22,10,20);
@@ -126,6 +141,7 @@ export function deriveThemePalette(
   pointCandidate:unknown,
   source:ThemeSource,
   confidence=65,
+  altCandidate?:unknown,
 ):CharacterThemePalette|undefined{
   const mainRaw=normalizeHexColor(mainCandidate);
   const pointRaw=normalizeHexColor(pointCandidate);
@@ -138,11 +154,26 @@ export function deriveThemePalette(
   // different hue: separate their UI roles with a clearly visible lightness ladder.
   const strongSeparation=colorsAreSimilar(mainHsl,pointHsl);
   const surface=surfaceLightness(mainHsl,strongSeparation);
+  // 세 번째 색은 main·point 어느 쪽과도 구분될 때만 남긴다. 거의 같은 색을 하나 더
+  // 들고 있어봐야 화면에서 두 색으로 읽히지 않는다.
+  const altRaw=normalizeHexColor(altCandidate);
+  const altHsl=altRaw?hexToHsl(altRaw):undefined;
+  const point=accentColor(pointBase,strongSeparation);
+  const alt=altRaw?accentColor(altRaw,strongSeparation):undefined;
+  // 원색이 서로 달라도 UI용으로 보정하면 한 색으로 뭉개질 수 있다(예: 검은색과 회색이
+  // 둘 다 같은 명도의 무채색으로 수렴). 보정 후 색까지 비교해야 진짜 두 색이 된다.
+  const altUsable=Boolean(
+    altRaw&&altHsl&&alt&&alt!==point&&
+    !colorsAreSimilar(altHsl,pointHsl)&&
+    !colorsAreSimilar(altHsl,mainHsl)&&
+    !colorsAreSimilar(hexToHsl(alt),hexToHsl(point)),
+  );
   return themePaletteSchema.parse({
     main:surfaceColor(mainBase,surface.main),
     mainSub:surfaceColor(mainBase,surface.mainSub),
-    point:accentColor(pointBase,strongSeparation),
+    point,
     pointSub:accentSoftColor(pointBase,strongSeparation),
+    ...(altUsable?{alt,altSub:accentSoftColor(altRaw!,strongSeparation)}:{}),
     source,
     confidence:clamp(Math.round(Number.isFinite(confidence)?confidence:65),0,100),
   });
