@@ -36,8 +36,8 @@ import './admin-console-polish.css';
 import './default-neutral-theme.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
-const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
-const metadataDescription = '프로필과 20문항으로 만드는 공유 가능한 Character Passport';
+const metadataTitle = 'CHA LAB ㅡ 캐릭터 정밀 해석';
+const metadataDescription = '나도 몰랐던 내 캐릭터의 심리';
 const metadataThumbnail = '/metadata-thumbnail.png';
 const faviconPath = '/favicon.png?v=20260821';
 
