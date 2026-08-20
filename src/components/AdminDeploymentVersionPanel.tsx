@@ -35,23 +35,10 @@ export function AdminDeploymentVersionPanel() {
   if (pathname !== '/admin/console' || !deployment) return null;
 
   return (
-    <div className="container" style={{ paddingTop: 18 }}>
-      <div
-        style={{
-          display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
-          fontSize: 12, color: 'var(--muted)',
-        }}
-      >
+    <div className="container admin-deployment-panel">
+      <div className="admin-deployment-row">
         <span>현재 배포 버전</span>
-        <code
-          title={deployment.title}
-          style={{
-            padding: '4px 8px', borderRadius: 8, border: '1px solid var(--line)',
-            background: 'var(--paper)', color: 'var(--fg)', fontWeight: 800,
-          }}
-        >
-          {deployment.version}
-        </code>
+        <code className="admin-deployment-code" title={deployment.title}>{deployment.version}</code>
       </div>
     </div>
   );
