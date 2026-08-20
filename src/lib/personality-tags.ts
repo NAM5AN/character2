@@ -1,4 +1,4 @@
-export const PERSONALITY_TAG_MAX_SELECTIONS = 5;
+export const PERSONALITY_TAG_MAX_SELECTIONS = 8;
 
 export const PERSONALITY_TAG_CATALOG = [
   { key:'shy', label:'수줍은', family:'소심 · 수줍 · 내성적인 계열', tooltip:'소심 · 수줍 · 내성적', keywords:['소심','수줍','낯가림','낯을','내성적','부끄','숫기','조용','움츠','쭈뼛'] },
