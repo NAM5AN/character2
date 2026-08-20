@@ -34,6 +34,7 @@ import './report-theme-activation-fix.css';
 import './global-button-interactions.css';
 import './admin-console-polish.css';
 import './default-neutral-theme.css';
+import './footer-layout.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHA LAB ㅡ 캐릭터 정밀 해석';
@@ -114,7 +115,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <AdminDeploymentVersionPanel/>
         {children}
-        <footer className="footer"><div className="container"><span>CHA-LAB</span><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
+        <footer className="footer"><div className="container"><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
       </body>
     </html>
   );
