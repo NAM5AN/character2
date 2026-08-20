@@ -76,6 +76,9 @@ export const interviewQuestionSchema = z.object({
   question: z.string().min(8).max(120),
   options: z.array(z.string().min(1).max(65)).max(6).default([]),
   allowCustom: z.boolean().default(true),
+  // Internal grounding only. Old saved questions may not have it, so default to [].
+  // New generation routes require 1~2 exact contiguous source excerpts.
+  evidence: z.array(z.string().min(8).max(420)).max(2).default([]),
   rationale: z.string().min(1).max(260),
 }).superRefine((value, ctx) => {
   const type = value.responseType;
