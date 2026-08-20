@@ -12,7 +12,6 @@ import {
   type InterviewAnswer,
 } from '@/lib/schemas/character';
 import { askClaudeJson } from '@/lib/ai/anthropic';
-import { inferFinalAdaptiveTags, inferInterviewAdaptiveTags } from '@/lib/ai/personality-adaptive';
 import { attachAiUsageSession, logGenRetry, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
@@ -374,13 +373,11 @@ export async function POST(request:Request){
   try{
     await assertRateLimit('character_finalize',8,60);
     const body=requestSchema.parse(await readJsonWithinBudget(request));
-    const fallbackAdaptive=body.draft.personalityTags.ownerSelected.length?body.draft.personalityTags.ownerSelected:body.draft.personalityTags.aiInitial;
-    try{
-      const interviewAdaptive=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'personality_interview'},()=>inferInterviewAdaptiveTags(body.draft,body.answers));
-      body.draft.personalityTags={...body.draft.personalityTags,interviewAdaptive};
-    }catch{
-      body.draft.personalityTags={...body.draft.personalityTags,interviewAdaptive:fallbackAdaptive};
-    }
+    // 성격 태그는 AI 추론 단계에서 정해진 aiInitial과 오너가 고른 ownerSelected로 고정한다.
+    // 인터뷰 후·요약 후 태그를 다시 뽑던 AI 호출 2회는 제거했다(생성 시간·비용 절감).
+    // 스키마 호환을 위해 필드는 남기되, 확정된 태그를 그대로 채워 화면 폴백이 끊기지 않게 한다.
+    const fixedTags=body.draft.personalityTags.ownerSelected.length?body.draft.personalityTags.ownerSelected:body.draft.personalityTags.aiInitial;
+    body.draft.personalityTags={...body.draft.personalityTags,interviewAdaptive:fixedTags,finalAdaptive:fixedTags};
     const inferenceReview={
       confirmed:body.draft.aiInferences.filter(x=>x.ownerVerdict==='confirmed').map(x=>({text:x.text,evidence:x.evidence})),
       ambiguous:body.draft.aiInferences.filter(x=>x.ownerVerdict==='ambiguous').map(x=>({text:x.text,evidence:x.evidence,ownerFeedback:x.ownerFeedback?.trim()||''})),
@@ -398,13 +395,6 @@ export async function POST(request:Request){
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
     const summaryGenMs=Date.now()-summaryStartedAt;
 
-    const fallbackFinal=body.draft.personalityTags.interviewAdaptive.length?body.draft.personalityTags.interviewAdaptive:fallbackAdaptive;
-    try{
-      const finalAdaptive=await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:'personality_final'},()=>inferFinalAdaptiveTags(body.draft,summaryResult));
-      body.draft.personalityTags={...body.draft.personalityTags,finalAdaptive};
-    }catch{
-      body.draft.personalityTags={...body.draft.personalityTags,finalAdaptive:fallbackFinal};
-    }
 
     const sb=getSupabaseServer(),shareCode=await uniqueShareCode(),editToken=createEditToken(),characterId=crypto.randomUUID();
     const {name,age,gender,profileText}=body.draft.basicProfile;

@@ -88,22 +88,9 @@ export function PersonalityLoadingBridge(){
             draft.personalityTags={...state,ownerSelected};
             setLoadingPersonalityTags(sessionId,ownerSelected,'owner');
 
-            try{
-              const adaptiveResponse=await nextFetch('/api/characters/personality/adaptive',{
-                method:'POST',
-                headers:{'content-type':'application/json'},
-                body:JSON.stringify({draft,answers}),
-              });
-              const adaptiveBody=await adaptiveResponse.json().catch(()=>({}));
-              if(adaptiveResponse.ok){
-                const interviewAdaptive=normalizeTags((adaptiveBody as {tags?:unknown}).tags);
-                if(interviewAdaptive.length){
-                  draft.personalityTags={...draft.personalityTags,interviewAdaptive};
-                  setLoadingPersonalityTags(sessionId,interviewAdaptive,'interview');
-                }
-              }
-            }catch{}
-
+            // 예전에는 여기서 적응형 태그 AI 호출을 await 한 뒤에야 finalize 를 보냈다.
+            // 성격 태그는 AI 추론 단계 태그와 오너 선택으로 고정하기로 했으므로 그 호출을
+            // 제거한다. 리포트 생성이 그만큼 더 빨리 시작된다.
             payload.draft=draft;
             init={...init,body:JSON.stringify(payload)};
           }
