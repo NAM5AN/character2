@@ -2,13 +2,25 @@
 
 import { useEffect } from 'react';
 import { applyCharacterThemePalette, resetCharacterThemePalette } from '@/lib/character-theme-client';
-import { themePaletteSchema, type CharacterThemePalette } from '@/lib/theme-palette';
+import { extractThemeSeedFromText } from '@/lib/character-theme';
+import { deriveThemePalette, themePaletteSchema, type CharacterThemePalette, type ThemeSource } from '@/lib/theme-palette';
 
 const ANALYSIS_SESSION_KEY='chara_lab_analysis_session_v1';
+const THEME_STORAGE_KEY='chara_lab_character_theme_v1';
+const THEME_SHARE_PREFIX='chara_theme_';
 
 type SavedThemeSession={
   stage?:unknown;
   draft?:{themePalette?:unknown}|null;
+};
+
+type DraftLike={
+  themePalette?:unknown;
+  basicProfile?:{
+    profileText?:unknown;
+    secretProfileText?:unknown;
+    appearanceNotes?:unknown;
+  }|null;
 };
 
 function validPalette(value:unknown):CharacterThemePalette|null{
@@ -25,22 +37,62 @@ function readSavedSession():SavedThemeSession|null{
   }catch{return null}
 }
 
+function readStoredPalette(key=THEME_STORAGE_KEY):CharacterThemePalette|null{
+  try{
+    const raw=localStorage.getItem(key);
+    return raw?validPalette(JSON.parse(raw)):null;
+  }catch{return null}
+}
+
+function storePalette(palette:CharacterThemePalette,key=THEME_STORAGE_KEY){
+  try{localStorage.setItem(key,JSON.stringify(palette))}catch{}
+}
+
+function clearStoredPalette(){
+  try{localStorage.removeItem(THEME_STORAGE_KEY)}catch{}
+}
+
 function visibleCharacterStage(){
   return Boolean(document.querySelector('#personality-tag-picker,.question-card,.report-mag'));
+}
+
+function paletteFromDraft(value:unknown):CharacterThemePalette|null{
+  if(!value||typeof value!=='object')return null;
+  const draft=value as DraftLike;
+  const explicit=validPalette(draft.themePalette);
+  if(explicit)return explicit;
+
+  const basic=draft.basicProfile&&typeof draft.basicProfile==='object'?draft.basicProfile:null;
+  if(!basic)return null;
+  const profileText=typeof basic.profileText==='string'?basic.profileText:'';
+  const secretProfileText=typeof basic.secretProfileText==='string'?basic.secretProfileText:'';
+  const appearanceNotes=typeof basic.appearanceNotes==='string'?basic.appearanceNotes:'';
+
+  const imageSeed=appearanceNotes.trim()?extractThemeSeedFromText(appearanceNotes):undefined;
+  const textSeed=(profileText.trim()||secretProfileText.trim())?extractThemeSeedFromText(profileText,secretProfileText):undefined;
+  const main=imageSeed?.mainColor||textSeed?.mainColor||null;
+  const point=imageSeed?.pointColor||textSeed?.pointColor||null;
+  if(!main&&!point)return null;
+
+  const hasImage=Boolean(imageSeed?.mainColor||imageSeed?.pointColor);
+  const hasText=Boolean(textSeed?.mainColor||textSeed?.pointColor);
+  const source:ThemeSource=hasImage&&hasText?'mixed':hasImage?'image':'text';
+  return deriveThemePalette(main,point,source,hasImage&&hasText?82:hasImage?78:70)||null;
 }
 
 function paletteFromPayload(payload:unknown):CharacterThemePalette|null{
   if(!payload||typeof payload!=='object')return null;
   const record=payload as Record<string,unknown>;
-  const directDraft=record.draft&&typeof record.draft==='object'?record.draft as Record<string,unknown>:null;
-  const direct=validPalette(directDraft?.themePalette);
+  const direct=validPalette(record.themePalette);
   if(direct)return direct;
+  const directDraft=paletteFromDraft(record.draft);
+  if(directDraft)return directDraft;
   const result=record.result&&typeof record.result==='object'?record.result as Record<string,unknown>:null;
-  const resultDraft=result?.draft&&typeof result.draft==='object'?result.draft as Record<string,unknown>:null;
-  return validPalette(resultDraft?.themePalette);
+  if(!result)return null;
+  return validPalette(result.themePalette)||paletteFromDraft(result.draft);
 }
 
-async function paletteFromResponse(response:Response){
+async function payloadFromResponse(response:Response){
   try{
     const clone=response.clone();
     const type=clone.headers.get('content-type')||'';
@@ -49,14 +101,26 @@ async function paletteFromResponse(response:Response){
       const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
       for(let index=lines.length-1;index>=0;index-=1){
         try{
-          const palette=paletteFromPayload(JSON.parse(lines[index]));
-          if(palette)return palette;
+          const parsed=JSON.parse(lines[index]) as unknown;
+          if(parsed&&typeof parsed==='object'&&'result' in (parsed as Record<string,unknown>))return parsed;
         }catch{}
       }
       return null;
     }
-    return paletteFromPayload(await clone.json().catch(()=>null));
+    return await clone.json().catch(()=>null);
   }catch{return null}
+}
+
+async function paletteFromResponse(response:Response){
+  const payload=await payloadFromResponse(response);
+  return paletteFromPayload(payload);
+}
+
+function patchedJsonResponse(response:Response,payload:Record<string,unknown>){
+  const headers=new Headers(response.headers);
+  headers.set('content-type','application/json');
+  headers.delete('content-length');
+  return new Response(JSON.stringify(payload),{status:response.status,statusText:response.statusText,headers});
 }
 
 export function AnalyzeCharacterThemeBridge(){
@@ -64,29 +128,65 @@ export function AnalyzeCharacterThemeBridge(){
     const originalFetch=window.fetch.bind(window);
     let disposed=false;
 
+    const applyAndRemember=(palette:CharacterThemePalette)=>{
+      if(disposed)return;
+      storePalette(palette);
+      applyCharacterThemePalette(palette);
+    };
+
     const syncSaved=()=>{
       if(disposed)return;
       const saved=readSavedSession();
-      const palette=validPalette(saved?.draft?.themePalette);
-      const stage=typeof saved?.stage==='string'?saved.stage:'';
-      if(palette&&(stage==='input'||visibleCharacterStage())){
+      const sessionPalette=validPalette(saved?.draft?.themePalette);
+      const palette=sessionPalette||readStoredPalette();
+      if(palette&&visibleCharacterStage()){
         applyCharacterThemePalette(palette);
         return;
       }
-      if(!palette&&!visibleCharacterStage())resetCharacterThemePalette();
+      if(!visibleCharacterStage())resetCharacterThemePalette();
     };
 
     window.fetch=async(input:RequestInfo|URL,init?:RequestInit)=>{
       const url=typeof input==='string'?input:input instanceof URL?input.toString():input.url;
       const isParse=url.includes('/api/characters/parse');
       const isReplay=/\/api\/admin\/data\/[^/]+\/replay(?:\?|$)/.test(url);
-      if(isParse)resetCharacterThemePalette();
+      const isFinalize=url.includes('/api/characters/finalize');
+
+      if(isParse){
+        clearStoredPalette();
+        resetCharacterThemePalette();
+      }
+
       const response=await originalFetch(input,init);
+
       if(isParse||isReplay){
         void paletteFromResponse(response).then(palette=>{
-          if(!disposed&&palette)applyCharacterThemePalette(palette);
+          if(palette)applyAndRemember(palette);
         });
       }
+
+      if(isFinalize&&response.ok){
+        try{
+          const payload=await response.clone().json() as Record<string,unknown>;
+          const shareCode=typeof payload.shareCode==='string'?payload.shareCode:'';
+          const editToken=typeof payload.editToken==='string'?payload.editToken:'';
+          const palette=readStoredPalette();
+          if(palette&&shareCode&&editToken){
+            await originalFetch(`/api/characters/${shareCode}/theme`,{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify({editToken,palette}),
+            }).catch(()=>null);
+            storePalette(palette,`${THEME_SHARE_PREFIX}${shareCode}`);
+            const preview=payload.preview&&typeof payload.preview==='object'?payload.preview as Record<string,unknown>:null;
+            if(preview){
+              payload.preview={...preview,themePalette:palette};
+              return patchedJsonResponse(response,payload);
+            }
+          }
+        }catch{}
+      }
+
       return response;
     };
 
