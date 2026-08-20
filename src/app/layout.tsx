@@ -5,6 +5,7 @@ import { AdminTelemetryRefreshBridge } from '@/components/AdminTelemetryRefreshB
 import { ReplayResultUrlBridge } from '@/components/ReplayResultUrlBridge';
 import { FeedbackReporter } from '@/components/FeedbackReporter';
 import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
+import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
 import './globals.css';
 import './bipolar-mobile-fix.css';
 import './feedback.css';
@@ -14,6 +15,7 @@ import './report-magazine.css';
 import './report-summary-explorer.css';
 import './report-summary-polish.css';
 import './report-detail-uniform.css';
+import './report-detail-accordion.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHARA LAB — 캐릭터 정밀 분석';
@@ -68,6 +70,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminTelemetryRefreshBridge/>
         <ReplayResultUrlBridge/>
         <AdminFeedbackShortcut/>
+        <DetailReportAccordionBridge/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
