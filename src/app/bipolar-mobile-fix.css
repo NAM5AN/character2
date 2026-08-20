@@ -1,0 +1,5 @@
+@media (max-width: 640px) {
+  .bipolar-control .five-level-scale::before {
+    left: 26px !important;
+  }
+}
