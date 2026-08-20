@@ -5,10 +5,21 @@ import type { CharacterReportPreview } from '@/lib/character-report';
 import { CharacterReportView } from '@/components/CharacterReportView';
 import { CompletedCharacterReportView, type CompletedDetailPayload } from '@/components/CompletedCharacterReportView';
 import { PersonalityFlavorProvider } from '@/lib/loading-flavor';
+import { applyCharacterThemePalette, resetCharacterThemePalette } from '@/lib/character-theme-client';
 
 export function CharacterReportClient({preview,completedDetail}:{preview:CharacterReportPreview;completedDetail?:CompletedDetailPayload|null}){
   const [creatorEditToken,setCreatorEditToken]=useState<string|undefined>(undefined);
   const [resolvedDetail,setResolvedDetail]=useState<CompletedDetailPayload|null>(completedDetail||null);
+
+  // A report already contains its persisted palette. Apply it from the report data
+  // itself instead of relying only on pathname-detection bridges. This keeps the
+  // theme working after name/owner lookup, client navigation and future report routes.
+  useEffect(()=>{
+    if(!preview.themePalette)return;
+    applyCharacterThemePalette(preview.themePalette);
+    try{localStorage.setItem(`chara_theme_${preview.shareCode}`,JSON.stringify(preview.themePalette))}catch{}
+    return()=>resetCharacterThemePalette();
+  },[preview.shareCode,preview.themePalette]);
 
   useEffect(()=>{
     let cancelled=false;
