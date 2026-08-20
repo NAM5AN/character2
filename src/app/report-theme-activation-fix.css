@@ -1,0 +1,31 @@
+/* Stored/fresh report activation fallback.
+   Report screens can render outside .analyze-page and before .completed-report-view exists,
+   so the presence of .report-mag itself is the reliable report-page signal. */
+html[data-character-theme='active'] body:has(.report-mag) {
+  background-color: var(--character-page-bg) !important;
+}
+
+html[data-character-theme='active'] body:has(.report-mag) .site-header {
+  background-color: color-mix(in srgb,var(--character-main) 90%,transparent) !important;
+  border-bottom-color: color-mix(in srgb,var(--character-point) 18%,var(--line)) !important;
+}
+
+/* Keep the report's main summary surfaces visibly tied to the palette even when
+   older layout CSS uses fixed warm-paper fills. */
+html[data-character-theme='active'] .report-mag .summary-card,
+html[data-character-theme='active'] .report-mag .summary-expanded,
+html[data-character-theme='active'] .report-mag .summary-read-item,
+html[data-character-theme='active'] .report-mag .sheet,
+html[data-character-theme='active'] .report-mag .cover {
+  border-color: color-mix(in srgb,var(--character-point) 18%,var(--line));
+}
+
+html[data-character-theme='active'] .report-mag .summary-card-no,
+html[data-character-theme='active'] .report-mag .summary-expanded-head > span {
+  color: var(--character-accent) !important;
+}
+
+html[data-character-theme='active'] .report-mag .summary-card-no {
+  background-color: var(--character-accent) !important;
+  color: #fff !important;
+}
