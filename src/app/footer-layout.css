@@ -1,0 +1,23 @@
+/* Keep the global footer at the real bottom on short screens/pages without
+   pinning it over page content. Long pages keep the footer after their content. */
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.footer .container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
