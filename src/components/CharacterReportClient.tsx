@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { CharacterReportPreview } from '@/lib/character-report';
 import { CharacterReportView } from '@/components/CharacterReportView';
 import { CompletedCharacterReportView, type CompletedDetailPayload } from '@/components/CompletedCharacterReportView';
+import { DetailReportShareFooterBridge } from '@/components/DetailReportShareFooterBridge';
 import { PersonalityFlavorProvider } from '@/lib/loading-flavor';
 import { applyCharacterThemePalette, resetCharacterThemePalette } from '@/lib/character-theme-client';
 
@@ -64,5 +65,6 @@ export function CharacterReportClient({preview,completedDetail}:{preview:Charact
       ? <CompletedCharacterReportView preview={preview} detail={resolvedDetail}/>
       : <CharacterReportView preview={preview} creatorEditToken={creatorEditToken}/>
     }
+    <DetailReportShareFooterBridge/>
   </PersonalityFlavorProvider>;
 }
