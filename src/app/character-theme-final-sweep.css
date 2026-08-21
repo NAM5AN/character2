@@ -48,11 +48,31 @@ html[data-character-theme='active'] .report-mag .sheet {
 }
 
 /* Paid-detail preview cards previously inherited mainSub directly.  Very light
-   palettes (e.g. #FAFAFA) therefore looked completely unthemed.  Mix in pointSub
-   so the preview remains subtle but visibly belongs to the character palette. */
+   palettes (e.g. #FAFAFA) therefore looked completely unthemed.  Keep one shared
+   surface value so the cards and their fade masks always resolve to the same hue. */
+html[data-character-theme='active'] .full-preview-sections {
+  --full-preview-card-background: color-mix(in srgb,var(--character-accent-soft) 58%,var(--character-surface));
+}
+
 html[data-character-theme='active'] .full-preview-section {
-  background: color-mix(in srgb,var(--character-accent-soft) 58%,var(--character-surface)) !important;
+  background: var(--full-preview-card-background) !important;
   border-color: color-mix(in srgb,var(--character-point) 24%,var(--line)) !important;
+}
+
+html[data-character-theme='active'] .full-preview-tags .tag {
+  background: var(--character-accent-soft) !important;
+  border: 1px solid color-mix(in srgb,var(--character-point) 34%,transparent);
+  color: color-mix(in srgb,var(--character-point) 86%,#171816) !important;
+}
+
+html[data-character-theme='active'] .full-preview-other {
+  background: #fff !important;
+}
+
+html[data-character-theme='active'] .full-preview-share {
+  background: var(--character-accent) !important;
+  border-color: var(--character-accent) !important;
+  color: #fff !important;
 }
 
 html[data-character-theme='active'] .full-preview-overlay > div {
@@ -60,24 +80,24 @@ html[data-character-theme='active'] .full-preview-overlay > div {
   border-color: color-mix(in srgb,var(--character-point) 30%,var(--line)) !important;
 }
 
-/* Keep the blur/fade masks in the same hue instead of falling back to warm white. */
+/* Fade into the card surface itself, not into a fresh layer of point color. */
 html[data-character-theme='active'] .full-preview-section.preview-index-0 > div:last-child {
-  background: color-mix(in srgb,var(--character-accent-soft) 12%,transparent) !important;
+  background: color-mix(in srgb,var(--full-preview-card-background) 12%,transparent) !important;
 }
 html[data-character-theme='active'] .full-preview-section.preview-index-1 > div:last-child {
-  background: color-mix(in srgb,var(--character-accent-soft) 24%,transparent) !important;
+  background: color-mix(in srgb,var(--full-preview-card-background) 24%,transparent) !important;
 }
 html[data-character-theme='active'] .full-preview-section.preview-index-2 > div:last-child {
-  background: color-mix(in srgb,var(--character-accent-soft) 38%,transparent) !important;
+  background: color-mix(in srgb,var(--full-preview-card-background) 38%,transparent) !important;
 }
 
 html[data-character-theme='active'] .full-preview-sections > div:last-child {
   background: linear-gradient(
     180deg,
     transparent 0%,
-    color-mix(in srgb,var(--character-accent-soft) 10%,transparent) 30%,
-    color-mix(in srgb,var(--character-accent-soft) 30%,transparent) 58%,
-    color-mix(in srgb,var(--character-accent-soft) 68%,transparent) 82%,
-    color-mix(in srgb,var(--character-accent-soft) 88%,var(--character-surface)) 100%
+    color-mix(in srgb,var(--full-preview-card-background) 10%,transparent) 30%,
+    color-mix(in srgb,var(--full-preview-card-background) 30%,transparent) 58%,
+    color-mix(in srgb,var(--full-preview-card-background) 68%,transparent) 82%,
+    var(--full-preview-card-background) 100%
   ) !important;
 }

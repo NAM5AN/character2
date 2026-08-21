@@ -340,17 +340,17 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
 
     {!detail&&<section className="card" style={{marginTop:24,padding:'34px 28px',overflow:'hidden',position:'relative'}}>
       <h2 style={{fontSize:'clamp(27px,4vw,40px)',marginTop:0}}>여기서 한 단계 더 들어가면</h2>
-      <p style={{lineHeight:1.75,maxWidth:760,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
-      <div className="tags" style={{marginBottom:18}}>{['이런 캐릭터예요','이렇게 작동해요','이렇게 관계를 맺어요','이런 애착이 있어요','이렇게 갈등해요','이런 매력이 있어요','통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
+      <p style={{lineHeight:1.75,marginBottom:20}}>요약에서 보인 성향이 <strong>어떤 관계에서 달라지는지, 무엇을 가장 원하고 두려워하는지, 겉과 속의 모순이 어디서 생기는지</strong>까지 풀어서 볼 수 있어요.</p>
+      <div className="tags full-preview-tags" style={{marginBottom:18}}>{['이런 캐릭터예요','이렇게 작동해요','이렇게 관계를 맺어요','이런 애착이 있어요','이렇게 갈등해요','이런 매력이 있어요','통합 리포트'].map(x=><span className="tag" key={x}>{x}</span>)}</div>
 
       <div style={{position:'relative'}}>
         <div aria-hidden="true" className="full-preview-sections">
           {previewSections.map(([title,t],index)=><div className={`full-preview-section preview-index-${index}`} key={title} style={{border:'1px solid var(--line)',borderRadius:16,padding:'22px 24px',background:'white',minHeight:230,position:'relative',overflow:'hidden'}}>
             <strong>{title}</strong>
             <div style={{marginTop:12,filter:`blur(${previewBlur[index]}px)`,opacity:previewOpacity[index],userSelect:'none'}}><ParagraphText text={t}/></div>
-            <div style={{position:'absolute',inset:0,background:`rgba(255,253,248,${previewWhite[index]})`,pointerEvents:'none'}}/>
+            <div style={{position:'absolute',inset:0,background:`rgba(255,255,255,${previewWhite[index]})`,pointerEvents:'none'}}/>
           </div>)}
-          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,253,248,0) 0%,rgba(255,253,248,.08) 30%,rgba(255,253,248,.3) 58%,rgba(255,253,248,.72) 82%,rgba(255,253,248,.9) 100%)',pointerEvents:'none'}}/>
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.08) 30%,rgba(255,255,255,.3) 58%,rgba(255,255,255,.72) 82%,rgba(255,255,255,.9) 100%)',pointerEvents:'none'}}/>
         </div>
         <div className="full-preview-overlay" style={{position:'absolute',left:'50%',top:'60%',transform:'translate(-50%,-50%)',zIndex:5,width:'min(600px,90%)',display:'flex',flexDirection:'column',alignItems:'center',gap:18,pointerEvents:'none'}}>
           {!busy&&<div style={{pointerEvents:'none',textAlign:'center',padding:'18px 22px',borderRadius:18,background:'rgba(255,253,248,.86)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',border:'1px solid var(--line)',boxShadow:'0 12px 34px rgba(23,24,22,.12)'}}>
@@ -359,8 +359,8 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>}
           <nav aria-label="리포트 다음 작업" style={{width:'min(440px,100%)',display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,pointerEvents:'auto'}}>
             <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{width:'100%',minHeight:46,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'normal'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
-            <Link className="btn" href="/analyze" style={{width:'100%',minHeight:46,display:'inline-flex',alignItems:'center',justifyContent:'center',textAlign:'center',whiteSpace:'normal'}}>다른 캐릭터 분석하기</Link>
-            <button type="button" className="btn soft" aria-live="polite" onClick={()=>void shareReport()} style={{gridColumn:'1 / -1',width:'100%',minHeight:46}}>{shareStatus||'공유하기'}</button>
+            <Link className="btn full-preview-other" href="/analyze" style={{width:'100%',minHeight:46,display:'inline-flex',alignItems:'center',justifyContent:'center',textAlign:'center',whiteSpace:'normal',background:'#fff'}}>다른 캐릭터 분석하기</Link>
+            <button type="button" className="btn primary full-preview-share" aria-live="polite" onClick={()=>void shareReport()} style={{gridColumn:'1 / -1',width:'100%',minHeight:46}}>{shareStatus||'공유하기'}</button>
           </nav>
         </div>
       </div>
