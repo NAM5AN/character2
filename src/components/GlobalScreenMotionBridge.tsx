@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 const EASE = 'cubic-bezier(.2,.72,.2,1)';
+const summaryAnimations = new WeakMap<HTMLElement, Animation>();
 
 function reducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -22,7 +23,7 @@ function animateEnter(element: HTMLElement, x = 0, y = 7, duration = 190) {
 
 function animateSummaryExpanded(element: HTMLElement) {
   if (reducedMotion()) return;
-  element.getAnimations().forEach(animation => animation.cancel());
+  summaryAnimations.get(element)?.cancel();
   const computed = window.getComputedStyle(element);
   const targetHeight = element.getBoundingClientRect().height;
   if (targetHeight < 1) return;
@@ -53,11 +54,56 @@ function animateSummaryExpanded(element: HTMLElement) {
     ],
     { duration: 340, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' },
   );
+  summaryAnimations.set(element, animation);
 
   void animation.finished.finally(() => {
+    if (summaryAnimations.get(element) !== animation) return;
+    summaryAnimations.delete(element);
     element.style.overflow = '';
     animation.cancel();
   });
+}
+
+async function animateSummaryCollapsed(element: HTMLElement) {
+  if (reducedMotion()) return;
+  summaryAnimations.get(element)?.cancel();
+  const computed = window.getComputedStyle(element);
+  const startHeight = element.getBoundingClientRect().height;
+  if (startHeight < 1) return;
+
+  element.style.overflow = 'hidden';
+  const animation = element.animate(
+    [
+      {
+        height: `${startHeight}px`,
+        marginTop: computed.marginTop,
+        paddingTop: computed.paddingTop,
+        paddingBottom: computed.paddingBottom,
+        borderTopWidth: computed.borderTopWidth,
+        borderBottomWidth: computed.borderBottomWidth,
+        opacity: 1,
+        transform: 'translateY(0)',
+      },
+      {
+        height: '0px',
+        marginTop: '0px',
+        paddingTop: '0px',
+        paddingBottom: '0px',
+        borderTopWidth: '0px',
+        borderBottomWidth: '0px',
+        opacity: 0,
+        transform: 'translateY(-10px)',
+      },
+    ],
+    { duration: 280, easing: 'cubic-bezier(.4,0,.25,1)', fill: 'forwards' },
+  );
+  summaryAnimations.set(element, animation);
+
+  try {
+    await animation.finished;
+  } catch {
+    return;
+  }
 }
 
 function summaryCardExpandedFrom(node: HTMLElement) {
@@ -104,6 +150,40 @@ export function GlobalScreenMotionBridge() {
 
   useEffect(() => {
     const pendingSummaryExpanded = new Set<HTMLElement>();
+    const closingSummaryCards = new WeakSet<HTMLButtonElement>();
+
+    // React가 펼친 본문을 바로 unmount하기 전에 캡처 단계에서 클릭을 잠깐 보류해
+    // 닫힘 애니메이션을 끝낸 뒤 원래 카드 클릭을 다시 전달한다.
+    const handleSummaryCollapse = (event: MouseEvent) => {
+      if (reducedMotion()) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const card = target?.closest<HTMLButtonElement>('.report-mag .summary-card.is-active');
+      if (!card) return;
+
+      if (card.dataset.summaryCollapseBypass === '1') {
+        delete card.dataset.summaryCollapseBypass;
+        return;
+      }
+
+      const sheet = card.closest<HTMLElement>('.report-mag .sheet');
+      const expanded = sheet?.querySelector<HTMLElement>('.summary-expanded');
+      if (!expanded || closingSummaryCards.has(card)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      closingSummaryCards.add(card);
+
+      void (async () => {
+        await animateSummaryCollapsed(expanded);
+        if (!card.isConnected || !card.classList.contains('is-active')) return;
+        card.dataset.summaryCollapseBypass = '1';
+        card.click();
+      })().finally(() => {
+        closingSummaryCards.delete(card);
+      });
+    };
+
+    document.addEventListener('click', handleSummaryCollapse, true);
 
     const syncDirectionalMotion = () => {
       queued.current = false;
@@ -177,6 +257,7 @@ export function GlobalScreenMotionBridge() {
     syncDirectionalMotion();
 
     return () => {
+      document.removeEventListener('click', handleSummaryCollapse, true);
       observer.disconnect();
       pendingSummaryExpanded.clear();
       if (queued.current) queued.current = false;
