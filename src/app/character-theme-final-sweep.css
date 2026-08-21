@@ -51,7 +51,7 @@ html[data-character-theme='active'] .report-mag .sheet {
    palettes (e.g. #FAFAFA) therefore looked completely unthemed.  Keep one shared
    surface value so the cards and their fade masks always resolve to the same hue. */
 html[data-character-theme='active'] .full-preview-sections {
-  --full-preview-card-background: color-mix(in srgb,var(--character-accent-soft) 58%,var(--character-surface));
+  --full-preview-card-background: #fff;
 }
 
 html[data-character-theme='active'] .full-preview-section {
