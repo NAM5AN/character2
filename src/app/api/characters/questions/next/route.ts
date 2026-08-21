@@ -250,10 +250,15 @@ export async function POST(request: Request) {
       .filter(x => x.ownerVerdict === 'rejected' && x.ownerFeedback?.trim())
       .map(x => x.ownerFeedback!.trim());
 
+    // 첫 배치는 오너 검수 결과를 쓰지 않고 프로필에 사실로 적힌 것만 근거로 삼는다.
+    // 검수에 의존하지 않으므로 오너가 검수를 마치기 전에 미리 만들어 둘 수 있고,
+    // 검수를 어떻게 고치든 그 질문이 낡아지지 않는다.
+    const profileOnly = startOrder === 1;
+
     const evidenceSources = questionEvidenceSources({
       publicProfile: body.draft.basicProfile.profileText,
       secretProfile: body.draft.basicProfile.secretProfileText,
-      ownerReview: body.draft.aiInferences.map(item => item.ownerFeedback || '').filter(Boolean),
+      ownerReview: profileOnly ? [] : body.draft.aiInferences.map(item => item.ownerFeedback || '').filter(Boolean),
       answers: body.answers.map(item => ({question:item.question,answer:item.answer,reason:item.reason})),
     });
 
@@ -262,10 +267,10 @@ export async function POST(request: Request) {
       traits: body.draft.traits,
       relationshipTraits: body.draft.relationshipTraits,
       confirmedFacts: body.draft.confirmedFacts,
-      confirmedInferences,
-      ownerClarifiedAmbiguities,
-      unresolvedAmbiguities,
-      ownerCorrections,
+      confirmedInferences: profileOnly ? [] : confirmedInferences,
+      ownerClarifiedAmbiguities: profileOnly ? [] : ownerClarifiedAmbiguities,
+      unresolvedAmbiguities: profileOnly ? [] : unresolvedAmbiguities,
+      ownerCorrections: profileOnly ? [] : ownerCorrections,
       analysisConfidence: body.draft.analysisConfidence,
     };
 
@@ -331,7 +336,7 @@ ${JSON.stringify(compactDraft)}
 - 이미 사용한 targetHook: ${JSON.stringify(usedHooks)}
 
 이번 배치의 적응성 규칙 — 매우 중요:
-${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근 실제 답변이나 이유에서 새로 드러난 조건, 예외, 우선순위, 모순을 출발점으로 삼으세요.`:'- 첫 배치이므로 프로필과 오너 검수에서 정보가치가 높은 미확인 지점을 고르세요.'}
+${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근 실제 답변이나 이유에서 새로 드러난 조건, 예외, 우선순위, 모순을 출발점으로 삼으세요.`:'- 첫 배치이므로 오너 검수 결과는 아직 쓰지 말고, 프로필에 사실로 적힌 내용에서만 정보가치가 높은 미확인 지점을 고르세요.'}
 - 이전 답변의 문장을 질문에 억지로 복사하지 말고, 그 답 때문에 새로 생긴 '아직 답이 없는 다음 의문'을 물으세요.
 - 이전 답변과 프로필 예상이 어긋났다면 그 차이를 가르는 질문을 우선 검토하세요.
 - 이미 답한 내용을 상황만 바꿔 재확인하면 실패입니다.
