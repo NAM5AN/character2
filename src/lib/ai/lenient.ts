@@ -17,7 +17,7 @@ function parseJsonish(value: string): unknown {
 
 // 문자열을 항목 배열로 편다. 줄바꿈 → 글머리표 → 세미콜론 순으로만 나누고,
 // 마침표로는 나누지 않는다(한 항목 안의 문장을 쪼개면 뜻이 망가진다).
-export function toStringArray(value: unknown): string[] {
+function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.flatMap(item => toStringArray(item));
   }
@@ -47,17 +47,6 @@ export function lenientStringArray<T extends z.ZodTypeAny>(inner: T): T {
     if (value === undefined || value === null) return value;
     const list = toStringArray(value);
     return list.length ? list : value;
-  }, inner) as unknown as T;
-}
-
-// 객체를 기대하는 자리에 JSON 문자열이 와도 살려낸다.
-export function lenientObject<T extends z.ZodTypeAny>(inner: T): T {
-  return z.preprocess(value => {
-    if (typeof value === 'string') {
-      const parsed = parseJsonish(value);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-    }
-    return value;
   }, inner) as unknown as T;
 }
 
