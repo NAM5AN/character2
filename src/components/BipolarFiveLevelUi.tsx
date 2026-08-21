@@ -198,9 +198,9 @@ export function BipolarFiveLevelUi(){
     .five-level-circle {
       width:58px;
       height:58px;
-      border:3px solid #77746f;
+      border:3px solid color-mix(in srgb,var(--character-point,#77746f) 42%,var(--line,#d8d5cf));
       border-radius:50%;
-      background:var(--paper);
+      background:transparent;
       display:block;
       flex:0 0 auto;
       transition:transform .14s ease,background .14s ease,border-color .14s ease,box-shadow .14s ease;
@@ -208,11 +208,12 @@ export function BipolarFiveLevelUi(){
     .five-level-choice.level-2 .five-level-circle,
     .five-level-choice.level-4 .five-level-circle { width:48px;height:48px;margin-top:5px; }
     .five-level-choice.level-3 .five-level-circle { width:38px;height:38px;margin-top:10px; }
-    .five-level-choice:hover .five-level-circle { border-color:var(--ink);transform:scale(1.05); }
+    .five-level-choice:hover { background:transparent; }
+    .five-level-choice:hover .five-level-circle { background:var(--character-accent-soft,var(--accent-soft));border-color:var(--character-accent,var(--accent));transform:scale(1.05); }
     .five-level-choice.selected .five-level-circle {
-      background:var(--ink);
-      border-color:var(--ink);
-      box-shadow:inset 0 0 0 7px var(--paper),0 0 0 2px var(--ink);
+      background:var(--character-accent,var(--accent));
+      border-color:var(--character-accent,var(--accent));
+      box-shadow:none;
     }
     /* 데스크톱에서는 위쪽 양끝 문장이 이미 보이므로 점 밑 문구를 숨긴다.
        모바일에서는 그 문장이 감춰지고 이 문구가 유일한 설명이라 아래 미디어쿼리에서 다시 보인다. */
@@ -262,7 +263,7 @@ export function BipolarFiveLevelUi(){
         text-align:left;
         border-radius:12px;
       }
-      .five-level-choice:hover { background:rgba(255,255,255,.35); }
+      .five-level-choice:hover { background:transparent; }
       .five-level-circle,
       .five-level-choice.level-2 .five-level-circle,
       .five-level-choice.level-3 .five-level-circle,

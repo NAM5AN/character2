@@ -119,18 +119,19 @@ html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thu
 /* Five-level A/B control: replace the remaining graphite/paper fills with the
    character palette while keeping label text colors exactly as before. */
 html[data-character-theme='active'] .analyze-page .five-level-circle {
-  background: var(--character-surface) !important;
-  border-color: color-mix(in srgb,var(--character-point) 38%,var(--line)) !important;
+  background: transparent !important;
+  border-color: color-mix(in srgb,var(--character-point) 42%,var(--line)) !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-choice:hover .five-level-circle {
+  background: var(--character-accent-soft) !important;
   border-color: var(--character-accent) !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-choice.selected .five-level-circle {
   background: var(--character-accent) !important;
   border-color: var(--character-accent) !important;
-  box-shadow: inset 0 0 0 7px var(--character-surface),0 0 0 2px var(--character-accent) !important;
+  box-shadow: none !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-scale::before {
@@ -138,7 +139,7 @@ html[data-character-theme='active'] .analyze-page .five-level-scale::before {
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-choice:hover {
-  background: color-mix(in srgb,var(--character-accent-soft) 56%,transparent);
+  background: transparent;
 }
 
 /* Personality chips keep their existing white/ink text colors. Only the fill and
