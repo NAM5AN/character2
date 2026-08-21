@@ -63,6 +63,8 @@ export function AnalyzeFlow(){
   const batchRequests=useRef<Map<number,Promise<InterviewQuestion[]>>>(new Map());
   const temporalRepairRequests=useRef<Set<string>>(new Set());
   const rankingDragIndexRef=useRef<number|null>(null);
+  const rankingDragPointerOffsetRef=useRef(0);
+  const rankingListRef=useRef<HTMLDivElement|null>(null);
   const rankingRowRefs=useRef<Map<string,HTMLDivElement>>(new Map());
   const rankingDragPositionsRef=useRef<Map<string,number>|null>(null);
 
@@ -201,8 +203,8 @@ export function AnalyzeFlow(){
   function addRank(option:string){setRanking(current=>current.includes(option)?current:[...current,option])}
   function removeRank(option:string){setRanking(current=>current.filter(item=>item!==option))}
   function moveRank(index:number,direction:-1|1){setRanking(current=>{const next=[...current];const target=index+direction;if(target<0||target>=next.length)return current;[next[index],next[target]]=[next[target],next[index]];return next})}
-  function startRankDrag(index:number,item:string,event:ReactPointerEvent<HTMLDivElement>){if(busy||event.button!==0||(event.target as HTMLElement).closest('button'))return;rankingDragIndexRef.current=index;setDraggingRankItem(item);event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
-  function dragRank(event:ReactPointerEvent<HTMLDivElement>){const from=rankingDragIndexRef.current;if(from===null)return;event.preventDefault();const row=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-ranking-index]');const to=Number(row?.dataset.rankingIndex);if(!Number.isInteger(to)||to<0||to>=ranking.length||to===from)return;const positions=new Map<string,number>();rankingRowRefs.current.forEach((element,item)=>positions.set(item,element.getBoundingClientRect().top));rankingRowRefs.current.forEach(element=>element.getAnimations().forEach(animation=>animation.cancel()));rankingDragPositionsRef.current=positions;setRanking(current=>{if(from>=current.length||to>=current.length)return current;const next=[...current];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});rankingDragIndexRef.current=to}
+  function startRankDrag(index:number,item:string,event:ReactPointerEvent<HTMLDivElement>){if(busy||event.button!==0||(event.target as HTMLElement).closest('button'))return;rankingDragIndexRef.current=index;rankingDragPointerOffsetRef.current=event.clientY-event.currentTarget.getBoundingClientRect().top;setDraggingRankItem(item);event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
+  function dragRank(event:ReactPointerEvent<HTMLDivElement>){const from=rankingDragIndexRef.current;const list=rankingListRef.current;if(from===null||!list)return;event.preventDefault();const draggedCenter=event.clientY-list.getBoundingClientRect().top-rankingDragPointerOffsetRef.current+event.currentTarget.offsetHeight/2;const currentCenter=event.currentTarget.offsetTop+event.currentTarget.offsetHeight/2;let to=from;if(draggedCenter>currentCenter){for(let index=from+1;index<ranking.length;index+=1){const candidate=rankingRowRefs.current.get(ranking[index]);if(candidate&&draggedCenter>candidate.offsetTop+candidate.offsetHeight/2)to=index}}else if(draggedCenter<currentCenter){for(let index=from-1;index>=0;index-=1){const candidate=rankingRowRefs.current.get(ranking[index]);if(candidate&&draggedCenter<candidate.offsetTop+candidate.offsetHeight/2)to=index}}if(to===from)return;const positions=new Map<string,number>();rankingRowRefs.current.forEach((element,item)=>positions.set(item,element.getBoundingClientRect().top));rankingRowRefs.current.forEach(element=>element.getAnimations().forEach(animation=>animation.cancel()));rankingDragPositionsRef.current=positions;setRanking(current=>{if(from>=current.length||to>=current.length)return current;const next=[...current];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});rankingDragIndexRef.current=to}
   function stopRankDrag(event:ReactPointerEvent<HTMLDivElement>){if(rankingDragIndexRef.current===null)return;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);rankingDragIndexRef.current=null;setDraggingRankItem(null)}
 
   function renderResponseControls(){
@@ -216,7 +218,7 @@ export function AnalyzeFlow(){
       const actionStyle={padding:0,width:34,height:34,display:'inline-grid',placeItems:'center',flex:'0 0 auto',color:'var(--character-accent, var(--accent))'} as const;
       return <div style={{marginTop:18}}>
         <p className="muted">중요한 순서대로 눌러주세요. 선택한 항목은 위아래로 끌거나 화살표로 순서를 바꿀 수 있어요.</p>
-        {ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=>{const isDragging=draggingRankItem===item;return <div
+        {ranking.length>0&&<div ref={rankingListRef} className="stack" style={{gap:8,marginBottom:14,position:'relative'}}>{ranking.map((item,index)=>{const isDragging=draggingRankItem===item;return <div
           key={item}
           ref={element=>{if(element)rankingRowRefs.current.set(item,element);else rankingRowRefs.current.delete(item)}}
           data-ranking-index={index}
