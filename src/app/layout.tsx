@@ -14,6 +14,7 @@ import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge'
 import { AdminDeploymentVersionPanel } from '@/components/AdminDeploymentVersionPanel';
 import { AdminConsoleLayoutPolish } from '@/components/AdminConsoleLayoutPolish';
 import { AdminConsoleDataEnhancements } from '@/components/AdminConsoleDataEnhancements';
+import { InterviewNextQuestionPolish } from '@/components/InterviewNextQuestionPolish';
 import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <GlobalScreenMotionBridge/>
         <AdminConsoleLayoutPolish/>
         <AdminConsoleDataEnhancements/>
+        <InterviewNextQuestionPolish/>
         <header className="site-header">
           <div className="container nav">
             <div className="brand-wrap">
