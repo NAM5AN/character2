@@ -137,7 +137,7 @@ const PAGES: { no: string; kicker: string; heading: string; secs: number[] }[] =
   { no: '03', kicker: 'CHARM / INTEGRATED', heading: '{name}의 모순과 방향을 함께 봅니다', secs: [5, 6] },
 ];
 
-export function DetailMagazinePage({ page, name, analysis, endNote }: { page: number; name: string; analysis: FinalAnalysis; endNote?: string }) {
+export function DetailMagazinePage({ page, name, analysis }: { page: number; name: string; analysis: FinalAnalysis; endNote?: string }) {
   const p = PAGES[page - 1];
   if (!p) return null;
   return <div className="report-mag"><article className="sheet">
@@ -146,7 +146,6 @@ export function DetailMagazinePage({ page, name, analysis, endNote }: { page: nu
       <div><div className="sheet-kicker">{p.kicker}</div><h2>{applyName(p.heading, name)}</h2></div>
     </header>
     {p.secs.map(si => <MagazineSection key={String(SECTION_META[si].key)} meta={SECTION_META[si]} name={name} analysis={analysis} />)}
-    {page >= 3 && endNote?.trim() ? <section className="end-note"><small>FINAL SENTENCE</small><p>{endNote}</p></section> : null}
   </article></div>;
 }
 
