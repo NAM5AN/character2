@@ -357,6 +357,15 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
             <div style={{fontSize:12,fontWeight:900,letterSpacing:'.03em',color:'var(--accent,#b8860b)',marginBottom:9}}>여기까지는 예고편이에요.</div>
             <p style={{margin:0,fontSize:'clamp(14px,2.4vw,16px)',lineHeight:1.75,fontWeight:700}}>아직 못 꺼낸 얘기가 더 많아요. 바로 확인해보세요.</p>
           </div>}
+          {busy&&<div role="status" aria-live="polite" style={{width:'100%',pointerEvents:'none',padding:'18px 20px',borderRadius:18,background:'var(--accent-soft)',border:'1px solid var(--line)',boxShadow:'0 12px 34px rgba(23,24,22,.12)'}}>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+              <div className="loading" style={{fontWeight:900}}>{flavorMessage} <i className="dot"/><i className="dot"/><i className="dot"/></div>
+              <strong style={{fontSize:20}}>{progress}%</strong>
+            </div>
+            <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
+              <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
+            </div>
+          </div>}
           <nav aria-label="리포트 다음 작업" style={{width:'min(440px,100%)',display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,pointerEvents:'auto'}}>
             <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{width:'100%',minHeight:46,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'normal'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
             <Link className="btn full-preview-other" href="/analyze" style={{width:'100%',minHeight:46,display:'inline-flex',alignItems:'center',justifyContent:'center',textAlign:'center',whiteSpace:'normal',background:'#fff'}}>다른 캐릭터 분석하기</Link>
@@ -365,15 +374,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         </div>
       </div>
 
-      {busy&&<div role="status" aria-live="polite" style={{marginTop:22,padding:'18px 20px',borderRadius:16,background:'var(--accent-soft)'}}>
-        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-          <div className="loading" style={{fontWeight:900}}>{flavorMessage} <i className="dot"/><i className="dot"/><i className="dot"/></div>
-          <strong style={{fontSize:20}}>{progress}%</strong>
-        </div>
-        <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
-          <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
-        </div>
-      </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
     </section>}
 
