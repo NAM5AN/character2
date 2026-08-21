@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { readJsonWithinBudget } from '@/lib/request-budget';
 import { z } from 'zod';
 import {
@@ -11,7 +10,8 @@ import {
   type SummaryAnalysisGeneration,
   type InterviewAnswer,
 } from '@/lib/schemas/character';
-import { askClaudeJson } from '@/lib/ai/anthropic';
+import { streamClaudeJson } from '@/lib/ai/anthropic';
+import { ndjsonStream } from '@/lib/ai/stream';
 import { attachAiUsageSession, logGenRetry, withAiUsageContext } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { generateShareCode } from '@/lib/share-code';
@@ -19,6 +19,10 @@ import { createEditToken, sha256 } from '@/lib/crypto';
 import { getSupabaseServer } from '@/lib/supabase/server';
 import { buildCharacterReportPreview } from '@/lib/character-report';
 import { apiError } from '@/lib/http';
+
+// 요약 생성은 1~3분 걸리고 그동안 진행률 스트림이 열려 있어야 한다. 플랫폼 상한을
+// 명시해 두지 않으면 기본값이 바뀔 때 스트림이 중간에 끊길 수 있다.
+export const maxDuration=300;
 
 const requestSchema=z.object({draft:characterDraftSchema,answers:z.array(interviewAnswerSchema).length(20)});
 type R=Record<string,unknown>;
@@ -297,12 +301,12 @@ function summaryQualityPass(insight:z.infer<typeof summaryInsightSchema>){
   return q.evidenceStrength>=2&&q.specificity>=2&&q.latentDepth>=2&&q.inferenceDistance>=2&&total>=12;
 }
 
-async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
+async function buildSummaryDossier(input:string,onProgress?:(ratio:number)=>void):Promise<SummaryDossier>{
   let last='';
   let lastModel:SummaryDossier|null=null;
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 분석에서 엄격한 품질 기준을 통과한 insight가 부족했습니다. 프로필·오너 검수·문답에서 서로 독립적인 단서를 다시 연결하고, 단순 재서술이 아닌 메커니즘 수준의 해석을 만들어주세요. 점검: ${last}`;
-    const model=await askClaudeJson({
+    const model=await streamClaudeJson({
       system:SUMMARY_PSYCHE_SYSTEM,
       schema:summaryDossierSchema,
       maxTokens:6000,
@@ -310,6 +314,7 @@ async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
       model:'anthropic/claude-sonnet-5',
       allowFallback:true,
       input:`${input}${retry}`,
+      onProgress,
     });
     lastModel=model;
     const passed=model.validatedInsights.filter(summaryQualityPass);
@@ -327,12 +332,12 @@ async function buildSummaryDossier(input:string):Promise<SummaryDossier>{
   throw new Error(`SUMMARY_PSYCHOLOGY_FAILED: ${last||'충분한 해석을 만들지 못함'}`);
 }
 
-async function generateSummary(input:string,src:SummarySource):Promise<SummaryAnalysisGeneration>{
+async function generateSummary(input:string,src:SummarySource,onProgress?:(ratio:number)=>void):Promise<SummaryAnalysisGeneration>{
   let last='';
   for(let attempt=0;attempt<2;attempt++){
     const retry=attempt===0?'':`\n\n이전 생성은 JSON 형식 또는 공개 요약 품질 점검에 걸렸습니다. 이번에는 사용자에게 보이는 oneLineSummary와 summary 6개 필드를 최우선으로 새로 작성하세요. 각 summary 필드는 160~260자를 목표로 하고 130자보다 짧아지지 않게 충분한 맥락을 담으세요. 각 필드는 반드시 2문단이며 문단 사이에 \\n\\n을 넣으세요. 각 문단 첫 문장은 반드시 **굵은 안내문**이고, 결론이 아니라 그 문단에서 다룰 주제만 알려줘야 합니다. 원자료를 다시 읽는 것이 아니라 제공된 심층 해석 묶음의 mechanism을 풀어쓰세요. misunderstoodPoint와 hiddenPattern도 빠뜨리지 마세요. evidencePack은 빈 객체 {}로 출력해도 됩니다. 이전 출력을 수리하지 말고 심층 해석 묶음에서 새로 작성하세요. 점검 내용: ${last}`;
     try{
-      const raw=await askClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:5000,maxAttempts:2,input:`${input}${retry}`,allowFallback:true});
+      const raw=await streamClaudeJson({system:SUMMARY_SYSTEM,schema:summaryAnalysisRawSchema,maxTokens:5000,maxAttempts:2,input:`${input}${retry}`,allowFallback:true,onProgress});
       const parsed=summaryAnalysisGenerationSchema.safeParse(normalize(raw,src));
       if(parsed.success){
         // 형식만 어긋났다면 재생성 대신 코드로 고쳐서 그대로 통과시킨다(비용 두 배 방지).
@@ -360,19 +365,31 @@ async function generateSummary(input:string,src:SummarySource):Promise<SummaryAn
   throw new Error(`AI_JSON_SCHEMA_FAILED: ${last||'SUMMARY_EVIDENCE_PACK_FAILED'}`);
 }
 // 요약 생성 전체 파이프라인(심층 dossier → 사용자용 요약). finalize와 관리자 재생성이 공유한다.
-export async function generateSummaryReport(src:SummarySource,usage:{sessionId?:string;shareCode?:string}):Promise<SummaryAnalysisGeneration>{
+export async function generateSummaryReport(src:SummarySource,usage:{sessionId?:string;shareCode?:string},onProgress?:(ratio:number)=>void):Promise<SummaryAnalysisGeneration>{
+  // 요약은 심층분석 → 요약작성 두 단계다. 진행률은 앞 단계 55% / 뒷 단계 45%로 이어붙여
+  // 화면의 % 가 실제 생성량을 따라가게 한다(단계 이름은 노출하지 않는다).
+  const dossierProgress=onProgress?(r:number)=>onProgress(r*.55):undefined;
+  const writeProgress=onProgress?(r:number)=>onProgress(.55+r*.45):undefined;
   const dossierInput=`캐릭터 데이터:\n${JSON.stringify(src.analysisDraft)}\n\n오너 검수:\n${JSON.stringify(src.review)}\n\n오너 인터뷰 20문항:\n${JSON.stringify(src.answers)}\n\n작업 규칙:\n- 답변의 문장을 순서대로 요약하지 말고 행동·조건·이유를 의미 단위로 압축하세요.\n- 서로 멀리 떨어진 단서를 최소 두 개 이상 연결해서만 강한 insight를 만드세요.\n- 오너가 정정한 내용은 기존 추론보다 우선하세요.\n- 한 행동이 어떤 욕구를 충족하거나 어떤 위험을 피하는지, 어떤 조건에서 반대로 뒤집히는지까지 보세요.\n- evidenceAnchors는 원 질문 전체를 복사하지 말고 행동·관계·조건만 짧게 남기세요.`;
-  const summaryDossier=await withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_psychology'},()=>buildSummaryDossier(dossierInput));
+  const summaryDossier=await withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_psychology'},()=>buildSummaryDossier(dossierInput,dossierProgress));
   const summaryInput=`캐릭터 이름: ${src.name}\n\n[검증된 요약용 심층 해석 묶음]\n${JSON.stringify(summaryDossier)}\n\n출력 규칙:\n- 원 프로필과 원 문답은 다시 볼 수 없다고 생각하고 이 심층 해석 묶음만으로 작성하세요.\n- oneLineSummary: 25~80자의 한 문장. 가장 흥미로운 긴장이나 행동 원리를 잡으세요.\n- summary.outerSelf: 겉으로 보이는 인상과 그 인상을 단순 라벨로 설명할 수 없는 이유.\n- summary.innerSelf: 실제 선택을 움직이는 자기상·욕구·내적 기준.\n- summary.conflictStyle: 감정이 흔들리는 자극과 평소 반응이 달라지는 임계점.\n- summary.affectionStyle: 신뢰가 생기는 조건과 관계에서 반복되는 거리·개입 패턴.\n- summary.misunderstoodPoint: 겉에서 오해하기 쉬운 의미와 실제 내부 기능의 차이.\n- summary.hiddenPattern: 서로 다른 insight를 다시 연결했을 때 보이는 의외의 공통 원리.\n- summary 6개 필드는 각각 160~260자를 목표로 하세요.\n- 각 필드는 정확히 2개의 자연스러운 문단으로 나누고 문단 사이는 빈 줄 하나(\\n\\n)로 구분하세요.\n- 모든 문단은 **문단에서 다룰 주제만 알려주는 짧은 안내문**으로 시작하세요.\n- 본문은 실제 상담사가 오너에게 캐릭터를 풀이하듯 자연스러운 해요체 존댓말로 작성하세요.\n- evidenceAnchors를 근거 목록처럼 나열하지 말고 필요한 경우 짧은 예시로만 사용하세요.\n- 여섯 카드는 같은 행동이나 같은 결론을 반복하지 마세요.\n- 상세 리포트에서 다룰 전체 인과와 반례를 미리 다 풀지는 마세요.\n- evidencePack에는 behaviorRules, relationshipPatterns, emotionalPatterns, valuesAndMotives, exceptionsAndConditions, tensionsAndContradictions, distinctiveDetails, uncertainties만 작성하고 각 축은 중요한 발견만 0~3개로 제한하세요.\n- summaryTags: 각 요약 카드의 스캔용 키워드 태그. {"outerSelf":[...],"innerSelf":[...],"conflictStyle":[...],"affectionStyle":[...],"misunderstoodPoint":[...],"hiddenPattern":[...]} 형태로, 카드마다 2~3개, 항목당 2~10자의 짧은 한국어 키워드(문장/설명/해시태그 기호 금지). 해당 카드 본문의 핵심만 담으세요.\n- summaryCardLines: 각 카드에 표시할 "전용 한 문장". {"outerSelf":"...","innerSelf":"...","conflictStyle":"...","affectionStyle":"...","misunderstoodPoint":"...","hiddenPattern":"..."} 형태로 6개 모두 작성하세요.\n  · 긴 summary 본문을 요약·축약하거나 첫 문장을 재사용하지 말고, 그 항목에서 가장 핵심적으로 새롭게 읽힌 결론을 한눈에 이해되게 정리한 문장이어야 합니다.\n  · 한 카드당 완결된 문장 1개. 약 25~55자 목표(자연스러움 우선). 말줄임표(…)로 끝내지 말고 문장을 완결하세요.\n  · 문체는 요약 본문과 같은 해요체(~해요/~보여요/~쪽에 가까워요 등).\n  · 카드 제목을 반복하거나 "이 캐릭터는 ~예요" 같은 메타 설명을 넣지 마세요.\n  · "다정해요/신중해요/관계를 중요하게 생각해요" 같은 일반적 성격 라벨로 끝내면 안 되고, 이 캐릭터만의 구체적 작동 원리나 모순이 드러나야 합니다.\n  · 본문 첫 안내문(**~부터 볼게요.**)을 그대로 쓰지 마세요.\n  · 6개 문장은 서로 같은 말을 반복하지 말고 각자 역할이 분명해야 합니다.\n  · 필드 역할: outerSelf=타인이 처음 보는 모습의 핵심과 그 인상이 단순하지 않은 이유 / innerSelf=실제 선택·행동을 움직이는 내적 기준 / conflictStyle=평소와 달라지는 핵심 자극·감정 임계점 / affectionStyle=가까워질수록 반복되는 친밀감·신뢰 패턴 / misunderstoodPoint=겉 의미와 실제 작동 이유의 차이 / hiddenPattern=여러 떨어진 단서를 연결해야 보이는 의외의 공통 원리.\n최종 JSON 키는 oneLineSummary, summary, summaryTags, summaryCardLines, evidencePack만 사용하세요.`;
-  return withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_teaser'},()=>generateSummary(summaryInput,src));
+  return withAiUsageContext({sessionId:usage.sessionId,shareCode:usage.shareCode,stage:'summary_teaser'},()=>generateSummary(summaryInput,src,writeProgress));
 }
 
 async function uniqueShareCode(){const sb=getSupabaseServer();for(let i=0;i<8;i++){const code=generateShareCode();const {data,error}=await sb.rpc('character2_share_code_exists',{p_share_code:code});if(error)throw error;if(data!==true)return code}throw new Error('SHARE_CODE_EXHAUSTED')}
 
 export async function POST(request:Request){
+  // 요청 본문 파싱 실패는 스트림을 열기 전에 평소대로 JSON 오류로 답한다.
+  let body:z.infer<typeof requestSchema>;
   try{
+    body=requestSchema.parse(await readJsonWithinBudget(request));
+  }catch(error){return apiError(error)}
+
+  // 요약 생성은 1~3분 걸린다. 예전에는 응답이 끝날 때까지 화면이 시간 기반으로 지어낸
+  // %를 보여줬는데, 실제 생성량과 무관해서 96%에서 한참 멈춘 것처럼 보였다.
+  // 이제 실제 생성 진행률을 그대로 흘려보낸다(단계 이름은 노출하지 않는다).
+  return ndjsonStream(async(emit)=>{
     await assertRateLimit('character_finalize',8,60);
-    const body=requestSchema.parse(await readJsonWithinBudget(request));
     // 성격 태그는 AI 추론 단계에서 정해진 aiInitial과 오너가 고른 ownerSelected로 고정한다.
     // 인터뷰 후·요약 후 태그를 다시 뽑던 AI 호출 2회는 제거했다(생성 시간·비용 절감).
     // 스키마 호환을 위해 필드는 남기되, 확정된 태그를 그대로 채워 화면 폴백이 끊기지 않게 한다.
@@ -391,7 +408,7 @@ export async function POST(request:Request){
       answers:body.answers,
       review:inferenceReview,
       analysisDraft,
-    },{sessionId:body.draft.usageSessionId});
+    },{sessionId:body.draft.usageSessionId},r=>emit(r*.97));
     characterEvidencePackSchema.parse(summaryResult.evidencePack);
     const summaryGenMs=Date.now()-summaryStartedAt;
 
@@ -409,6 +426,7 @@ export async function POST(request:Request){
     await attachAiUsageSession(body.draft.usageSessionId,shareCode);
     // 요약 리포트 생성 소요시간(관리자용). 실패해도 캐릭터 생성엔 영향 없게 조용히 넘어간다.
     try{await sb.rpc('character2_set_summary_timing',{p_share_code:shareCode,p_ms:summaryGenMs})}catch{}
-    return NextResponse.json({preview:buildCharacterReportPreview(passport),shareCode,editToken});
-  }catch(error){return apiError(error)}
+    return {preview:buildCharacterReportPreview(passport),shareCode,editToken};
+  // 스트리밍이 끊겨 진행률이 안 올라와도 막대가 멈춰 보이지 않게 시간 기반 하한을 둔다.
+  },{estimateSeconds:100,floorCap:.9});
 }

@@ -135,16 +135,11 @@ export function AnalyzeFlow(){
     return parts.join(' ');
   },[profileText,secretProfileText,draft,answers]);
 
+  // 예전에는 여기서 경과 시간만으로 %를 지어냈다. 이제 서버가 실제 생성 진행률을
+  // 흘려보내므로(finalize NDJSON 스트림) 시작값만 세우고 나머지는 스트림이 채운다.
   useEffect(()=>{
     if(stage!=='finalizing')return;
     setFinalizeProgress(4);
-    const started=Date.now();
-    const id=window.setInterval(()=>{
-      const elapsed=(Date.now()-started)/1000;
-      const ratio=1-Math.exp(-elapsed/70);
-      setFinalizeProgress(Math.max(4,Math.min(96,Math.round(ratio*96))));
-    },600);
-    return()=>window.clearInterval(id);
   },[stage]);
   const flavorName=draft?.basicProfile.name||name||'이 캐릭터';
   const flavorMessage=useRotatingFlavor(characterSignalText,flavorName,busy);
@@ -181,7 +176,7 @@ export function AnalyzeFlow(){
 
   function previousQuestion(){if(busy||!question)return;const previous=questionHistory.filter(item=>item.order<question.order).at(-1);if(previous)applyQuestion(previous,questionHistory,answers)}
   function forwardQuestion(){if(busy||!question)return;const next=questionHistory.find(item=>item.order===question.order+1);if(next)applyQuestion(next,questionHistory,answers)}
-  async function finalize(finalAnswers=answers){if(!draft)return;const normalizedAnswers=uniqueAnswersByOrder(finalAnswers);if(normalizedAnswers.length!==20){setStage('interview');setError('답변 순서를 복구하는 중이에요. 마지막으로 완료하지 못한 질문부터 다시 이어주세요.');return}setStage('finalizing');setBusy(true);setError('');try{const r=await fetch('/api/characters/finalize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers})});const body=await r.json().catch(()=>({}));if(!r.ok){handleApiError(r.status,body);setStage('interview');return}persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body);setStage('done')}finally{setBusy(false)}}
+  async function finalize(finalAnswers=answers){if(!draft)return;const normalizedAnswers=uniqueAnswersByOrder(finalAnswers);if(normalizedAnswers.length!==20){setStage('interview');setError('답변 순서를 복구하는 중이에요. 마지막으로 완료하지 못한 질문부터 다시 이어주세요.');return}setStage('finalizing');setBusy(true);setError('');try{const body=await postJsonStream<{preview:unknown;shareCode:string;editToken:string}>('/api/characters/finalize',{draft,answers:normalizedAnswers},r=>setFinalizeProgress(Math.max(4,Math.min(99,Math.round(r*100)))));persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body as never);setStage('done')}catch(err){const e=err as Error&{status?:number;body?:unknown};handleApiError(e.status||500,e.body||{error:e.message});setStage('interview')}finally{setBusy(false)}}
 
   function toggleMulti(option:string){const max=question?responseConfigOf(question).maxSelections:undefined;setMultiSelected(current=>{if(current.includes(option))return current.filter(item=>item!==option);if(max&&current.length>=max)return current;return [...current,option]})}
   function addRank(option:string){setRanking(current=>current.includes(option)?current:[...current,option])}

@@ -5,6 +5,29 @@
 // deploy or an error page), it transparently falls back to reading it as plain JSON.
 export type StreamError = Error & { status?: number; body?: unknown };
 
+// Reads the final {"result":...} payload out of a response that may be either an NDJSON
+// progress stream or a plain JSON body. fetch-wrapping bridges use this so they keep
+// working after a route is switched to streaming. Always pass a clone() — this consumes
+// the body. Returns null when the payload cannot be read.
+export async function readJsonOrStreamResult<T = Record<string, unknown>>(
+  response: Response,
+): Promise<T | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('ndjson')) {
+    return await response.json().catch(() => null) as T | null;
+  }
+  const text = await response.text().catch(() => '');
+  // The result line is the last one; scan backwards so progress lines are skipped cheaply.
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    try {
+      const message = JSON.parse(lines[i]) as Record<string, unknown>;
+      if ('result' in message) return message.result as T;
+    } catch { /* ignore malformed lines */ }
+  }
+  return null;
+}
+
 export async function postJsonStream<T>(
   url: string,
   payload: unknown,
