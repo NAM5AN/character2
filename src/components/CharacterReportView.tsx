@@ -327,7 +327,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         <div className="label">캐릭터 저장</div>
         {canEditIdentity?<>
           <div className="save-character-row">
-            <div className="field"><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></div>
+            <div className="field"><label className="label"><span className="label-text">오너명</span><input className="input" value={ownerName} maxLength={80} disabled={identityBusy} onChange={e=>{setOwnerName(e.target.value);setOwnerNameSaved(false);setIdentityError('')}} /></label></div>
             <button className="btn soft" disabled={identityBusy||!ownerName.trim()||ownerNameSaved} onClick={()=>void saveOwnerIdentity()}>{identityBusy?'저장 중…':ownerNameSaved?'저장 완료':'저장'}</button>
           </div>
           {identityError&&<p className="error" style={{marginBottom:0}}>{identityError}</p>}

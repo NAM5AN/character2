@@ -294,3 +294,25 @@
     line-height: 1.82 !important;
   }
 }
+
+/* 펼침 트리거가 button 이 되면서 브라우저 기본 스타일(테두리·배경·가운데정렬·폰트)이
+   grid 레이아웃을 덮어쓴다. 시각적 결과는 예전 header 와 동일하게 유지하고,
+   키보드 접근성만 얻기 위해 기본값만 되돌린다. */
+.report-mag button.section-head {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.report-mag button.section-head:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 4px;
+  border-radius: 6px;
+}

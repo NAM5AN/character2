@@ -90,6 +90,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko">
       <body>
+        {/* 키보드 사용자가 머리말·내비게이션을 건너뛰고 본문으로 바로 이동한다.
+            평소에는 화면 밖에 있고 포커스를 받을 때만 나타난다. */}
+        <a className="skip-to-content" href="#content">본문 바로가기</a>
         <ReportSummaryToggleBridge/>
         <AdminTelemetryRefreshBridge/>
         <ReplayResultUrlBridge/>
@@ -114,7 +117,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
         </header>
         <AdminDeploymentVersionPanel/>
-        {children}
+        <div id="content" tabIndex={-1}>{children}</div>
         <footer className="footer"><div className="container"><FeedbackReporter deploymentVersion={deploymentVersion}/></div></footer>
       </body>
     </html>

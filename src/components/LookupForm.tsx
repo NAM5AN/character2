@@ -30,8 +30,8 @@ export function LookupForm() {
   }
 
   return <form onSubmit={e=>{e.preventDefault();void submit()}}>
-    <div className="field" style={{marginTop:0}}><label className="label">캐릭터 이름</label><input className="input" value={name} maxLength={80} placeholder="예: 한서진" onChange={e=>setName(e.target.value)} /></div>
-    <div className="field"><label className="label">오너명</label><input className="input" value={ownerName} maxLength={80} placeholder="저장할 때 입력한 오너명" onChange={e=>setOwnerName(e.target.value)} /></div>
+    <div className="field" style={{marginTop:0}}><label className="label"><span className="label-text">캐릭터 이름</span><input className="input" value={name} maxLength={80} placeholder="예: 한서진" onChange={e=>setName(e.target.value)} /></label></div>
+    <div className="field"><label className="label"><span className="label-text">오너명</span><input className="input" value={ownerName} maxLength={80} placeholder="저장할 때 입력한 오너명" onChange={e=>setOwnerName(e.target.value)} /></label></div>
     {error&&<p className="error">{error}</p>}
     <button className="btn primary" disabled={busy||!name.trim()||!ownerName.trim()} type="submit">{busy?'찾는 중…':'리포트 불러오기'}</button>
   </form>;

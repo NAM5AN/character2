@@ -74,7 +74,7 @@ export function AccessCodeModal({
           >포스타입에서 코드 확인하기 ↗</a>
         </div>
       </div>
-      <div className="field"><label className="label">이용 코드</label><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} /></div>
+      <div className="field"><label className="label"><span className="label-text">이용 코드</span><input disabled={busy} className="input" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!busy)validate()}} /></label></div>
       {error && <div className="error" style={{whiteSpace:'pre-wrap'}}>{error}</div>}
       <div className="actions"><button className="btn primary" disabled={busy||!code.trim()} onClick={validate}>{busy?'확인 중…':submitLabel}</button><button className="btn" disabled={busy} onClick={onClose}>닫기</button></div>
     </div>

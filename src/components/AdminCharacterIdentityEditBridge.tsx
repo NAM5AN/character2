@@ -136,12 +136,12 @@ export function AdminCharacterIdentityEditBridge() {
       <h3 style={{ marginTop: 8 }}>캐릭터 정보 수정</h3>
       <p>공유코드는 유지하고 캐릭터명과 오너명만 수정합니다. 오너명을 비우고 저장하면 오너명 정보가 제거돼요.</p>
       <div className="field">
-        <label className="label">캐릭터명</label>
-        <input className="input" maxLength={80} disabled={busy} value={name} onChange={event => setName(event.target.value)} />
+        <label className="label"><span className="label-text">캐릭터명</span>
+        <input className="input" maxLength={80} disabled={busy} value={name} onChange={event => setName(event.target.value)} /></label>
       </div>
       <div className="field">
-        <label className="label">오너명 <span className="muted">(비워서 제거 가능)</span></label>
-        <input className="input" maxLength={80} disabled={busy} value={ownerName} onChange={event => setOwnerName(event.target.value)} />
+        <label className="label"><span className="label-text">오너명 <span className="muted">(비워서 제거 가능)</span></span>
+        <input className="input" maxLength={80} disabled={busy} value={ownerName} onChange={event => setOwnerName(event.target.value)} /></label>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="actions">

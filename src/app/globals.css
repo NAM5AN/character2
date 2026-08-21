@@ -58,7 +58,10 @@ h3 { letter-spacing: -.03em; }
 .page-head { margin-bottom: 32px; }
 .page-head p { color:var(--muted); max-width:680px; line-height:1.7; }
 .field { display:grid; gap:8px; margin:18px 0; }
-.label { font-size:13px; font-weight:800; }
+/* label 이 입력을 감싸도록 바뀌었다(접근 가능한 이름 연결). 감싸기 전과 같은
+   세로 배치를 유지하기 위해 블록으로 두고, 글자 부분만 따로 간격을 준다. */
+.label { font-size:13px; font-weight:800; display:block; }
+.label-text { display:block; margin-bottom:6px; }
 .field > label.label:has(+ textarea.textarea)::after { content:' · 구글 문서 · 포스타입 · 노션 공개 링크 가능'; color:var(--muted); font-weight:700; }
 .input, .textarea { width:100%; border:1px solid var(--line); border-radius:12px; background:white; color:var(--ink); padding:14px 15px; outline:none; }
 input[placeholder^="예:"]::placeholder,
@@ -144,3 +147,47 @@ textarea[placeholder^="예:"]::placeholder { color: transparent; }
   .bipolar-control { padding:18px 14px 16px; }
   .bipolar-labels { gap:14px; font-size:13px; }
 }
+
+/* 전역 키보드 포커스 표시.
+   :focus-visible 이라 마우스 클릭에는 나타나지 않고 키보드 이동에만 보인다.
+   캐릭터 테마가 배경색을 바꾸므로, 어두운 외곽선 바깥에 흰 테두리를 한 겹 둘러
+   밝은 배경과 어두운 배경 양쪽에서 모두 보이게 한다. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px #ffffffcc;
+  border-radius: 4px;
+}
+
+/* 이미 자체 포커스 스타일이 있는 컨트롤은 그대로 둔다(이중 표시 방지). */
+.bipolar-range:focus-visible {
+  box-shadow: none;
+}
+
+/* 본문 바로가기. 평소에는 화면 밖으로 밀어두고 포커스를 받을 때만 나타난다.
+   display:none 이나 visibility:hidden 은 포커스 자체를 막으므로 쓰지 않는다. */
+.skip-to-content {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 14px;
+  text-decoration: none;
+  transition: top .15s ease;
+}
+
+.skip-to-content:focus {
+  top: 12px;
+}
+
+/* children 래퍼는 순전히 이동 목표용이라 레이아웃에 관여하지 않아야 한다. */
+#content { display: contents; }
+
+/* display:contents 인 요소는 포커스 아웃라인을 그릴 상자가 없다. 이동 후 테두리가
+   깜빡이지 않도록 아웃라인을 지운다(이동 자체와 스크린리더 안내는 그대로 동작). */
+#content:focus { outline: none; }

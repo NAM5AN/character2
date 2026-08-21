@@ -771,24 +771,24 @@ export default function AdminConsolePage() {
 
         <div className="stack" style={{ gap: 12, marginTop: 16 }}>
           <div className="field" style={{ margin: 0 }}>
-            <label className="label">새 코드로 변경 (비우면 코드 유지, 4자 이상)</label>
+            <label className="label"><span className="label-text">새 코드로 변경 (비우면 코드 유지, 4자 이상)</span>
             <input
               className="input"
               value={codeInput}
               onChange={e => setCodeInput(e.target.value)}
               placeholder="새 결제코드 입력"
               style={{ maxWidth: 320 }}
-            />
+            /></label>
           </div>
           <div className="field" style={{ margin: 0 }}>
-            <label className="label">포스타입 유료글 주소</label>
+            <label className="label"><span className="label-text">포스타입 유료글 주소</span>
             <input
               className="input"
               value={postypeInput}
               onChange={e => setPostypeInput(e.target.value)}
               placeholder="https://posty.pe/..."
               style={{ maxWidth: 460 }}
-            />
+            /></label>
           </div>
         </div>
 

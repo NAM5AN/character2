@@ -108,8 +108,17 @@ function MagazineSection({ meta, name, analysis }: { meta: SectionMeta; name: st
   const uniqueTags = Array.from(new Set(tags));
   const tldr = a[`${meta.key}Tldr`] as string | undefined;
   const blocks = sectionStudyBlocks(String(meta.key), analysis);
+  // 펼침 트리거는 button 이어야 키보드로 도달·조작할 수 있다. header 에 onClick 만 있던
+  // 예전 구조에서는 Tab 으로 닿지도, Enter/Space 로 열리지도 않았다.
+  const panelId = `report-section-panel-${String(meta.key)}`;
   return <section className={`report-section${open ? ' is-open' : ''}`}>
-    <header className="section-head" onClick={() => setOpen(v => !v)} aria-expanded={open}>
+    <button
+      type="button"
+      className="section-head"
+      onClick={() => setOpen(v => !v)}
+      aria-expanded={open}
+      aria-controls={panelId}
+    >
       <div className="section-number">{meta.no}</div>
       <div>
         <div className="section-kicker">{meta.kicker}</div>
@@ -118,8 +127,8 @@ function MagazineSection({ meta, name, analysis }: { meta: SectionMeta; name: st
         {uniqueTags.length ? <div className="section-tags">{uniqueTags.map((t, i) => <span key={i}>#{t}</span>)}</div> : null}
       </div>
       <span className="section-chev" aria-hidden="true">▾</span>
-    </header>
-    {open && <div className="topic-grid">
+    </button>
+    {open && <div className="topic-grid" id={panelId}>
       {topics.map((topic, index) => <Fragment key={`${index}-${topic.lead.slice(0, 10)}`}>
         <article className={topicClass(index, total, String(meta.key))}>
           <div className="topic-no">{String(index + 1).padStart(2, '0')}</div>
