@@ -17,7 +17,6 @@ type DetailPayload={
   complete?:boolean;
 };
 
-const DETAIL_ESTIMATE_SECONDS=70;
 
 function paragraphChunks(text:string){
   const normalized=text.replace(/\r\n?/g,'\n').trim();
@@ -53,12 +52,6 @@ function formatError(message:string,_code:string,_details=''){
   return message;
 }
 
-function remainingLabel(elapsed:number){
-  if(elapsed>=DETAIL_ESTIMATE_SECONDS)return '조금 더 걸리고 있어요';
-  const remaining=Math.max(5,Math.ceil((DETAIL_ESTIMATE_SECONDS-elapsed)/5)*5);
-  return `약 ${remaining}초 남음`;
-}
-
 function TextSection({title,text}:{title:string;text?:string}){
   if(!text?.trim())return null;
   return <section className="result-block"><h3>{title}</h3><ParagraphText text={text}/></section>;
@@ -75,7 +68,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [progress,setProgress]=useState(0);
-  const [elapsedSeconds,setElapsedSeconds]=useState(0);
   // 상세 리포트 생성 로딩은 저장된 최종 성격 태그를 가장 먼저 사용한다.
   // 구버전 캐릭터는 interview → owner → initial 순서로 폴백하고, 태그 자체가 없을 때만 텍스트 키워드 감지를 쓴다.
   const flavorSignal=[preview.oneLineSummary,preview.summary?.outerSelf,preview.summary?.innerSelf,preview.summary?.conflictStyle,preview.summary?.affectionStyle,preview.summary?.misunderstoodPoint,preview.summary?.hiddenPattern].filter(Boolean).join(' ');
@@ -135,17 +127,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     }).catch(()=>{});
   },[unlockOpen,detail,creatorEditToken,preview.shareCode]);
 
-  useEffect(()=>{
-    if(!busy)return;
-    const startedAt=Date.now();
-    // 진행률은 서버 스트림이 채운다. 여기서는 경과 시간만 센다.
-    const tick=()=>{
-      setElapsedSeconds(Math.floor((Date.now()-startedAt)/1000));
-    };
-    tick();
-    const timer=window.setInterval(tick,1000);
-    return ()=>window.clearInterval(timer);
-  },[busy]);
 
   function editToken(){
     if(creatorEditToken)return creatorEditToken;
@@ -218,7 +199,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   }
 
   async function loadDetail(code:string){
-    setProgress(8);setElapsedSeconds(0);setBusy(true);setError('');setPrefetchError('');
+    setProgress(8);setBusy(true);setError('');setPrefetchError('');
     try{
       const token=editToken();
       // 서버가 실제 생성 진행률을 NDJSON 으로 흘려보낸다(경과 시간 추정 대신).
@@ -361,9 +342,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         </div>
         <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
           <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:14,flexWrap:'wrap',marginTop:8,fontSize:13}}>
-          <span className="muted">{remainingLabel(elapsedSeconds)}</span>
         </div>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
