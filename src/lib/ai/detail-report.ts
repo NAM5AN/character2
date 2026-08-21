@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { askClaudeJson, rewriteReportLeads } from '@/lib/ai/anthropic';
+import { askClaudeJson, streamClaudeJson, rewriteReportLeads } from '@/lib/ai/anthropic';
 import { lenientArray, lenientStringArray } from '@/lib/ai/lenient';
 import {
   analysisTypeSummarySchema,
@@ -369,9 +369,10 @@ function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
   return q.evidenceStrength>=2 && q.specificity>=2 && q.latentDepth>=2 && q.inferenceDistance>=2 && total>=12;
 }
 
-async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|UnknownRecord):Promise<PsychologicalModel>{
-  const model=await askClaudeJson({
+async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|UnknownRecord,onProgress?:(r:number)=>void):Promise<PsychologicalModel>{
+  const model=await streamClaudeJson({
     system:PSYCHE_SYSTEM,
+    onProgress,
     schema:psychologicalModelSchema,
     maxAttempts:2,
     input:`캐릭터 이름: ${seed.name}\n\n[원자료 — 이 호출에서만 사용]\n${JSON.stringify(packet)}\n\n작업 규칙:\n- 원 질문을 그대로 다시 쓰지 말고, 서로 떨어진 행동·상황·관계 조건을 연결해 해석하세요.\n- validatedInsights는 quality rubric 통과 항목만 남기세요. evidenceStrength/specificity/latentDepth/inferenceDistance는 각각 2 이상, 전체 합은 12 이상이어야 합니다.\n- evidenceAnchors는 질문 문장을 보존하지 말고 행동·상황·관계 조건만 짧게 남기세요.\n- prediction은 이 해석이 맞다면 다른 상황에서 어떤 반응을 보일지 적어 행동 예측력을 확인하세요.\n- tensions는 실제로 상반된 행동이 같은 욕구에서 갈라질 때만 작성하고 억지로 개수를 채우지 마세요.\n- 여섯 분석 축을 모두 다루되, 하나의 충분히 깊은 insight가 여러 축을 연결해도 됩니다. 축별 개수를 맞추기 위해 약한 가설을 억지로 만들지 마세요.\n- 오너의 명시적 정정은 가장 높은 우선순위로 반영하세요.`,
@@ -411,8 +412,9 @@ function commonWriterInput(seed:DetailSeed,dossier:ReportDossier){
   return `캐릭터 이름: ${seed.name}\n\n[검증된 심층 해석 묶음]\n${JSON.stringify(dossier)}\n\n공통 규칙:\n- 배정된 소주제는 하나도 빠뜨리지 말되, 각 소주제는 핵심만 간결하게 다루세요. 분량을 채우려 말을 늘리지 말고, 중복·군더더기·뻔한 일반론을 걷어내 압축하세요. 길게 쓰는 것보다 날카롭게 쓰는 게 낫습니다.\n- 문장 길이를 들쭉날쭉하게 해 호흡을 만드세요. 긴 문장 사이에 짧고 단정한 문장을 섞고, 모든 문장이 비슷한 리듬으로 이어지지 않게 하세요.\n- 핵심 지점마다 있는 단서로 그릴 수 있는 짧고 구체적인 장면을 하나씩 넣어 추상적인 설명만 이어지지 않게 하세요.\n- 원 질문/원 답변을 떠올려 재구성하지 마세요.\n- 모든 문장은 자연스러운 해요체 존댓말로 완결하세요.\n- 자연스럽게 나뉜 모든 문단의 첫 문장은 반드시 **굵은 안내문**으로 시작하세요. 안내문은 결론이 아니라 그 문단에서 다룰 주제만 알려주는 짧은 문장이어야 합니다.\n- 안내문은 상담사가 화제를 안내하는 A형 또는 독자가 궁금해할 질문을 던지는 C형 중 하나만 사용하고, 둘을 한 문장에 합치거나 기계적으로 번갈아 쓰지 마세요.\n- 안내문 뒤 본문에서는 가장 중요한 해석 1~2곳을 별표 두 개로 감싸 하이라이트하세요(6~25자 구절, 문장 통째로 감싸지 말 것, 강조할 지점이 없으면 생략).\n- 같은 insight를 여러 문단에서 반복하지 말고 맥락이 자연스럽게 이어지게 쓰세요.\n- 근거가 부족한 소주제는 삭제하지 말고 불확실성을 표시한 뒤 현재 읽을 수 있는 범위까지 설명하세요.\n- 새로운 과거 사건이나 숨겨진 설정을 창작하지 마세요.\n- 질문 번호, 점수, 퍼센트, 슬라이더, 선택지 번호, 분석 과정이나 입력 출처를 드러내는 표현은 사용하지 마세요.`;
 }
 
-async function writeStage1(seed:DetailSeed,dossier:ReportDossier){
-  return askClaudeJson({
+async function writeStage1(seed:DetailSeed,dossier:ReportDossier,onProgress?:(r:number)=>void){
+  return streamClaudeJson({
+    onProgress,
     system:REPORT_SYSTEM,
     schema:stage1Schema,
     maxAttempts:2,
@@ -490,7 +492,7 @@ export async function buildDetailDossier(seedInput:unknown,publicProfileText='',
   return buildReportDossier(psyche);
 }
 
-export async function generatePaidDetailStage1(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown,precomputedDossier?:unknown):Promise<{analysis:FinalAnalysis;dossier:ReportDossier}>{
+export async function generatePaidDetailStage1(seedInput:unknown,publicProfileText='',privateSourceInput?:unknown,precomputedDossier?:unknown,onProgress?:(r:number)=>void):Promise<{analysis:FinalAnalysis;dossier:ReportDossier}>{
   const seed=detailSeedSchema.parse(seedInput);
   const {packet,sources}=buildSourcePacket(seed,publicProfileText,privateSourceInput);
   // 미리 계산해둔 dossier가 있으면 심리모델(가장 무거운 호출)을 건너뛴다. 없거나 형식이 안 맞으면 정상 생성.
@@ -499,8 +501,13 @@ export async function generatePaidDetailStage1(seedInput:unknown,publicProfileTe
     const parsed=reportDossierSchema.safeParse(precomputedDossier);
     if(parsed.success)dossier=parsed.data;
   }
-  if(!dossier)dossier=buildReportDossier(await buildPsychologicalModel(seed,packet));
-  const stage=await writeStage1(seed,dossier);
+  // 미리 계산된 dossier 가 있으면 글쓰기 한 단계뿐이라 진행률을 통째로 준다.
+  // 없으면 심리모델(앞 45%) → 글쓰기(뒤 55%)로 이어붙여 한 막대로 보이게 한다.
+  const hasDossier=Boolean(dossier);
+  const psycheProgress=onProgress?(r:number)=>onProgress(r*.45):undefined;
+  const writeProgress=onProgress?(r:number)=>onProgress(hasDossier?r:.45+r*.55):undefined;
+  if(!dossier)dossier=buildReportDossier(await buildPsychologicalModel(seed,packet,psycheProgress));
+  const stage=await writeStage1(seed,dossier,writeProgress);
   validateVisibleText(`${stage.characterOverview} ${stage.innerMechanics}`,sources);
   const analysis=finalAnalysisSchema.parse({oneLineSummary:seed.oneLineSummary,summary:seed.summary,...stage});
   return {analysis,dossier};

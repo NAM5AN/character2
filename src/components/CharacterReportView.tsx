@@ -1,4 +1,5 @@
 'use client';
+import { postJsonStream, type StreamError } from '@/lib/stream-client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FinalAnalysis } from '@/lib/schemas/character';
@@ -50,13 +51,6 @@ function apiErrorInfo(body:unknown,status:number){
 
 function formatError(message:string,_code:string,_details=''){
   return message;
-}
-
-function estimatedProgress(elapsed:number){
-  if(elapsed<12)return Math.min(30,8+elapsed*1.8);
-  if(elapsed<38)return Math.min(70,30+(elapsed-12)*1.55);
-  if(elapsed<65)return Math.min(94,70+(elapsed-38)*.9);
-  return Math.min(97,94+(elapsed-65)*.12);
 }
 
 function remainingLabel(elapsed:number){
@@ -144,10 +138,9 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   useEffect(()=>{
     if(!busy)return;
     const startedAt=Date.now();
+    // 진행률은 서버 스트림이 채운다. 여기서는 경과 시간만 센다.
     const tick=()=>{
-      const elapsed=Math.floor((Date.now()-startedAt)/1000);
-      setElapsedSeconds(elapsed);
-      setProgress(Math.round(estimatedProgress(elapsed)));
+      setElapsedSeconds(Math.floor((Date.now()-startedAt)/1000));
     };
     tick();
     const timer=window.setInterval(tick,1000);
@@ -228,15 +221,21 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     setProgress(8);setElapsedSeconds(0);setBusy(true);setError('');setPrefetchError('');
     try{
       const token=editToken();
-      const r=await fetch(`/api/characters/${preview.shareCode}`,{
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify({accessCode:code,stage:1,...(token?{editToken:token}:{})}),
-      });
-      const body=await r.json().catch(()=>({}));
-      if(!r.ok){
-        const apiError=apiErrorInfo(body,r.status);
-        if(r.status===401){localStorage.removeItem('chara_ai_access_code');setUnlockOpen(true)}
+      // 서버가 실제 생성 진행률을 NDJSON 으로 흘려보낸다(경과 시간 추정 대신).
+      let body:{detail:DetailPayload};
+      try{
+        body=await postJsonStream<{detail:DetailPayload}>(
+          `/api/characters/${preview.shareCode}`,
+          {accessCode:code,stage:1,...(token?{editToken:token}:{})},
+          r=>setProgress(Math.max(8,Math.min(99,Math.round(r*100)))),
+        );
+      }catch(streamError){
+        const e=streamError as StreamError;
+        const status=e.status||500;
+        const failed=(e.body??{error:e.message}) as Record<string,unknown>;
+        {
+        const apiError=apiErrorInfo(failed,status);
+        if(status===401){localStorage.removeItem('chara_ai_access_code');setUnlockOpen(true)}
         if(apiError.code==='DETAIL_OWNER_SOURCE_REQUIRED'){
           setError('상세 리포트가 아직 준비되지 않았어요. 처음 한 번은 이 캐릭터를 만든 브라우저에서 열어주세요.');
         }else if(apiError.code==='EDIT_TOKEN_INVALID'){
@@ -247,6 +246,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           setError('상세 리포트를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
         }
         return;
+        }
       }
       codeRef.current=code;
       tokenRef.current=token;

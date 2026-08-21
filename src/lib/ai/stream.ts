@@ -6,7 +6,11 @@ type StreamRun = (emit: (progress: number) => void) => Promise<unknown>;
 // works and a final {"result":...} (or {"error":...,"status":...}) line. Progress is
 // monotonic and throttled. An optional time-based floor keeps the bar moving even when
 // the underlying work reports no real progress (e.g. streaming unavailable).
-export function ndjsonStream(run: StreamRun, options: { estimateSeconds?: number; floorCap?: number } = {}): Response {
+export function ndjsonStream(
+  run: StreamRun,
+  // headers: 스트리밍 응답에도 Set-Cookie 같은 헤더를 붙여야 하는 호출부를 위한 것.
+  options: { estimateSeconds?: number; floorCap?: number; headers?: Record<string, string> } = {},
+): Response {
   const encoder = new TextEncoder();
   const estimateSeconds = options.estimateSeconds ?? 0;
   const floorCap = options.floorCap ?? 0.9;
@@ -58,6 +62,7 @@ export function ndjsonStream(run: StreamRun, options: { estimateSeconds?: number
       'content-type': 'application/x-ndjson; charset=utf-8',
       'cache-control': 'no-store, no-transform',
       'x-accel-buffering': 'no',
+      ...(options.headers ?? {}),
     },
   });
 }

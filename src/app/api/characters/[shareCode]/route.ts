@@ -16,7 +16,8 @@ import { withAiUsageContext } from '@/lib/ai/usage';
 import { CHARACTER_DEEP_ANALYSIS_SKILL_VERSION } from '@/lib/ai/character-deep-analysis-skill';
 import { apiError } from '@/lib/http';
 import { createDetailViewToken, sha256 } from '@/lib/crypto';
-import { detailViewCookieName, detailViewCookieOptions } from '@/lib/detail-access';
+import { detailViewCookieName, detailViewCookieOptions, serializeDetailViewCookie } from '@/lib/detail-access';
+import { ndjsonStream } from '@/lib/ai/stream';
 
 const detailBundleSchema=z.object({
   seed:z.unknown().nullable().optional(),
@@ -80,6 +81,10 @@ const detailSchema=z.object({
   // dossier가 준비된 뒤 남은 두 페이지(2,3)를 한 요청에서 병렬 생성해 한 번에 저장한다.
   finishRemaining:z.boolean().optional().default(false),
 });
+
+// 첫 페이지 생성은 1분 이상 걸리고 그동안 진행률 스트림이 열려 있어야 한다.
+// 플랫폼 기본값이 바뀌어도 스트림이 중간에 끊기지 않도록 상한을 명시한다.
+export const maxDuration=300;
 
 export async function POST(request:Request,context:{params:Promise<{shareCode:string}>}){
   let issuedCookie:{shareCode:string;token:string}|null=null;
@@ -179,12 +184,20 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
       }
 
       const precomputed=usablePrecomputedDossier(bundle);
-      const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource,precomputed));
-      const storedAnalysis:Record<string,unknown>={...generated.analysis,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:1,detailComplete:false,_detailDossier:generated.dossier};
-      await saveDetail(storedAnalysis);
-      await markTimingDone();
-      const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
-      return respond({detail:{analysis:publicAnalysis,stageReady:1,complete:false,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}});
+      // 첫 페이지는 1분 넘게 걸린다. 예전에는 화면이 경과 시간으로 %를 지어냈지만,
+      // 이제 실제 생성 진행률을 흘려보낸다(요약 화면과 같은 방식).
+      return ndjsonStream(async(emit)=>{
+        const generated=await withAiUsageContext({shareCode,stage:'detail_stage_1'},()=>generatePaidDetailStage1(bundle.seed,bundle.publicProfileText,privateSource,precomputed,(r:number)=>emit(r*.97)));
+        const storedAnalysis:Record<string,unknown>={...generated.analysis,detailVersion:DETAIL_REPORT_VERSION,skillVersion:CHARACTER_DEEP_ANALYSIS_SKILL_VERSION,detailStage:1,detailComplete:false,_detailDossier:generated.dossier};
+        await saveDetail(storedAnalysis);
+        await markTimingDone();
+        const publicAnalysis=finalAnalysisSchema.parse(storedAnalysis);
+        return {detail:{analysis:publicAnalysis,stageReady:1,complete:false,confirmedFactCount:bundle.confirmedFactCount,inferenceCount:bundle.inferenceCount,cached:false}};
+      },{
+        estimateSeconds:70,
+        floorCap:.9,
+        ...(issuedCookie?{headers:{'set-cookie':serializeDetailViewCookie(issuedCookie.shareCode,issuedCookie.token)}}:{}),
+      });
     }
 
     // 남은 두 페이지(2,3)를 병렬로 한 번에 생성. dossier만 있으면 되므로 stage 2 저장을 기다리지 않는다.
