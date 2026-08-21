@@ -109,10 +109,12 @@ async function exportCsv(token: string) {
       text(row.id),
     ].map(csvCell).join(',')),
   ];
-  const kstDate = new Intl.DateTimeFormat('en-CA', {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date());
-  const filename = `cha-lab_ai-diagnostics_${kstDate}.csv`;
+  }).formatToParts(now);
+  const part = (type: string) => parts.find(item => item.type === type)?.value || '';
+  const filename = `cha-lab_ai-diagnostics_${part('year')}-${part('month')}-${part('day')}.csv`;
 
   return new Response(`\uFEFF${lines.join('\r\n')}`, {
     status: 200,
@@ -164,11 +166,14 @@ export async function DELETE(request: Request) {
     }
 
     const sb = getSupabaseServer();
-    const { data, error } = await sb.rpc('character2_admin_delete_gen_failures', {
-      p_token: token,
-      p_ids: body.all ? null : body.ids,
-      p_all: body.all,
-    });
+    const result = body.all
+      ? await sb.rpc('character2_admin_clear_gen_diagnostics', { p_token: token })
+      : await sb.rpc('character2_admin_delete_gen_failures', {
+          p_token: token,
+          p_ids: body.ids,
+          p_all: false,
+        });
+    const { data, error } = result;
     if (error) {
       if (error.message?.includes('ADMIN_AUTH_INVALID')) {
         return NextResponse.json({ error: 'ADMIN_AUTH_INVALID' }, { status: 401 });
