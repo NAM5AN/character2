@@ -96,9 +96,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           : undefined;
   const flavorMessage=useRotatingFlavor(flavorSignal,preview.name,busy,reportFlavorTags);
   const [reportPage,setReportPage]=useState<1|2|3>(1);
-  const [stageReady,setStageReady]=useState(0);
-  const [prefetchBusy,setPrefetchBusy]=useState(false);
-  const [prefetchError,setPrefetchError]=useState('');
+  const [stageReady,setStageReady]=useState(0);  const [prefetchError,setPrefetchError]=useState('');
   const [ownerName,setOwnerName]=useState(preview.ownerName||'');
   const [ownerNameSaved,setOwnerNameSaved]=useState(Boolean(preview.ownerName));
   const [identityBusy,setIdentityBusy]=useState(false);
@@ -206,9 +204,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     const code=codeRef.current;
     const token=tokenRef.current;
     if(!code||!token)return;
-    inFlightStagesRef.current.add(2);inFlightStagesRef.current.add(3);
-    setPrefetchBusy(true);
-    setPrefetchError('');
+    inFlightStagesRef.current.add(2);inFlightStagesRef.current.add(3);    setPrefetchError('');
     try{
       const r=await fetch(`/api/characters/${preview.shareCode}`,{
         method:'POST',
@@ -225,9 +221,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     }catch{
       setPrefetchError('다음 페이지를 준비하지 못했어요. 잠시 후 다시 시도해주세요.');
     }finally{
-      inFlightStagesRef.current.delete(2);inFlightStagesRef.current.delete(3);
-      setPrefetchBusy(inFlightStagesRef.current.size>0);
-    }
+      inFlightStagesRef.current.delete(2);inFlightStagesRef.current.delete(3);    }
   }
 
   async function loadDetail(code:string){

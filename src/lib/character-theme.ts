@@ -36,7 +36,7 @@ function hexToRgb(hex:string):RGB|null{
   return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};
 }
 function rgbToHsl({r,g,b}:RGB):HSL{
-  let rr=r/255,gg=g/255,bb=b/255;
+  const rr=r/255,gg=g/255,bb=b/255;
   const max=Math.max(rr,gg,bb),min=Math.min(rr,gg,bb);
   let h=0,s=0;const l=(max+min)/2;
   if(max!==min){

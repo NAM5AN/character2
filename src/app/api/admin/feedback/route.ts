@@ -15,11 +15,11 @@ export async function GET(){
     const {data,error}=await sb.rpc('character2_admin_feedback_list',{p_token:token});
     if(error){if(error.message?.includes('ADMIN_AUTH_INVALID'))return NextResponse.json({error:'ADMIN_AUTH_INVALID'},{status:401});throw error}
 
-    const reports=await Promise.all((Array.isArray(data)?data:[]).map(async(report:any)=>({
+    const reports=await Promise.all((Array.isArray(data)?data:[]).map(async(report:Record<string,unknown>)=>({
       ...report,
-      attachments:Array.isArray(report.attachments)?await Promise.all(report.attachments.map(async(item:any)=>{
+      attachments:Array.isArray(report.attachments)?await Promise.all((report.attachments as Record<string,unknown>[]).map(async(item:Record<string,unknown>)=>{
         if(typeof item?.path!=='string'||!item.path)return {...item,url:''};
-        const {data:signed,error:signError}=await sb.storage.from('character2-feedback').createSignedUrl(item.path,SIGNED_URL_TTL_SECONDS);
+        const {data:signed,error:signError}=await sb.storage.from('character2-feedback').createSignedUrl(item.path as string,SIGNED_URL_TTL_SECONDS);
         return {...item,url:signError?'':signed?.signedUrl||''};
       })):[],
     })));

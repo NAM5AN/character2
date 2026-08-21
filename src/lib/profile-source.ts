@@ -127,8 +127,10 @@ function htmlToReadableText(html: string) {
   return deduped.join('\n').trim();
 }
 
-function notionBlockText(block: any) {
-  const properties = block?.properties || {};
+// notion-client 의 블록은 스키마가 느슨하다. any 대신 실제로 읽는 부분만 좁혀서 받는다.
+type NotionTextProps = Record<string, Parameters<typeof getTextContent>[0]>;
+function notionBlockText(block: { properties?: unknown } | null | undefined) {
+  const properties = (block?.properties || {}) as NotionTextProps;
   const texts = [
     getTextContent(properties.title),
     getTextContent(properties.caption),
@@ -194,7 +196,7 @@ async function readNotionProfileUrl(url: URL) {
     if (lines.reduce((n, l) => n + l.length + 1, 0) > MAX_PROFILE_CHARS) break;
   }
 
-  let text = lines.join('\n').replace(/\n{3,}/gu, '\n\n').replace(/\u0000/gu, '').trim();
+  const text = lines.join('\n').replace(/\n{3,}/gu, '\n\n').replace(/\u0000/gu, '').trim();
 
   console.info('NOTION_PROFILE_READ', {
     pageId,

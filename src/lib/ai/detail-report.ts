@@ -369,15 +369,6 @@ function qualityPass(insight:z.infer<typeof validatedInsightSchema>){
   return q.evidenceStrength>=2 && q.specificity>=2 && q.latentDepth>=2 && q.inferenceDistance>=2 && total>=12;
 }
 
-function validatedInsightReason(model:PsychologicalModel){
-  const passed=model.validatedInsights.filter(qualityPass);
-  // The six report axes are coverage targets, not a requirement for six separate strong hypotheses.
-  // One high-quality insight can legitimately connect multiple axes. Failing the whole report at 5/6
-  // discarded an otherwise strong analysis and created a false-negative production error.
-  if(passed.length<4)return `품질 기준 통과 insight 부족 (${passed.length}개)`;
-  return '';
-}
-
 async function buildPsychologicalModel(seed:DetailSeed,packet:SourcePacket|UnknownRecord):Promise<PsychologicalModel>{
   const model=await askClaudeJson({
     system:PSYCHE_SYSTEM,
