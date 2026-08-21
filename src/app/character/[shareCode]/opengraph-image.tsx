@@ -8,6 +8,10 @@ export const alt='CHA LAB 캐릭터 정밀 해석';
 export const size={width:1200,height:630};
 export const contentType='image/png';
 
+const boldFontPromise=fetch('https://cdn.jsdelivr.net/gh/wefonts/pretendard/Pretendard-ExtraBold.ttf')
+  .then(response=>response.ok?response.arrayBuffer():null)
+  .catch(()=>null);
+
 async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   const code=normalizeShareCode(rawCode);
   if(!isShareCode(code))return null;
@@ -34,7 +38,10 @@ function compactSummary(value:string,max=180){
 
 export default async function Image({params}:{params:Promise<{shareCode:string}>}){
   const {shareCode}=await params;
-  const preview=await loadPreview(shareCode);
+  const [preview,boldFont]=await Promise.all([
+    loadPreview(shareCode),
+    boldFontPromise,
+  ]);
 
   const name=preview?.name?.trim()||'캐릭터';
   const particle=topicParticle(name);
@@ -78,8 +85,9 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
           flexWrap:'wrap',
           alignItems:'baseline',
           maxWidth:1040,
+          fontFamily:boldFont?'Pretendard':'sans-serif',
           fontSize:78,
-          fontWeight:900,
+          fontWeight:800,
           lineHeight:1.08,
           letterSpacing:'-0.04em',
           marginBottom:38,
@@ -88,6 +96,7 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         <span
           style={{
             display:'flex',
+            fontWeight:800,
             lineHeight:1.08,
             borderBottom:`9px solid ${pointSub}`,
             paddingBottom:3,
@@ -96,7 +105,7 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         >
           {name}
         </span>
-        <span style={{display:'flex',lineHeight:1.08}}>{particle} 왜 이럴까요?</span>
+        <span style={{display:'flex',fontWeight:800,lineHeight:1.08}}>{particle} 왜 이럴까요?</span>
       </div>
 
       <div
@@ -113,6 +122,14 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         {summary}
       </div>
     </div>,
-    size,
+    {
+      ...size,
+      fonts:boldFont?[{
+        name:'Pretendard',
+        data:boldFont,
+        weight:800,
+        style:'normal',
+      }]:[],
+    },
   );
 }
