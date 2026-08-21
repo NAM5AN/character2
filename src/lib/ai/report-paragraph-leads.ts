@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { generateValidatedJson } from '@/lib/ai/json';
+import { lenientArray } from '@/lib/ai/lenient';
 import { REPORT_FIELDS, pickFallbackLead, type ReportField } from '@/lib/report-lead-fallbacks';
 import { logGenRetry } from '@/lib/ai/usage';
 import { applyName } from '@/lib/josa';
@@ -64,7 +65,9 @@ const topicTitleSchema = z.object({
 
 function leadBatchSchema(length: number) {
   return z.object({
-    leads: z.array(topicTitleSchema).length(length),
+    // 모델이 leads 를 배열이 아니라 JSON 문자열로 뱉는 실패가 관측됐다(제목이 전부 폴백으로
+    // 대체되고 호출 하나가 통째로 버려졌다). 내용은 멀쩡하므로 배열로 펴서 받는다.
+    leads: lenientArray(z.array(topicTitleSchema).length(length)),
   });
 }
 

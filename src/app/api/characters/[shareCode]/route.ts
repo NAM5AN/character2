@@ -170,7 +170,9 @@ export async function POST(request:Request,context:{params:Promise<{shareCode:st
     const markTimingStart=async()=>{try{await sb.rpc('character2_mark_detail_timing_start',{p_share_code:shareCode})}catch{}};
     const markTimingDone=async()=>{try{await sb.rpc('character2_mark_detail_timing_done',{p_share_code:shareCode})}catch{}};
 
-    if(body.stage===1){
+    // stage 는 기본값이 1이라, stage 를 생략하는 finishRemaining 요청도 이 분기에 걸렸다.
+    // 그래서 남은 두 페이지 대신 1페이지가 매번 다시 생성됐다(비용 낭비 + stageReady 정체).
+    if(body.stage===1&&!body.finishRemaining){
       if(!body.editToken)return respond({error:'DETAIL_OWNER_SOURCE_REQUIRED'},409);
       await markTimingStart();
       const seedRecord=record(bundle.seed);
