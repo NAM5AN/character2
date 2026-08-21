@@ -1,0 +1,36 @@
+/* Touch browsers can keep :hover latched after a tap or drag.
+   On coarse pointers, use :active for the temporary finger-down feedback and
+   neutralize synthesized hover once the finger is released. */
+@media (hover: none), (pointer: coarse) {
+  .analyze-page .option:not(.selected):hover {
+    background: white !important;
+    border-color: var(--line) !important;
+  }
+
+  html[data-character-theme='active'] .analyze-page .option:not(.selected):hover {
+    background: var(--character-surface) !important;
+    border-color: color-mix(in srgb, var(--character-point) 18%, var(--line)) !important;
+  }
+
+  .analyze-page .option:not(:disabled):not(.selected):active {
+    background: #f8f5ef !important;
+    border-color: var(--ink) !important;
+  }
+
+  html[data-character-theme='active'] .analyze-page .option:not(:disabled):not(.selected):active {
+    background: var(--character-accent-soft) !important;
+    border-color: var(--character-accent) !important;
+  }
+
+  .analyze-page .five-level-choice:not(.selected):hover .five-level-circle {
+    background: transparent !important;
+    border-color: color-mix(in srgb, var(--character-point,#77746f) 42%, var(--line,#d8d5cf)) !important;
+    transform: none !important;
+  }
+
+  .analyze-page .five-level-choice:not(:disabled):not(.selected):active .five-level-circle {
+    background: var(--character-accent-soft,var(--accent-soft)) !important;
+    border-color: var(--character-accent,var(--accent)) !important;
+    transform: scale(1.05) !important;
+  }
+}
