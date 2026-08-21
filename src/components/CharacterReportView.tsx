@@ -67,6 +67,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
   const [detail,setDetail]=useState<DetailPayload|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [shareStatus,setShareStatus]=useState('');
   const [progress,setProgress]=useState(0);
   // 상세 리포트 생성 로딩은 저장된 최종 성격 태그를 가장 먼저 사용한다.
   // 구버전 캐릭터는 interview → owner → initial 순서로 폴백하고, 태그 자체가 없을 때만 텍스트 키워드 감지를 쓴다.
@@ -132,6 +133,28 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     if(creatorEditToken)return creatorEditToken;
     if(typeof window==='undefined')return '';
     return localStorage.getItem(`chara_edit_${preview.shareCode}`)||'';
+  }
+
+  async function copyShareUrl(url:string){
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);return}
+    const field=document.createElement('textarea');
+    field.value=url;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';
+    document.body.appendChild(field);field.select();
+    const copied=document.execCommand('copy');field.remove();
+    if(!copied)throw new Error('COPY_FAILED');
+  }
+
+  async function shareReport(){
+    const url=`${window.location.origin}/character/${preview.shareCode}`;
+    const data={title:`${preview.name} 캐릭터 리포트`,text:`${preview.name}의 캐릭터 리포트를 확인해보세요.`,url};
+    setShareStatus('');
+    try{
+      if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare(data))){await navigator.share(data);setShareStatus('공유했어요');return}
+      await copyShareUrl(url);setShareStatus('링크를 복사했어요');
+    }catch(error){
+      if(error instanceof DOMException&&error.name==='AbortError')return;
+      try{await copyShareUrl(url);setShareStatus('링크를 복사했어요')}catch{setShareStatus('공유하지 못했어요')}
+    }
   }
 
   async function saveOwnerIdentity(){
@@ -331,7 +354,11 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
             <div style={{fontSize:12,fontWeight:900,letterSpacing:'.03em',color:'var(--accent,#b8860b)',marginBottom:9}}>여기까지는 예고편이에요.</div>
             <p style={{margin:0,fontSize:'clamp(14px,2.4vw,16px)',lineHeight:1.75,fontWeight:700}}>아직 못 꺼낸 얘기가 더 많아요. 바로 확인해보세요.</p>
           </div>}
-          <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{pointerEvents:'auto',boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'nowrap'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
+          <nav aria-label="리포트 다음 작업" style={{width:'min(440px,100%)',display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,pointerEvents:'auto'}}>
+            <button className="btn primary full-preview-cta" disabled={busy} onClick={requestDetail} style={{width:'100%',minHeight:46,boxShadow:'0 10px 26px rgba(23,24,22,.18)',whiteSpace:'normal'}}>{busy?'리포트를 작성하는 중…':'더 자세히 보기'}</button>
+            <Link className="btn" href="/analyze" style={{width:'100%',minHeight:46,display:'inline-flex',alignItems:'center',justifyContent:'center',textAlign:'center',whiteSpace:'normal'}}>다른 캐릭터 분석하기</Link>
+            <button type="button" className="btn soft" aria-live="polite" onClick={()=>void shareReport()} style={{gridColumn:'1 / -1',width:'100%',minHeight:46}}>{shareStatus||'공유하기'}</button>
+          </nav>
         </div>
       </div>
 
@@ -345,7 +372,6 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
         </div>
       </div>}
       {error&&<div className="error" style={{whiteSpace:'pre-wrap',marginTop:18}}>{error}</div>}
-      <div className="actions" style={{justifyContent:'center',marginTop:24}}><Link className="btn" href="/analyze">다른 캐릭터 분석</Link></div>
     </section>}
 
     {detail&&<div id="paid-detail-report" style={{scrollMarginTop:90,marginTop:34}}>
