@@ -148,7 +148,16 @@ export function AnalyzeFlow(){
   },[profileText,secretProfileText,draft,answers]);
 
   const flavorName=draft?.basicProfile.name||name||'이 캐릭터';
-  const flavorMessage=useRotatingFlavor(characterSignalText,flavorName,busy);
+  // 요약 생성 화면에서 쓸 확정 성격 태그(오너 선택 우선, 없으면 AI 초기 선택).
+  const settledFlavorTags=useMemo(()=>{
+    const tags=draft?.personalityTags;
+    const owner=tags?.ownerSelected??[];
+    const ai=tags?.aiInitial??[];
+    return owner.length?owner:ai;
+  },[draft]);
+  // 프로필 파싱 화면은 성격을 아직 모르므로 공통(any) 문구만, 요약 생성 화면은 확정 태그를
+  // 직접 넘겨 성격별 문구가 나오게 한다. (빈 배열 = 공통만, 키워드 감지에 의존하지 않음)
+  const flavorMessage=useRotatingFlavor(characterSignalText,flavorName,busy,stage==='finalizing'?settledFlavorTags:[]);
 
   function continueSavedAnalysis(){if(!resumeCandidate)return;persistenceEnabled.current=false;restoreSavedSession(resumeCandidate);setResumeCandidate(null);window.setTimeout(()=>{persistenceEnabled.current=true},0)}
   function startFreshAnalysis(){persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);setResumeCandidate(null);clearProgressState();window.setTimeout(()=>{persistenceEnabled.current=true},0)}
