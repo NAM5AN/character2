@@ -18,6 +18,7 @@ import './globals.css';
 import './character-theme.css';
 import './analyze-character-theme.css';
 import './appearance-image-mobile.css';
+import './modal-viewport-fix.css';
 import './bipolar-mobile-fix.css';
 import './feedback.css';
 import './report-pagination.css';
