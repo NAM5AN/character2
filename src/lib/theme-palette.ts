@@ -9,6 +9,9 @@ export const themePaletteSchema=z.object({
   pointSub:z.string().regex(HEX_RE),
   // 투톤 머리·오드아이처럼 캐릭터가 색을 더 가진 경우의 두 번째 포인트색.
   // 예전에 저장된 팔레트에는 없으므로 optional.
+  // accent 배경 위에 올릴 전경색. 색조는 accent 와 같고 명도만 낮춘 값이라
+  // 흰 글씨로 대체하지 않고도 대비를 확보한다. 예전 팔레트에는 없으므로 optional.
+  pointInk:z.string().regex(HEX_RE).optional(),
   alt:z.string().regex(HEX_RE).optional(),
   altSub:z.string().regex(HEX_RE).optional(),
   source:themeSourceSchema,
@@ -136,6 +139,52 @@ function surfaceLightness(raw:Hsl,strongSeparation:boolean){
   return {main:92,mainSub:97};
 }
 
+// --- 대비 보정 -------------------------------------------------------------
+// 캐릭터 색을 쓰되 읽을 수 있어야 한다. 색조(hue)는 절대 바꾸지 않고 명도만 조정해
+// "배경 + 같은 색조의 어두운 글자" 조합이 WCAG AA(4.5:1)를 넘도록 만든다.
+
+function relativeLuminance(hsl:Hsl){
+  const hex=hslToHex(hsl);const n=parseInt(hex.slice(1),16);
+  const parts=[(n>>16)&255,(n>>8)&255,n&255].map(v=>{
+    const x=v/255;return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4);
+  });
+  return 0.2126*parts[0]+0.7152*parts[1]+0.0722*parts[2];
+}
+
+export function contrastRatio(a:Hsl,b:Hsl){
+  const first=relativeLuminance(a),second=relativeLuminance(b);
+  const hi=Math.max(first,second),lo=Math.min(first,second);
+  return (hi+0.05)/(lo+0.05);
+}
+
+const CONTRAST_TARGET=4.5;
+
+// accent 배경과 그 위 글자색을 함께 정한다. 배경은 필요한 만큼만 밝히고(어둡게는
+// 하지 않는다), 글자는 같은 색조에서 충분히 어두운 명도를 찾는다.
+function solveAccentPair(accent:string,surface?:string){
+  const base=hexToHsl(accent);
+  const inkSaturation=Math.min(base.s,62);   // 글자는 너무 쨍하면 읽기 어렵다
+  const surfaceHsl=surface?hexToHsl(surface):undefined;
+  // accent 는 글자를 받는 배경이자, 진행률 막대·선택 표시 같은 그래픽 자체이기도 하다.
+  // 그래픽은 밝은 표면 위에서 3:1 이 필요하므로, 너무 밝아지면 오히려 안 보인다.
+  // 그래서 밝히는 방향과 어둡게 하는 방향을 모두 시도하고 둘 다 만족하는 값을 고른다.
+  const order:number[]=[];
+  const start=Math.round(base.l);
+  for(let d=0;d<=60;d+=1){ if(start-d>=12)order.push(start-d); if(d>0&&start+d<=92)order.push(start+d); }
+  for(const backgroundL of order){
+    const background={h:base.h,s:base.s,l:backgroundL};
+    for(let inkL=40;inkL>=8;inkL-=2){
+      const ink={h:base.h,s:inkSaturation,l:inkL};
+      if(contrastRatio(ink,background)<CONTRAST_TARGET)continue;
+      // 표면 대비 3:1 은 그래픽(막대·점·테두리)이 보이기 위한 최소치다.
+      if(surfaceHsl&&contrastRatio(background,surfaceHsl)<3)continue;
+      return {background:hslToHex(background),ink:hslToHex(ink)};
+    }
+  }
+  // 무채색 등 색조로 해결이 안 되는 극단값은 명도만으로 안전한 짝을 만든다.
+  return {background:hslToHex({h:base.h,s:base.s,l:82}),ink:hslToHex({h:base.h,s:inkSaturation,l:12})};
+}
+
 export function deriveThemePalette(
   mainCandidate:unknown,
   pointCandidate:unknown,
@@ -168,10 +217,14 @@ export function deriveThemePalette(
     !colorsAreSimilar(altHsl,mainHsl)&&
     !colorsAreSimilar(hexToHsl(alt),hexToHsl(point)),
   );
+  // accent 와 그 위 글자색을 대비가 보장되는 짝으로 확정한다(색조 유지).
+  const surfaceForGraphics=surfaceColor(mainBase,surface.mainSub);
+  const accentPair=solveAccentPair(point,surfaceForGraphics);
   return themePaletteSchema.parse({
     main:surfaceColor(mainBase,surface.main),
     mainSub:surfaceColor(mainBase,surface.mainSub),
-    point,
+    point:accentPair.background,
+    pointInk:accentPair.ink,
     pointSub:accentSoftColor(pointBase,strongSeparation),
     ...(altUsable?{alt,altSub:accentSoftColor(altRaw!,strongSeparation)}:{}),
     source,

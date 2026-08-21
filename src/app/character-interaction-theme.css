@@ -31,7 +31,9 @@ html[data-character-theme='active'] body:has(.report-mag) .btn.primary,
 html[data-character-theme='active'] .completed-report-view .btn.primary {
   background-color: var(--character-accent);
   border-color: var(--character-accent);
-  color: #fff;
+  /* 밝은 캐릭터 색 위에서 흰 글씨는 대비가 무너진다. 팔레트가 색조를 유지한 채
+     명도만 낮춰 계산한 글자색을 쓴다(구버전 팔레트에서는 흰색으로 되돌아간다). */
+  color: var(--character-accent-ink);
 }
 
 html[data-character-theme='active'] .analyze-page .btn.primary:hover,

@@ -11,6 +11,9 @@
   --character-surface: var(--character-main-sub);
   --character-accent: var(--character-point);
   --character-accent-soft: var(--character-point-sub);
+  /* accent 배경 위 글자색. 팔레트가 색조를 유지한 채 명도만 낮춰 계산한다.
+     구버전 팔레트(pointInk 없음)에서는 기존처럼 흰 글씨로 되돌아간다. */
+  --character-accent-ink: var(--character-point-ink, #ffffff);
   /* 투톤 머리·오드아이처럼 색이 더 있는 캐릭터에서만 --character-alt 가 채워진다.
      단색 캐릭터에서는 포인트색으로 자연스럽게 접혀서 어디서 써도 안전하다. */
   --character-accent-alt: var(--character-alt, var(--character-point));
