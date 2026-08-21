@@ -9,13 +9,20 @@ type Summary = {
   affectionStyle?: string; misunderstoodPoint?: string; hiddenPattern?: string;
 } | null;
 
-type Inference = {
-  id?: string; text?: string; confidence?: number;
-  evidence?: string[]; evidenceIds?: string[];
-  ownerVerdict?: string; ownerFeedback?: string;
+type RetryCostDetail = {
+  id: string;
+  createdAt: string;
+  stage: string;
+  model: string | null;
+  attemptSequence: number | null;
+  errorCode: string;
+  errorDetail: string | null;
+  costUsd: number | string | null;
+  gptInTok: number | string;
+  gptOutTok: number | string;
+  costKnown: boolean;
+  costSource: 'gateway_exact' | 'token_estimate' | 'unavailable';
 };
-
-type Answer = { order?: number; question?: string; answer?: string; reason?: string };
 
 type AdminCharacter = {
   shareCode: string;
@@ -25,20 +32,22 @@ type AdminCharacter = {
   createdAt: string;
   updatedAt: string;
   analysisConfidence: number | null;
-  publicProfile: string;
-  secretProfile: string;
   oneLineSummary: string;
   summary: Summary;
-  inferences: Inference[];
-  answers: Answer[];
   detailReport: Record<string, unknown> | null;
-  detailGeneratedAt: string | null;
   summaryCostUsd: number | string | null;
   detailCostUsd: number | string | null;
   summaryGptInTok: number | string | null;
   summaryGptOutTok: number | string | null;
   detailGptInTok: number | string | null;
   detailGptOutTok: number | string | null;
+  wastedCostUsd: number | string | null;
+  wastedGptInTok: number | string | null;
+  wastedGptOutTok: number | string | null;
+  wastedAttemptCount: number | string | null;
+  wastedUnknownCount: number | string | null;
+  retryCount: number | string | null;
+  retryDetails: RetryCostDetail[] | null;
   summaryGenMs: number | string | null;
   detailGenMs: number | string | null;
 };
@@ -97,6 +106,9 @@ type FailuresState =
 function retryLabel(code: string) {
   if (code === 'RETRY_TRUNCATED') return '출력이 상한에 잘림';
   if (code === 'RETRY_SCHEMA') return 'JSON 구조 검증 실패';
+  if (code === 'RETRY_PROVIDER') return 'AI 제공사 응답 오류';
+  if (code === 'RETRY_STREAM_FALLBACK') return '실시간 생성 오류로 일반 생성 재시도';
+  if (code === 'RETRY_MODEL_FALLBACK') return '다른 AI 모델로 재시도';
   if (code === 'RETRY_SUMMARY_TOO_SHORT') return '요약 필드가 너무 짧음';
   if (code === 'RETRY_SUMMARY_FORMAT') return '요약 문단 형식 오류';
   if (code === 'RETRY_INSIGHT_QUALITY') return 'insight 품질 기준 미달';
@@ -162,6 +174,22 @@ function summaryTotalCost(c: AdminCharacter): number {
 function detailTotalCost(c: AdminCharacter): number {
   return Number(c.detailCostUsd || 0) + gptCost(c.detailGptInTok, c.detailGptOutTok);
 }
+function wastedTotalCost(c: AdminCharacter): number {
+  return Number(c.wastedCostUsd || 0) + gptCost(c.wastedGptInTok, c.wastedGptOutTok);
+}
+
+function retryDetailCost(detail: RetryCostDetail): string {
+  if (!detail.costKnown) return '비용 확인 불가';
+  const usd = detail.costSource === 'token_estimate'
+    ? gptCost(detail.gptInTok, detail.gptOutTok)
+    : Number(detail.costUsd || 0);
+  return `${fmtCost(usd)}${detail.costSource === 'token_estimate' ? ' (토큰 추정)' : ' (실측)'}`;
+}
+
+function modelLabel(model: string | null): string {
+  if (!model) return '모델 기록 없음';
+  return model.replace(/^anthropic\//u, '').replace(/^openai\//u, '');
+}
 
 // 생성된 리포트(요약 + 상세)의 총 글자수.
 function reportChars(c: AdminCharacter): number {
@@ -187,134 +215,11 @@ function fmtCost(usd: number | string | null): string {
   return `${Math.round(n * USD_TO_KRW).toLocaleString('ko-KR')}원`;
 }
 
-const SUMMARY_LABELS: [keyof NonNullable<Summary>, string][] = [
-  ['outerSelf', '겉모습 · 타인이 보는 인상'],
-  ['innerSelf', '속마음 · 실제 동기'],
-  ['conflictStyle', '갈등 · 감정 반응'],
-  ['affectionStyle', '애정 · 관계 방식'],
-  ['misunderstoodPoint', '오해받는 지점'],
-  ['hiddenPattern', '숨은 패턴'],
-];
-
-const DETAIL_LABELS: [string, string][] = [
-  ['characterOverview', '캐릭터 개요'],
-  ['innerMechanics', '내면 메커니즘'],
-  ['relationshipStyle', '관계 스타일'],
-  ['attachmentStyle', '애착 스타일'],
-  ['conflictStyleDetailed', '갈등 상세'],
-  ['charmAndContradictions', '매력과 모순'],
-  ['integratedReport', '통합 리포트'],
-  ['detailedReport', '상세 리포트(구버전)'],
-];
-
-const VERDICT_LABEL: Record<string, string> = {
-  confirmed: '오너 확인', ambiguous: '애매', rejected: '반려', unreviewed: '미검토',
-};
-
 function fmtDate(value: string | null): string {
   if (!value) return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function Prose({ text }: { text: string }) {
-  const clean = (text || '').trim();
-  if (!clean) return <p className="muted" style={{ margin: 0 }}>—</p>;
-  return <p style={{ margin: 0, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{clean}</p>;
-}
-
-type SectionDef = { key: string; label: string; count?: number; empty: boolean; render: () => React.ReactNode };
-
-function buildSections(c: AdminCharacter): SectionDef[] {
-  const detailKeys = c.detailReport
-    ? DETAIL_LABELS.filter(([k]) => typeof c.detailReport?.[k] === 'string' && (c.detailReport?.[k] as string).trim())
-    : [];
-  return [
-    {
-      key: 'public', label: '공개 프로필', empty: !c.publicProfile?.trim(),
-      render: () => <Prose text={c.publicProfile} />,
-    },
-    {
-      key: 'secret', label: '비밀 프로필', empty: !c.secretProfile?.trim(),
-      render: () => <Prose text={c.secretProfile} />,
-    },
-    {
-      key: 'summary', label: '요약 리포트', empty: !c.oneLineSummary?.trim() && !c.summary,
-      render: () => (
-        <>
-          <p style={{ margin: '0 0 14px', fontWeight: 800, lineHeight: 1.6 }}>{c.oneLineSummary || '—'}</p>
-          <div className="stack" style={{ gap: 12 }}>
-            {SUMMARY_LABELS.map(([key, label]) => (
-              <div className="result-block" key={key} style={{ padding: 16 }}>
-                <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{label}</h3>
-                <Prose text={(c.summary?.[key] as string) || ''} />
-              </div>
-            ))}
-          </div>
-        </>
-      ),
-    },
-    {
-      key: 'inferences', label: '추론', count: c.inferences?.length || 0, empty: (c.inferences?.length || 0) === 0,
-      render: () => (
-        <>
-          {(c.inferences || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
-          {(c.inferences || []).map((inf, i) => (
-            <div className="inference" key={inf.id || i}>
-              <div className="inference-top">
-                <p style={{ fontWeight: 700 }}>{inf.text || '—'}</p>
-                <span className="tag" style={{ whiteSpace: 'nowrap' }}>
-                  {VERDICT_LABEL[inf.ownerVerdict || 'unreviewed'] || inf.ownerVerdict}
-                  {typeof inf.confidence === 'number' && ` · ${inf.confidence}`}
-                </span>
-              </div>
-              {inf.ownerFeedback && <p className="muted" style={{ margin: '6px 0 0' }}>오너 메모: {inf.ownerFeedback}</p>}
-              {Array.isArray(inf.evidence) && inf.evidence.length > 0 && (
-                <div className="pills">{inf.evidence.map((e, j) => <span className="pill" key={j}>{e}</span>)}</div>
-              )}
-            </div>
-          ))}
-        </>
-      ),
-    },
-    {
-      key: 'answers', label: '질문 응답', count: c.answers?.length || 0, empty: (c.answers?.length || 0) === 0,
-      render: () => (
-        <>
-          {(c.answers || []).length === 0 && <p className="muted" style={{ margin: 0 }}>—</p>}
-          {(c.answers || []).map((a, i) => (
-            <div className="inference" key={a.order ?? i}>
-              <p style={{ fontWeight: 700, margin: 0 }}>{a.order ? `${a.order}. ` : ''}{a.question || '—'}</p>
-              <p style={{ margin: '6px 0 0', lineHeight: 1.6 }}>{a.answer || '—'}</p>
-              {a.reason && <p className="muted" style={{ margin: '4px 0 0' }}>이유: {a.reason}</p>}
-            </div>
-          ))}
-        </>
-      ),
-    },
-    {
-      key: 'detail', label: '상세 리포트', empty: !c.detailReport,
-      render: () => (
-        <>
-          {!c.detailReport && <p className="muted" style={{ margin: 0 }}>아직 생성되지 않았어요.</p>}
-          {c.detailReport && (
-            <>
-              <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>생성 {fmtDate(c.detailGeneratedAt)}</p>
-              <div className="stack" style={{ gap: 12 }}>
-                {detailKeys.map(([key, label]) => (
-                  <div className="result-block" key={key} style={{ padding: 16 }}>
-                    <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>{label}</h3>
-                    <Prose text={c.detailReport?.[key] as string} />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </>
-      ),
-    },
-  ];
 }
 
 export default function AdminConsolePage() {
@@ -324,7 +229,7 @@ export default function AdminConsolePage() {
   const [errorText, setErrorText] = useState('');
   const [query, setQuery] = useState('');
   const [detailChar, setDetailChar] = useState<AdminCharacter | null>(null);
-  const [openSection, setOpenSection] = useState<string | null>(null);
+  const [retryChar, setRetryChar] = useState<AdminCharacter | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AdminCharacter | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [resetting, setResetting] = useState('');
@@ -499,9 +404,8 @@ export default function AdminConsolePage() {
     );
   }, [characters, query]);
 
-  function openDetail(c: AdminCharacter) {
+  function openManagement(c: AdminCharacter) {
     setDetailChar(c);
-    setOpenSection(null);
   }
 
   async function logout() {
@@ -586,8 +490,6 @@ export default function AdminConsolePage() {
       </main>
     );
   }
-
-  const sections = detailChar ? buildSections(detailChar) : [];
 
   const balanceLow = balance.state === 'ready' && balance.balance != null && balance.balance <= 0;
   const balanceWarn = balance.state === 'ready' && balance.balance != null && balance.balance > 0 && balance.balance < 5;
@@ -940,30 +842,102 @@ export default function AdminConsolePage() {
                   {c.analysisConfidence != null && ` · 신뢰도 ${c.analysisConfidence}`}
                   {c.detailReport ? ' · 상세리포트 있음' : ' · 상세리포트 없음'}
                 </p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                  <span className="tag" style={{ fontSize: 12 }}>리포트 {reportChars(c).toLocaleString()}자</span>
-                  <span className="tag" style={{ fontSize: 12 }}>요약 {fmtCost(summaryTotalCost(c))}</span>
-                  <span className="tag" style={{ fontSize: 12 }}>상세 {fmtCost(detailTotalCost(c))}</span>
-                  <span className="tag" style={{ fontSize: 12, fontWeight: 800 }}>합계 {fmtCost(summaryTotalCost(c) + detailTotalCost(c))}</span>
-                  <span className="tag" style={{ fontSize: 12 }}>요약 생성 {fmtDuration(c.summaryGenMs)}</span>
-                  <span className="tag" style={{ fontSize: 12 }}>상세 생성 {fmtDuration(c.detailGenMs)}</span>
-                </div>
                 </Link>
               </div>
               <div className="actions" style={{ marginTop: 0 }}>
-                <button className="btn" onClick={() => openDetail(c)}>관리</button>
+                <button className="btn" onClick={() => openManagement(c)}>관리</button>
                 <button className="btn danger" onClick={() => setPendingDelete(c)}>삭제</button>
               </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <span className="tag" style={{ fontSize: 12 }}>리포트 {reportChars(c).toLocaleString()}자</span>
+              <span className="tag" style={{ fontSize: 12 }}>요약 {fmtCost(summaryTotalCost(c))}</span>
+              <span className="tag" style={{ fontSize: 12 }}>상세 {fmtCost(detailTotalCost(c))}</span>
+              <span className="tag" style={{ fontSize: 12, fontWeight: 800 }}>합계 {fmtCost(summaryTotalCost(c) + detailTotalCost(c))}</span>
+              <span
+                className="tag"
+                title="오류 손실은 합계 비용에 이미 포함된 금액입니다. 비용 미확인은 정확한 사용량을 받지 못한 시도예요."
+                style={{ fontSize: 12, color: Number(c.wastedAttemptCount || 0) > 0 ? '#9d3e30' : undefined }}
+              >
+                오류 손실 {fmtCost(wastedTotalCost(c))}
+                {Number(c.wastedUnknownCount || 0) > 0 && ` · 비용 미확인 ${Number(c.wastedUnknownCount).toLocaleString('ko-KR')}회`}
+              </span>
+              {Number(c.retryCount || 0) > 0 ? (
+                <button
+                  className="tag"
+                  onClick={() => setRetryChar(c)}
+                  style={{ fontSize: 12, cursor: 'pointer', color: '#9d3e30', border: 0, fontFamily: 'inherit' }}
+                  aria-label={`${c.name} 재시도 내역 보기`}
+                >
+                  재시도 {Number(c.retryCount).toLocaleString('ko-KR')}회 ›
+                </button>
+              ) : (
+                <span className="tag" style={{ fontSize: 12 }}>재시도 0회</span>
+              )}
+              <span className="tag" style={{ fontSize: 12 }}>요약 생성 {fmtDuration(c.summaryGenMs)}</span>
+              <span className="tag" style={{ fontSize: 12 }}>상세 생성 {fmtDuration(c.detailGenMs)}</span>
             </div>
           </div>
         ))}
       </div>
 
+      {retryChar && (
+        <div className="modal-backdrop" onClick={() => setRetryChar(null)}>
+          <div
+            className="modal"
+            style={{ width: 'min(760px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                <div>
+                  <strong style={{ fontSize: 22 }}>{retryChar.name || '(이름 없음)'} 재시도 내역</strong>
+                  <p className="muted" style={{ margin: '7px 0 0', fontSize: 12, lineHeight: 1.6 }}>
+                    재시도 {Number(retryChar.retryCount || 0).toLocaleString('ko-KR')}회 · 오류로 버려진 시도 {Number(retryChar.wastedAttemptCount || 0).toLocaleString('ko-KR')}회 · 확인된 손실 {fmtCost(wastedTotalCost(retryChar))}
+                    {Number(retryChar.wastedUnknownCount || 0) > 0 && ` · 비용 미확인 ${Number(retryChar.wastedUnknownCount).toLocaleString('ko-KR')}회`}
+                  </p>
+                </div>
+                <button className="btn" style={{ padding: '8px 12px' }} onClick={() => setRetryChar(null)} aria-label="닫기">✕</button>
+              </div>
+              <p className="muted" style={{ margin: '10px 0 0', fontSize: 11, lineHeight: 1.55 }}>
+                확인된 손실은 전체 합계에 이미 포함된 금액이에요. 새 기록은 호출별로 연결되며, 연결 기능 이전 기록이나 사용량을 받지 못한 호출은 비용 미확인으로 표시합니다.
+              </p>
+            </div>
+            <div style={{ overflow: 'auto', padding: '14px 16px 20px' }}>
+              {(retryChar.retryDetails || []).length === 0 && (
+                <p className="muted" style={{ margin: 8 }}>표시할 재시도 상세 기록이 없어요.</p>
+              )}
+              <div className="stack" style={{ gap: 10 }}>
+                {(retryChar.retryDetails || []).map(detail => (
+                  <div key={detail.id} style={{ padding: '13px 15px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--paper)' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="tag" style={{ fontSize: 11, fontWeight: 800 }}>{stageLabel(detail.stage)}</span>
+                      <strong style={{ fontSize: 13 }}>{retryLabel(detail.errorCode)}</strong>
+                      <span className="tag" style={{ fontSize: 11 }}>{modelLabel(detail.model)}</span>
+                      {detail.attemptSequence != null && <span className="muted" style={{ fontSize: 11 }}>작업 내 {detail.attemptSequence}번째 호출</span>}
+                      <span className="muted" style={{ marginLeft: 'auto', fontSize: 11 }}>{fmtDate(detail.createdAt)}</span>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 800, color: detail.costKnown ? '#9d3e30' : 'var(--muted)' }}>
+                      이 재시도로 버린 비용 · {retryDetailCost(detail)}
+                    </div>
+                    {detail.errorDetail && (
+                      <p className="muted" style={{ margin: '7px 0 0', fontSize: 11, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {detail.errorDetail}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detailChar && (
         <div className="modal-backdrop" onClick={() => setDetailChar(null)}>
           <div
             className="modal"
-            style={{ width: 'min(760px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0 }}
+            style={{ width: 'min(680px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', padding: 0 }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid var(--line)' }}>
@@ -978,39 +952,18 @@ export default function AdminConsolePage() {
                 </div>
                 <button className="btn" style={{ padding: '8px 12px' }} onClick={() => setDetailChar(null)} aria-label="닫기">✕</button>
               </div>
-              <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>항목을 눌러 내용을 펼쳐보세요.</p>
+              <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>리포트 내용은 실제 사용자 화면에서 확인하고, 이 창에서는 재생성·초기화 작업만 관리합니다.</p>
             </div>
 
             <div style={{ overflow: 'auto', padding: '12px 16px 20px' }}>
-              <div className="stack" style={{ gap: 8 }}>
-                {sections.map(s => {
-                  const open = openSection === s.key;
-                  return (
-                    <div key={s.key} style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden', background: 'var(--paper)' }}>
-                      <button
-                        onClick={() => setOpenSection(open ? null : s.key)}
-                        style={{
-                          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-                          padding: '15px 18px', background: open ? 'var(--accent-soft)' : 'transparent', border: 0,
-                          fontWeight: 800, fontSize: 15, textAlign: 'left', cursor: 'pointer',
-                        }}
-                        aria-expanded={open}
-                      >
-                        <span>
-                          {s.label}
-                          {s.count != null && <span className="muted" style={{ fontWeight: 700 }}> · {s.count}개</span>}
-                          {s.empty && <span className="muted" style={{ fontWeight: 700 }}> · 없음</span>}
-                        </span>
-                        <span aria-hidden style={{ fontSize: 18, color: 'var(--muted)' }}>{open ? '−' : '+'}</span>
-                      </button>
-                      {open && (
-                        <div style={{ padding: '4px 18px 20px', borderTop: '1px solid var(--line)' }}>
-                          {s.render()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div style={{ padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--paper)' }}>
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>실제 리포트 확인</div>
+                <p className="muted" style={{ margin: '0 0 12px', fontSize: 12, lineHeight: 1.6 }}>
+                  공유 링크를 새 창으로 열어 사용자가 보는 것과 같은 화면에서 확인합니다.
+                </p>
+                <Link className="btn primary" href={`/character/${encodeURIComponent(detailChar.shareCode)}`} target="_blank" rel="noopener noreferrer">
+                  사용자 리포트 새 창에서 보기 ↗
+                </Link>
               </div>
 
               <div style={{ marginTop: 20, padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 12, background: 'var(--paper)' }}>

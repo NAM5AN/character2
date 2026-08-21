@@ -264,7 +264,7 @@ export async function POST(request: Request) {
     const [publicSource, secretSource, appearanceNotes] = await Promise.all([
       resolveProfileInput(body.profileText, true),
       resolveProfileInput(body.secretProfileText, false),
-      withAiUsageContext({sessionId:usageSessionId,stage:'profile_image'},()=>analyzeAppearanceImages(body.appearanceImages)),
+      withAiUsageContext({sessionId:usageSessionId,characterName:body.name,stage:'profile_image'},()=>analyzeAppearanceImages(body.appearanceImages)),
     ]);
     emit(0.15);
     const profileText = publicSource.text;
@@ -272,7 +272,7 @@ export async function POST(request: Request) {
 
     const sourceAnchors = buildSourceAnchors(profileText, secretProfileText, appearanceNotes);
 
-    const raw = await withAiUsageContext({sessionId:usageSessionId,stage:'profile_parse'},()=>streamOpenAIJson({
+    const raw = await withAiUsageContext({sessionId:usageSessionId,characterName:body.name,stage:'profile_parse'},()=>streamOpenAIJson({
       instructions: PARSER_INSTRUCTIONS_V2,
       schema: initialCharacterDraftSchema,
       maxOutputTokens: 3800,

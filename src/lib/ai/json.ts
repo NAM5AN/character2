@@ -1,6 +1,27 @@
 import { generateText, streamText, tool } from 'ai';
 import { z } from 'zod';
-import { aiGatewayUsageOptions, logGenRetry, scheduleAiUsageRecord } from '@/lib/ai/usage';
+import {
+  aiGatewayUsageOptions,
+  beginAiAttempt,
+  logGenRetry,
+  scheduleAiUsageRecord,
+  type AiAttemptRef,
+} from '@/lib/ai/usage';
+
+export class AiJsonSchemaError extends Error {
+  readonly aiAttempt?: AiAttemptRef;
+
+  constructor(message: string, aiAttempt?: AiAttemptRef) {
+    super(message);
+    this.name = 'AiJsonSchemaError';
+    this.aiAttempt = aiAttempt;
+  }
+}
+
+function attemptErrorCode(truncated: boolean, hasResponse: boolean) {
+  if (truncated) return 'RETRY_TRUNCATED';
+  return hasResponse ? 'RETRY_SCHEMA' : 'RETRY_PROVIDER';
+}
 
 function imageFilePart(dataUrl:string){
   const match=dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/iu);
@@ -40,6 +61,7 @@ export async function generateValidatedJson<T>(args: {
   // 같은 상한으로 다시 시도하면 똑같이 잘려서 성공할 수 없으므로, 그 경우에만 상한을 올려 재시도한다.
   // 상한을 낮추는 일은 없으므로 정상 성공 경로의 출력은 달라지지 않는다.
   let outputCap = args.maxOutputTokens;
+  let lastAttempt: AiAttemptRef | undefined;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryNote = attempt === 0
@@ -47,8 +69,11 @@ export async function generateValidatedJson<T>(args: {
       : `\n\n이전 생성은 구조 검증에 실패했습니다. 이전 출력을 복사하거나 수리하려 하지 말고 원본 입력만 보고 처음부터 다시 작성하세요. 실패 원인: ${lastReason}`;
     const prompt = `${args.prompt}${retryNote}`;
     const providerOptions=aiGatewayUsageOptions();
+    const aiAttempt = beginAiAttempt(args.model, attempt + 1);
+    lastAttempt = aiAttempt;
 
     let truncated = false;
+    let usageResponse: unknown;
     try {
       const response = await generateText({
         model: args.model,
@@ -73,19 +98,32 @@ export async function generateValidatedJson<T>(args: {
         ...(typeof outputCap === 'number' ? { maxOutputTokens: outputCap } : {}),
       });
 
+      usageResponse = response;
       truncated = response.finishReason === 'length';
-      scheduleAiUsageRecord({model:args.model,attempt:attempt+1,response});
       const call = response.toolCalls.find(item => item.toolName === 'submit_result');
       if (!call) throw new Error('AI_TOOL_RESULT_MISSING');
-      return args.schema.parse(call.input);
+      const parsed = args.schema.safeParse(call.input);
+      if (!parsed.success) throw parsed.error;
+      scheduleAiUsageRecord({ attempt: aiAttempt, response, outcome: 'accepted' });
+      return parsed.data;
     } catch (error) {
       lastReason = error instanceof Error ? error.message : String(error);
-      if (attempt + 1 < maxAttempts) logGenRetry(truncated ? 'RETRY_TRUNCATED' : 'RETRY_SCHEMA', lastReason);
+      const willRetry = attempt + 1 < maxAttempts;
+      const errorCode = attemptErrorCode(truncated, Boolean(usageResponse));
+      scheduleAiUsageRecord({
+        attempt: aiAttempt,
+        response: usageResponse,
+        outcome: willRetry ? 'retried' : 'failed',
+        errorCode,
+        errorDetail: lastReason,
+        hasUsage: Boolean(usageResponse),
+      });
+      if (willRetry) logGenRetry(errorCode, lastReason, aiAttempt);
       if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
     }
   }
 
-  throw new Error(`AI_JSON_SCHEMA_FAILED: ${lastReason}`);
+  throw new AiJsonSchemaError(`AI_JSON_SCHEMA_FAILED: ${lastReason}`, lastAttempt);
 }
 
 function deltaText(part:unknown):string{
@@ -117,6 +155,7 @@ export async function streamValidatedJson<T>(args: {
   let lastReason = 'AI_STRUCTURED_OUTPUT_FAILED';
   // generateValidatedJson과 같은 이유로, 잘린 출력일 때만 상한을 올려 재시도한다.
   let outputCap = args.maxOutputTokens;
+  let lastAttempt: AiAttemptRef | undefined;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryNote = attempt === 0
@@ -124,9 +163,12 @@ export async function streamValidatedJson<T>(args: {
       : `\n\n이전 생성은 구조 검증에 실패했습니다. 이전 출력을 복사하거나 수리하려 하지 말고 원본 입력만 보고 처음부터 다시 작성하세요. 실패 원인: ${lastReason}`;
     const prompt = `${args.prompt}${retryNote}`;
     const providerOptions = aiGatewayUsageOptions();
+    const aiAttempt = beginAiAttempt(args.model, attempt + 1);
+    lastAttempt = aiAttempt;
 
     let toolCallInput: unknown;
     let truncated = false;
+    let usageResponse: unknown;
     try {
       const result = streamText({
         model: args.model,
@@ -163,26 +205,30 @@ export async function streamValidatedJson<T>(args: {
         }
       }
 
-      truncated = (await result.finishReason) === 'length';
+      const finishReason = await result.finishReason;
+      truncated = finishReason === 'length';
+      usageResponse = {
+        usage: await result.usage,
+        providerMetadata: await result.providerMetadata,
+        finishReason,
+      };
       const calls = await result.toolCalls;
       const call = calls.find(item => item.toolName === 'submit_result');
       if (!call) throw new Error('AI_TOOL_RESULT_MISSING');
-      try {
-        scheduleAiUsageRecord({
-          model: args.model,
-          attempt: attempt + 1,
-          response: {
-            usage: await result.usage,
-            providerMetadata: await result.providerMetadata,
-            finishReason: await result.finishReason,
-          },
-        });
-      } catch { /* usage telemetry is best-effort */ }
       toolCallInput = (call as { input: unknown }).input;
     } catch (streamError) {
       // The streaming mechanism failed (not a content/schema problem). Never regress:
       // fall back to the proven non-streaming generator for this model.
-      void streamError;
+      const message = streamError instanceof Error ? streamError.message : String(streamError);
+      scheduleAiUsageRecord({
+        attempt: aiAttempt,
+        response: usageResponse,
+        outcome: 'retried',
+        errorCode: 'RETRY_STREAM_FALLBACK',
+        errorDetail: message,
+        hasUsage: Boolean(usageResponse),
+      });
+      logGenRetry('RETRY_STREAM_FALLBACK', message, aiAttempt);
       return generateValidatedJson({
         model: args.model,
         system: args.system,
@@ -195,13 +241,24 @@ export async function streamValidatedJson<T>(args: {
 
     const parsed = args.schema.safeParse(toolCallInput);
     if (parsed.success) {
+      scheduleAiUsageRecord({ attempt: aiAttempt, response: usageResponse, outcome: 'accepted' });
       args.onProgress?.(1);
       return parsed.data;
     }
     lastReason = parsed.error.message;
-    if (attempt + 1 < maxAttempts) logGenRetry(truncated ? 'RETRY_TRUNCATED' : 'RETRY_SCHEMA', lastReason);
+    const willRetry = attempt + 1 < maxAttempts;
+    const errorCode = attemptErrorCode(truncated, true);
+    scheduleAiUsageRecord({
+      attempt: aiAttempt,
+      response: usageResponse,
+      outcome: willRetry ? 'retried' : 'failed',
+      errorCode,
+      errorDetail: lastReason,
+      hasUsage: true,
+    });
+    if (willRetry) logGenRetry(errorCode, lastReason, aiAttempt);
     if (truncated && typeof outputCap === 'number') outputCap = Math.min(Math.round(outputCap * 1.6), 16000);
   }
 
-  throw new Error(`AI_JSON_SCHEMA_FAILED: ${lastReason}`);
+  throw new AiJsonSchemaError(`AI_JSON_SCHEMA_FAILED: ${lastReason}`, lastAttempt);
 }

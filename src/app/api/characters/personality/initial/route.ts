@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }));
 
     const result = await withAiUsageContext(
-      { sessionId: draft.usageSessionId, stage: 'profile_personality_repair' },
+      { sessionId: draft.usageSessionId, characterName: draft.basicProfile.name, stage: 'profile_personality_repair' },
       () => askOpenAIJson({
         instructions: `당신은 자캐커뮤니티 캐릭터의 프로필을 읽고 오너에게 제안할 성격 태그를 고르는 분류기입니다.
 허용 목록 안에서 현재 캐릭터와 가장 가까운 태그를 1~${PERSONALITY_TAG_MAX_SELECTIONS}개 고르세요.

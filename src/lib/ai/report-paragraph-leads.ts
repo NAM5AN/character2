@@ -210,6 +210,7 @@ export async function rewriteDetailedReportParagraphLeads<T>(value: T, model: st
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('DETAIL_PARAGRAPH_LEAD_REWRITE_FAILED', error);
+    // 소제목 생성이 통째로 실패하면 폴백 제목이 쓰인다. 관리자 화면에서 보이도록 남긴다.
     logGenRetry('LEAD_REWRITE_FAILED', `문단 ${items.length}개 / ${message}`);
     leads = [];
   }

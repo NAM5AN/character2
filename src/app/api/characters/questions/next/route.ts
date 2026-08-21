@@ -314,7 +314,7 @@ export async function POST(request: Request) {
       rule:RESPONSE_TYPE_RULES[spec.responseType],
     }));
 
-    const generated = await withAiUsageContext({sessionId:body.draft.usageSessionId,stage:`questions_${startOrder}_${startOrder+batchCount-1}`},()=>askOpenAIJson({
+    const generated = await withAiUsageContext({sessionId:body.draft.usageSessionId,characterName:body.draft.basicProfile.name,stage:`questions_${startOrder}_${startOrder+batchCount-1}`},()=>askOpenAIJson({
       instructions: `${QUESTION_INSTRUCTIONS}\n\n${QUESTION_EVIDENCE_INSTRUCTIONS}\n\n이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
       schema: batchSchema,
       maxOutputTokens: Math.max(2200, batchCount * 1250),

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { generateValidatedJson, streamValidatedJson } from '@/lib/ai/json';
+import { aiAttemptFromError, logGenRetry } from '@/lib/ai/usage';
 
 export async function askOpenAIJson<T>(args: {
   instructions: string;
@@ -23,6 +24,7 @@ export async function askOpenAIJson<T>(args: {
     if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
 
     const fallbackModel = process.env.OPENAI_JSON_FALLBACK_MODEL || 'anthropic/claude-sonnet-5';
+    logGenRetry('RETRY_MODEL_FALLBACK', `${primaryModel} → ${fallbackModel} / ${message}`, aiAttemptFromError(error));
     return generateValidatedJson({
       model: fallbackModel,
       system: `${args.instructions}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
@@ -60,6 +62,7 @@ export async function streamOpenAIJson<T>(args: {
     if (!message.startsWith('AI_JSON_SCHEMA_FAILED')) throw error;
 
     const fallbackModel = process.env.OPENAI_JSON_FALLBACK_MODEL || 'anthropic/claude-sonnet-5';
+    logGenRetry('RETRY_MODEL_FALLBACK', `${primaryModel} → ${fallbackModel} / ${message}`, aiAttemptFromError(error));
     return streamValidatedJson({
       model: fallbackModel,
       system: `${args.instructions}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,

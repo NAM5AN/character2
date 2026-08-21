@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     await assertRateLimit('personality_adaptive', 12, 60);
     const body = requestSchema.parse(await readJsonWithinBudget(request));
     const tags = await withAiUsageContext(
-      { sessionId: body.draft.usageSessionId, stage: 'personality_interview' },
+      { sessionId: body.draft.usageSessionId, characterName: body.draft.basicProfile.name, stage: 'personality_interview' },
       () => inferInterviewAdaptiveTags(body.draft, body.answers),
     );
     return NextResponse.json({ tags });

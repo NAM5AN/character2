@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { generateValidatedJson, streamValidatedJson } from '@/lib/ai/json';
 import { getCharacterDeepAnalysisSkill } from '@/lib/ai/character-deep-analysis-skill';
 import { rewriteDetailedReportParagraphLeads } from '@/lib/ai/report-paragraph-leads';
+import { aiAttemptFromError, logGenRetry } from '@/lib/ai/usage';
 
 const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5';
 const DEFAULT_DETAIL_MODEL = 'anthropic/claude-opus-4.8';
@@ -94,6 +95,7 @@ export async function askClaudeJson<T>(args: {
     if (args.allowFallback === false) throw error;
 
     const fallbackModel = process.env.CLAUDE_JSON_FALLBACK_MODEL || 'openai/gpt-5.6-luna';
+    logGenRetry('RETRY_MODEL_FALLBACK', `${primaryModel} → ${fallbackModel} / ${message}`, aiAttemptFromError(error));
     const result = await generateValidatedJson({
       model: fallbackModel,
       system: `${resolvedSystem}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
@@ -141,6 +143,7 @@ export async function streamClaudeJson<T>(args: {
     if (args.allowFallback === false) throw error;
 
     const fallbackModel = process.env.CLAUDE_JSON_FALLBACK_MODEL || 'openai/gpt-5.6-luna';
+    logGenRetry('RETRY_MODEL_FALLBACK', `${primaryModel} → ${fallbackModel} / ${message}`, aiAttemptFromError(error));
     const result = await streamValidatedJson({
       model: fallbackModel,
       system: `${resolvedSystem}\n\n이 요청은 다른 모델의 JSON 생성 실패 후 재시도입니다. 원본 입력만 근거로 새 JSON을 생성하세요.`,
