@@ -29,7 +29,14 @@
   }
 
   .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:first-of-type > .btn {
+    width: 100%;
     max-width: 100%;
+    min-height: 48px;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center;
+    line-height: 1.15;
     white-space: nowrap;
   }
 
