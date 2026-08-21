@@ -287,37 +287,182 @@
   }
 }
 
-@media (max-width: 560px) {
+/* Mobile admin: prioritize readable character information over side-by-side desktop actions. */
+@media (max-width: 680px) {
   .admin-console-page {
-    padding-bottom: 40px;
+    width: calc(100% - 20px) !important;
+    padding-top: 12px;
+    padding-bottom: 34px;
+    gap: 10px;
+  }
+
+  .admin-console-page .card,
+  .admin-console-page .admin-console-head,
+  .admin-console-page .admin-settings-card,
+  .admin-console-page .admin-character-search {
+    border-radius: 14px !important;
   }
 
   .admin-console-page .admin-console-head {
-    border-radius: 16px;
+    padding: 16px !important;
   }
 
   .admin-console-page .admin-console-head h1 {
-    font-size: 31px !important;
+    font-size: 28px !important;
+    line-height: 1.08;
   }
 
   .admin-console-page .admin-console-head .actions,
-  .admin-console-page .admin-settings-card .actions {
+  .admin-console-page .admin-settings-card .actions,
+  .admin-console-page .admin-ops-balance > div:last-child {
     width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px !important;
   }
 
   .admin-console-page .admin-console-head .actions .btn,
   .admin-console-page .admin-settings-card .actions .btn,
-  .admin-console-page .admin-settings-card .actions a.btn {
-    flex: 1 1 auto;
+  .admin-console-page .admin-settings-card .actions a.btn,
+  .admin-console-page .admin-ops-balance > div:last-child .btn {
+    width: 100%;
+    min-width: 0;
     justify-content: center;
+    text-align: center;
+    padding: 10px 9px !important;
+  }
+
+  .admin-console-page .admin-settings-card input.input {
+    max-width: none !important;
+  }
+
+  .admin-console-page .admin-character-search {
+    padding: 12px;
+    margin-top: 30px !important;
+  }
+
+  .admin-console-page .admin-character-grid {
+    gap: 10px !important;
   }
 
   .admin-console-page .admin-character-grid > .card {
-    padding: 16px !important;
+    padding: 15px !important;
+    height: auto;
+  }
+
+  /* The desktop card puts text and action buttons on one row. On mobile that leaves
+     only a few characters of text width, so stack the actions under the metadata. */
+  .admin-console-page .admin-character-grid > .card > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    width: 100%;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] {
+    width: 100% !important;
+    flex: 0 0 auto !important;
+    display: block !important;
+    min-width: 0 !important;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] > div:first-child {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px 9px !important;
+    flex-wrap: wrap !important;
+    width: 100%;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] strong {
+    font-size: 20px !important;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] .muted,
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] p {
+    word-break: keep-all !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] > p {
+    width: 100%;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > button[aria-label$='상세 열기'] .tag {
+    white-space: nowrap;
+    font-size: 11px !important;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > .actions {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 7px !important;
+    margin-top: 0 !important;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > .actions .btn,
+  .admin-console-page .admin-character-grid > .card > div:first-child > .actions a.btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 10px !important;
+    text-align: center;
+    justify-content: center;
+    white-space: normal;
+    word-break: keep-all;
+  }
+
+  .admin-console-page .admin-ops-failures,
+  .admin-console-page .admin-ops-balance,
+  .admin-console-page .admin-ops-costs,
+  .admin-console-page .admin-settings-card {
+    padding: 14px !important;
+  }
+
+  .admin-console-page .modal-backdrop {
+    padding: 8px !important;
+    align-items: stretch;
+  }
+
+  .admin-console-page .modal {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 16px !important;
+  }
+
+  .admin-console-page .modal .actions {
+    gap: 7px;
+  }
+
+  .admin-console-page .modal .actions .btn {
+    flex: 1 1 140px;
+    min-height: 42px;
+    white-space: normal;
+    word-break: keep-all;
   }
 
   .admin-deployment-row {
     justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 390px) {
+  .admin-console-page .admin-console-head .actions,
+  .admin-console-page .admin-settings-card .actions,
+  .admin-console-page .admin-ops-balance > div:last-child {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-console-page .admin-character-grid > .card > div:first-child > .actions {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
