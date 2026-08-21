@@ -201,8 +201,50 @@
   .report-mag .cover--summary-only { min-height: 0; }
   .report-mag .summary-explorer-head { align-items: stretch; flex-direction: column; gap: 16px; }
   .report-mag .summary-view-toggle { align-self: flex-start; }
-  .report-mag .summary-card-grid { grid-template-columns: 1fr; }
-  .report-mag .summary-card { min-height: 132px; }
+
+  /* 모바일은 6개 요약 카드를 2열 × 3행으로 보여 한 카드가 화면을 과하게 차지하지 않게 한다. */
+  .report-mag .summary-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .report-mag .summary-card {
+    min-height: 170px;
+    gap: 12px;
+    padding: 14px 13px 13px;
+    border-radius: 14px;
+  }
+
+  .report-mag .summary-card-top {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .report-mag .summary-card-no {
+    width: 24px;
+    height: 24px;
+    font-size: 9px;
+  }
+
+  .report-mag .summary-card h3 {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 1.32;
+  }
+
+  .report-mag .summary-card-preview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  .report-mag .summary-card-hint {
+    font-size: 10.5px;
+  }
+
   .report-mag .summary-expanded { padding: 24px 4px 26px; }
   .report-mag .summary-expanded-body { grid-template-columns: 1fr; gap: 18px; }
 }
