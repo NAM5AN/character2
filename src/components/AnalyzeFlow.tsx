@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion, QuestionResponseType } from '@/lib/schemas/question';
@@ -63,8 +63,11 @@ export function AnalyzeFlow(){
   const batchRequests=useRef<Map<number,Promise<InterviewQuestion[]>>>(new Map());
   const temporalRepairRequests=useRef<Set<string>>(new Set());
   const rankingDragIndexRef=useRef<number|null>(null);
+  const rankingRowRefs=useRef<Map<string,HTMLDivElement>>(new Map());
+  const rankingDragPositionsRef=useRef<Map<string,number>|null>(null);
 
   useEffect(()=>{questionHistoryRef.current=questionHistory},[questionHistory]);
+  useLayoutEffect(()=>{const previous=rankingDragPositionsRef.current;if(!previous)return;rankingDragPositionsRef.current=null;ranking.forEach(item=>{const row=rankingRowRefs.current.get(item);const before=previous.get(item);if(!row||before===undefined)return;const delta=before-row.getBoundingClientRect().top;if(Math.abs(delta)<1)return;const scale=draggingRankItem===item?' scale(1.015)':'';row.animate([{transform:`translateY(${delta}px)${scale}`},{transform:`translateY(0)${scale}`}],{duration:220,easing:'cubic-bezier(.22, 1, .36, 1)'})})},[ranking,draggingRankItem]);
 
   function resetResponseDraft(){setSelected('');setCustom('');setReason('');setMultiSelected([]);setRanking([]);rankingDragIndexRef.current=null;setDraggingRankItem(null);setSliderValue(50);setMatrixAnswers({});setSecondary('')}
   function setHistory(next:InterviewQuestion[]){questionHistoryRef.current=next;setQuestionHistory(next)}
@@ -199,7 +202,7 @@ export function AnalyzeFlow(){
   function removeRank(option:string){setRanking(current=>current.filter(item=>item!==option))}
   function moveRank(index:number,direction:-1|1){setRanking(current=>{const next=[...current];const target=index+direction;if(target<0||target>=next.length)return current;[next[index],next[target]]=[next[target],next[index]];return next})}
   function startRankDrag(index:number,item:string,event:ReactPointerEvent<HTMLDivElement>){if(busy||event.button!==0||(event.target as HTMLElement).closest('button'))return;rankingDragIndexRef.current=index;setDraggingRankItem(item);event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
-  function dragRank(event:ReactPointerEvent<HTMLDivElement>){const from=rankingDragIndexRef.current;if(from===null)return;event.preventDefault();const row=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-ranking-index]');const to=Number(row?.dataset.rankingIndex);if(!Number.isInteger(to)||to<0||to>=ranking.length||to===from)return;setRanking(current=>{if(from>=current.length||to>=current.length)return current;const next=[...current];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});rankingDragIndexRef.current=to}
+  function dragRank(event:ReactPointerEvent<HTMLDivElement>){const from=rankingDragIndexRef.current;if(from===null)return;event.preventDefault();const row=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-ranking-index]');const to=Number(row?.dataset.rankingIndex);if(!Number.isInteger(to)||to<0||to>=ranking.length||to===from)return;const positions=new Map<string,number>();rankingRowRefs.current.forEach((element,item)=>positions.set(item,element.getBoundingClientRect().top));rankingRowRefs.current.forEach(element=>element.getAnimations().forEach(animation=>animation.cancel()));rankingDragPositionsRef.current=positions;setRanking(current=>{if(from>=current.length||to>=current.length)return current;const next=[...current];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});rankingDragIndexRef.current=to}
   function stopRankDrag(event:ReactPointerEvent<HTMLDivElement>){if(rankingDragIndexRef.current===null)return;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);rankingDragIndexRef.current=null;setDraggingRankItem(null)}
 
   function renderResponseControls(){
@@ -215,6 +218,7 @@ export function AnalyzeFlow(){
         <p className="muted">중요한 순서대로 눌러주세요. 선택한 항목은 위아래로 끌거나 화살표로 순서를 바꿀 수 있어요.</p>
         {ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=>{const isDragging=draggingRankItem===item;return <div
           key={item}
+          ref={element=>{if(element)rankingRowRefs.current.set(item,element);else rankingRowRefs.current.delete(item)}}
           data-ranking-index={index}
           onPointerDown={event=>startRankDrag(index,item,event)}
           onPointerMove={dragRank}
