@@ -1,5 +1,31 @@
 @media (max-width: 640px) {
+  /* Keep the vertical axis on the exact centre of the 48px circle column. */
   .bipolar-control .five-level-scale::before {
-    left: 26px !important;
+    left: 24px !important;
+    z-index: 0 !important;
+  }
+
+  .bipolar-control .five-level-choice {
+    position: relative;
+    z-index: 1;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* The circles sit above the axis so the line never shows through them. */
+  .bipolar-control .five-level-circle,
+  .bipolar-control .five-level-choice.level-2 .five-level-circle,
+  .bipolar-control .five-level-choice.level-3 .five-level-circle,
+  .bipolar-control .five-level-choice.level-4 .five-level-circle {
+    justify-self: center;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    position: relative;
+    z-index: 2 !important;
+    background: #fff !important;
+  }
+
+  .bipolar-control .five-level-choice.selected .five-level-circle {
+    background: var(--character-accent, var(--accent)) !important;
   }
 }
