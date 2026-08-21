@@ -47,9 +47,24 @@ function readCurrentDraft():DraftLike|null{
   }catch{return null}
 }
 
+function syncProfileLoadingCopy(){
+  const status=document.querySelector<HTMLElement>('.analyze-page .card[aria-busy="true"] [role="status"]');
+  if(!status)return;
+
+  const heading=status.querySelector<HTMLElement>(':scope > div:first-child > strong:first-child');
+  if(heading&&heading.textContent!=='잠시만 기다려주세요.')heading.textContent='잠시만 기다려주세요.';
+
+  const card=status.closest<HTMLElement>('.card[aria-busy="true"]');
+  const button=card?.querySelector<HTMLButtonElement>('.actions .btn.primary');
+  if(button?.disabled&&button.textContent?.startsWith('프로필을 읽는 중')&&button.textContent!=='프로필을 읽는 중…'){
+    button.textContent='프로필을 읽는 중…';
+  }
+}
+
 export function PersonalityLoadingBridge(){
   useEffect(()=>{
     let lastOwnerSignature='';
+    let copyQueued=false;
 
     const syncOwnerTags=()=>{
       const draft=readCurrentDraft();
@@ -62,8 +77,20 @@ export function PersonalityLoadingBridge(){
       setLoadingPersonalityTags(sessionId,selected,'owner');
     };
 
+    const queueProfileLoadingCopy=()=>{
+      if(copyQueued)return;
+      copyQueued=true;
+      window.requestAnimationFrame(()=>{
+        copyQueued=false;
+        syncProfileLoadingCopy();
+      });
+    };
+
     syncOwnerTags();
+    queueProfileLoadingCopy();
     const syncTimer=window.setInterval(syncOwnerTags,350);
+    const loadingCopyObserver=new MutationObserver(queueProfileLoadingCopy);
+    loadingCopyObserver.observe(document.body,{childList:true,subtree:true,characterData:true});
 
     // AnalyzeReviewUiPolish가 먼저 감싼 fetch를 이어받아, 최종 분석 요청 직전에만
     // 20문항 기반 성격 재판별을 한 번 수행한다.
@@ -103,9 +130,18 @@ export function PersonalityLoadingBridge(){
     window.fetch=wrappedFetch;
     return()=>{
       window.clearInterval(syncTimer);
+      loadingCopyObserver.disconnect();
       if(window.fetch===wrappedFetch)window.fetch=nextFetch;
     };
   },[]);
 
-  return null;
+  return <style>{`
+    .analyze-page .card[aria-busy='true'] [role='status'] > p.muted {
+      font-size: 13px !important;
+      line-height: 1.45 !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  `}</style>;
 }
