@@ -10,7 +10,8 @@ import {
   questionEvidenceIssues,
   questionEvidenceSources,
 } from '@/lib/question-evidence';
-import { withAiUsageContext } from '@/lib/ai/usage';
+import { repairGeneratedQuestions } from '@/lib/question-repair';
+import { withAiUsageContext, logGenRetry } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
 import { apiError } from '@/lib/http';
 
@@ -133,7 +134,7 @@ function buildHistory(answers: z.infer<typeof interviewAnswerSchema>[]) {
 
 function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>, evidenceSources: string[]) {
   const specMap = new Map(specs.map(spec => [spec.order, spec.responseType]));
-  return z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
+  const validated = z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
     const seenOrders = new Set<number>();
     const seenHooks = new Set<string>();
     value.questions.forEach((question,index)=>{
@@ -196,6 +197,18 @@ function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>,
     });
     for(const spec of specs) if(!seenOrders.has(spec.order)) ctx.addIssue({code:'custom',path:['questions'],message:`${spec.order}번 문항이 빠졌습니다.`});
   });
+
+  // 검증 전에, 질문 내용을 바꾸지 않고 고칠 수 있는 위반(빈 척도 라벨, UI가 이미 주는
+  // "기타" 보기 중복, 검증 못 하는 evidence)만 보정한다. 이 위반들 때문에 문항 전체를
+  // 다른 모델로 다시 만드는 일이 없어져서 다음 질문이 그만큼 빨리 나온다.
+  // 내용이 부실한 위반은 여기서 손대지 않으므로 기존처럼 재생성된다.
+  return z.preprocess(value=>{
+    try{
+      const repaired=repairGeneratedQuestions(value,specs,evidenceSources);
+      if(repaired)logGenRetry('REPAIR_QUESTION_FORMAT',`문항 ${repaired}개 자동 보정(재생성 없음)`);
+    }catch{/* 보정 실패는 무시하고 원본 그대로 검증한다 */}
+    return value;
+  },validated);
 }
 
 export async function POST(request: Request) {
@@ -203,7 +216,7 @@ export async function POST(request: Request) {
     await assertRateLimit('question_batch', 30, 60);
     // 예산 검사를 거친 본문. 아래 보정 로직은 스키마 검증 전 원본을 손봐야 해서
     // 느슨한 레코드로 다룬다(검증은 바로 뒤 requestSchema.parse 가 담당).
-    const raw = await readJsonWithinBudget(request) as Record<string, any>;
+    const raw = await readJsonWithinBudget(request) as Record<string, unknown>;
     if (raw && Array.isArray(raw.plannedQuestions)) {
       for (const planned of raw.plannedQuestions) {
         if (planned?.responseType !== 'condition_followup') continue;
