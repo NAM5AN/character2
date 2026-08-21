@@ -214,7 +214,10 @@ export function BipolarFiveLevelUi(){
       border-color:var(--ink);
       box-shadow:inset 0 0 0 7px var(--paper),0 0 0 2px var(--ink);
     }
+    /* 데스크톱에서는 위쪽 양끝 문장이 이미 보이므로 점 밑 문구를 숨긴다.
+       모바일에서는 그 문장이 감춰지고 이 문구가 유일한 설명이라 아래 미디어쿼리에서 다시 보인다. */
     .five-level-label {
+      display:none;
       font-size:12px;
       line-height:1.4;
       font-weight:800;
@@ -273,6 +276,7 @@ export function BipolarFiveLevelUi(){
       .five-level-choice.level-4 .five-level-circle { width:37px;height:37px; }
       .five-level-choice.level-3 .five-level-circle { width:30px;height:30px; }
       .five-level-label {
+        display:block;
         max-width:none;
         font-size:13px;
         line-height:1.45;
