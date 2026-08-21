@@ -1,0 +1,67 @@
+@media (max-width: 760px) {
+  /* Keep accordion hit areas and chevrons stable on touch devices. */
+  .report-mag button.section-head {
+    position: relative !important;
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding-right: 42px !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .report-mag .section-chev,
+  .report-mag .report-section.is-open .section-chev {
+    position: absolute !important;
+    right: 2px !important;
+    top: 4px !important;
+    width: 25px !important;
+    height: 25px !important;
+    margin: 0 !important;
+    justify-self: auto !important;
+    align-self: auto !important;
+    pointer-events: none !important;
+    -webkit-mask-size: 25px 25px !important;
+    mask-size: 25px 25px !important;
+    transform-origin: center !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open {
+    position: relative !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding-right: 44px !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion::after,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open::after {
+    position: absolute !important;
+    right: 4px !important;
+    top: 22px !important;
+    width: 23px !important;
+    height: 23px !important;
+    margin: 0 !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    justify-self: auto !important;
+    align-self: auto !important;
+    pointer-events: none !important;
+    -webkit-mask-size: 23px 23px !important;
+    mask-size: 23px 23px !important;
+    transform-origin: center !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-no,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-no,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion .topic-content,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open .topic-content,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion h4,
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open h4 {
+    grid-column: 1 !important;
+  }
+
+  .report-mag .topic-grid > article.topic.detail-topic-accordion.is-topic-open p {
+    grid-column: 1 !important;
+  }
+}
