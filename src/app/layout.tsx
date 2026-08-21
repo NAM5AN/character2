@@ -36,6 +36,7 @@ import './global-button-interactions.css';
 import './admin-console-polish.css';
 import './default-neutral-theme.css';
 import './footer-layout.css';
+import './touch-hover-fix.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHA LAB ㅡ 캐릭터 정밀 해석';
