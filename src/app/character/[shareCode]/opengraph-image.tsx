@@ -52,7 +52,7 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         flexDirection:'column',
         justifyContent:'center',
         alignItems:'flex-start',
-        padding:'76px 88px',
+        padding:'72px 84px',
         background:main,
         color:'#171816',
         fontFamily:'sans-serif',
@@ -62,11 +62,11 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         style={{
           display:'flex',
           color:point,
-          fontSize:28,
+          fontSize:31,
           fontWeight:800,
           letterSpacing:'0.11em',
           lineHeight:1,
-          marginBottom:34,
+          marginBottom:36,
         }}
       >
         CHA LAB
@@ -76,38 +76,38 @@ export default async function Image({params}:{params:Promise<{shareCode:string}>
         style={{
           display:'flex',
           flexWrap:'wrap',
-          alignItems:'flex-end',
-          maxWidth:1030,
-          fontSize:66,
+          alignItems:'baseline',
+          maxWidth:1040,
+          fontSize:78,
           fontWeight:900,
-          lineHeight:1.18,
-          letterSpacing:'-0.035em',
-          marginBottom:34,
+          lineHeight:1.08,
+          letterSpacing:'-0.04em',
+          marginBottom:38,
         }}
       >
         <span
           style={{
             display:'flex',
-            borderBottom:`10px solid ${pointSub}`,
-            paddingBottom:2,
-            marginRight:9,
-            lineHeight:1.02,
+            lineHeight:1.08,
+            borderBottom:`9px solid ${pointSub}`,
+            paddingBottom:3,
+            marginRight:0,
           }}
         >
           {name}
         </span>
-        <span style={{display:'flex'}}>{particle} 왜 이럴까요?</span>
+        <span style={{display:'flex',lineHeight:1.08}}>{particle} 왜 이럴까요?</span>
       </div>
 
       <div
         style={{
           display:'flex',
-          maxWidth:1010,
-          fontSize:31,
-          fontWeight:500,
-          lineHeight:1.5,
-          letterSpacing:'-0.018em',
-          color:'rgba(23,24,22,.78)',
+          maxWidth:1030,
+          fontSize:36,
+          fontWeight:600,
+          lineHeight:1.48,
+          letterSpacing:'-0.022em',
+          color:'#3B3C39',
         }}
       >
         {summary}
