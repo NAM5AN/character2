@@ -10,6 +10,7 @@ import {
   questionEvidenceIssues,
   questionEvidenceSources,
 } from '@/lib/question-evidence';
+import { lenientArray } from '@/lib/ai/lenient';
 import { repairGeneratedQuestions } from '@/lib/question-repair';
 import { withAiUsageContext, logGenRetry } from '@/lib/ai/usage';
 import { assertRateLimit } from '@/lib/rate-limit';
@@ -134,7 +135,9 @@ function buildHistory(answers: z.infer<typeof interviewAnswerSchema>[]) {
 
 function makeBatchSchema(specs: Array<{order:number;responseType:ResponseType}>, evidenceSources: string[]) {
   const specMap = new Map(specs.map(spec => [spec.order, spec.responseType]));
-  const validated = z.object({questions:z.array(interviewQuestionSchema).length(specs.length)}).superRefine((value,ctx)=>{
+  // 모델이 questions 를 배열이 아니라 JSON 문자열로 뱉는 실패가 관측됐다. 내용은 멀쩡하므로
+  // 배열로 펴서 받는다(내용이 비면 평소대로 검증에서 걸린다).
+  const validated = z.object({questions:lenientArray(z.array(interviewQuestionSchema).length(specs.length))}).superRefine((value,ctx)=>{
     const seenOrders = new Set<number>();
     const seenHooks = new Set<string>();
     value.questions.forEach((question,index)=>{

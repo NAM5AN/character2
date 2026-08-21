@@ -1,4 +1,4 @@
-import { questionEvidenceIssues } from '@/lib/question-evidence';
+import { questionEvidenceIssues, quotedPhrases, sourceExcerptForPhrase } from '@/lib/question-evidence';
 
 // 질문 생성 결과가 검증에 걸리면 다른 모델로 문항 전체를 다시 만든다(시간·비용 2배).
 // 그런데 실패 사유 중에는 질문·선택지 자체는 멀쩡하고 곁다리만 어긋난 경우가 많다.
@@ -82,22 +82,57 @@ function stripUiProvidedOptions(question: UnknownRecord, responseType: string) {
   return changed;
 }
 
-// evidence는 서버 검증용 내부 근거이고 사용자 화면에는 안 보인다. 원문과 대조해서
-// 통과 못 하는 항목만 버리고, 최소 1개가 남을 때만 보정으로 인정한다.
-// 하나도 안 남으면 근거 없는 질문이므로 손대지 않고 재생성 경로로 보낸다.
-function dropUnverifiableEvidence(question: UnknownRecord, sources: string[]) {
-  const evidence = stringList(question.evidence);
-  if (evidence.length < 2) return false;
+// evidence 는 서버 검증용 내부 근거이고 사용자 화면에는 안 보인다. 프로덕션에서 관측된
+// 실패는 세 가지였다: 검증 못 하는 항목이 섞임, 상한(2개)을 넘김, 질문이 인용한 대사가
+// evidence 에 없음. 셋 다 질문 문장 자체는 멀쩡하므로 배치를 다시 만들 이유가 없다.
+// 근거를 지어내지는 않는다 — 원문에서 찾지 못하면 손대지 않고 재생성 경로로 보낸다.
+const EVIDENCE_MAX = 2;
 
-  const kept = evidence.filter(quote => {
-    const probe = { ...question, evidence: [quote] } as unknown as Parameters<typeof questionEvidenceIssues>[0];
-    return questionEvidenceIssues(probe, sources).length === 0;
-  });
-  if (!kept.length || kept.length === evidence.length) return false;
-  question.evidence = kept;
+function verifies(question: UnknownRecord, quote: string, sources: string[]) {
+  const probe = { ...question, evidence: [quote] } as unknown as Parameters<typeof questionEvidenceIssues>[0];
+  return questionEvidenceIssues(probe, sources).length === 0;
+}
+
+function repairEvidence(question: UnknownRecord, sources: string[]) {
+  const original = stringList(question.evidence);
+  let evidence = original.slice();
+
+  // 1) 원문과 대조되지 않는 항목은 버린다(전부 버려질 때는 그대로 둔다).
+  const verified = evidence.filter(quote => verifies(question, quote, sources));
+  if (verified.length) evidence = verified;
+
+  // 2) 질문이 따옴표로 인용한 대사가 evidence 에 없으면, 그 대사를 담은 원문 구절을 찾아 채운다.
+  const questionText = typeof question.question === 'string' ? question.question : '';
+  for (const phrase of quotedPhrases(questionText)) {
+    if (evidence.some(quote => verifies(question, quote, sources) && quote.includes(phrase))) continue;
+    const covered = questionEvidenceIssues(
+      { ...question, evidence } as unknown as Parameters<typeof questionEvidenceIssues>[0], sources,
+    ).every(issue => !issue.message.includes(phrase.slice(0, 30)));
+    if (covered) continue;
+    const excerpt = sourceExcerptForPhrase(phrase, sources);
+    if (!excerpt) continue;
+    evidence = [excerpt, ...evidence.filter(quote => quote !== excerpt)];
+  }
+
+  // 3) 상한을 넘기면 앞쪽(검증 통과·인용 포함) 우선으로 잘라낸다.
+  if (evidence.length > EVIDENCE_MAX) evidence = evidence.slice(0, EVIDENCE_MAX);
+
+  if (!evidence.length) return false;
+  if (evidence.length === original.length && evidence.every((q, i) => q === original[i])) return false;
+  question.evidence = evidence;
   return true;
 }
 
+// rationale 은 프롬프트가 요구하지만 코드 어디에서도 읽지 않는 내부 메모다.
+// 이것 하나가 비었다고 배치 전체를 다시 만드는 것은 순전한 낭비이므로 채워서 통과시킨다.
+function fillMissingRationale(question: UnknownRecord) {
+  const current = question.rationale;
+  if (typeof current === 'string' && current.trim()) return false;
+  const hook = typeof question.targetHook === 'string' ? question.targetHook.trim() : '';
+  const hypothesis = typeof question.hypothesis === 'string' ? question.hypothesis.trim() : '';
+  question.rationale = (hypothesis || hook || '생성 근거 미기재').slice(0, 260);
+  return true;
+}
 // 생성 결과 전체를 훑어 고칠 수 있는 위반만 고친다. 반환값은 보정한 문항 수.
 export function repairGeneratedQuestions(
   value: unknown,
@@ -120,7 +155,8 @@ export function repairGeneratedQuestions(
     let changed = false;
     if (repairScaleLabels(question, responseType)) changed = true;
     if (stripUiProvidedOptions(question, responseType)) changed = true;
-    if (dropUnverifiableEvidence(question, evidenceSources)) changed = true;
+    if (repairEvidence(question, evidenceSources)) changed = true;
+    if (fillMissingRationale(question)) changed = true;
     if (changed) repaired += 1;
   }
   return repaired;

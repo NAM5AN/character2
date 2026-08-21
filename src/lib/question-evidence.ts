@@ -53,7 +53,7 @@ function evidenceExistsInSources(evidence: string, sources: string[]) {
   return sources.some(source => normalizeLoose(source).includes(looseNeedle));
 }
 
-function quotedPhrases(question: string) {
+export function quotedPhrases(question: string) {
   const out: string[] = [];
   const seen = new Set<string>();
   const regex = /[“"‘']([^”"’']{2,100})[”"’']/gu;
@@ -111,4 +111,24 @@ export function questionEvidenceIssues(question: InterviewQuestion, sources: str
   }
 
   return issues;
+}
+
+// 질문이 원문 대사를 따옴표로 인용했는데 evidence 에 그 구절이 빠진 경우가 잦다.
+// 인용문을 실제로 담고 있는 원문 구절을 찾아 evidence 로 쓸 수 있게 돌려준다.
+// 원문에 없는 인용이면 빈 문자열을 돌려 재생성 경로로 보낸다(근거를 지어내지 않는다).
+export function sourceExcerptForPhrase(phrase: string, sources: string[]) {
+  const needle = normalizeSpace(phrase);
+  if (needle.length < 2) return '';
+  for (const raw of sources) {
+    const source = normalizeSpace(raw);
+    const at = source.indexOf(needle);
+    if (at < 0) continue;
+    // 인용문 앞뒤 문맥을 조금 붙여 8~420자 범위의 연속 구절로 자른다.
+    const start = Math.max(0, at - 60);
+    const end = Math.min(source.length, at + needle.length + 60);
+    const excerpt = source.slice(start, end).trim();
+    if (excerpt.length >= 8 && excerpt.length <= 420) return excerpt;
+    if (excerpt.length > 420) return excerpt.slice(0, 420).trim();
+  }
+  return '';
 }
