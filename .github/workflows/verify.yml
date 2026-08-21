@@ -1,0 +1,44 @@
+name: Verify
+
+# 접근성 회귀를 사람의 기억이 아니라 빌드가 막도록 한다.
+# 세 검사는 서로 다른 층을 본다:
+#   lint  — 마크업 규칙 위반(역할 오용, 라벨 미연결)
+#   test  — 캐릭터 색 팔레트의 대비·색조 보장
+#   build — 타입과 실제 컴파일
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 테스트가 --experimental-strip-types 로 .ts 를 직접 읽는다. 로컬과 같은 계열을 쓴다.
+          node-version: 24.x
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint src
+
+      - name: Types
+        run: npx tsc --noEmit
+
+      # 캐릭터 색은 사용자 데이터라 무엇이든 들어온다. 대비가 보장되는지,
+      # 그리고 대비를 맞추느라 색조를 바꾸지는 않았는지 함께 확인한다.
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # 빌드만 확인하므로 실제 키는 필요 없다. 없으면 실패하는 코드가 있어 빈 값을 넣는다.
+          CHARACTER2_TELEMETRY_SECRET: ci-placeholder
