@@ -1,26 +1,20 @@
 @media (max-width: 640px) {
-  /* Mobile uses the same simplified 5-point layout as desktop:
-     only the two pole labels are shown, with no connecting axis. */
+  /* Mobile bipolar answers stay vertical, but without the old connecting bar.
+     Only the two pole captions remain; the three middle captions are hidden. */
   .bipolar-control .bipolar-labels {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-    gap: 14px !important;
-    margin-bottom: 20px !important;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
+    display: none !important;
   }
 
   .bipolar-control .five-level-scale {
-    display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    align-items: center !important;
-    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
     position: relative !important;
     margin-top: 0 !important;
-    padding: 0 !important;
+    padding: 2px 0 !important;
   }
 
-  /* Remove the mobile vertical bar entirely. */
   .bipolar-control .five-level-scale::before {
     content: none !important;
     display: none !important;
@@ -28,28 +22,40 @@
 
   .bipolar-control .five-level-choice {
     width: 100% !important;
-    min-height: 52px !important;
-    display: flex !important;
+    min-height: 58px !important;
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr) !important;
     align-items: center !important;
-    justify-content: center !important;
-    padding: 0 !important;
+    gap: 14px !important;
+    padding: 4px 2px !important;
     position: relative !important;
     z-index: 1 !important;
+    text-align: left !important;
   }
 
-  /* Keep all five selectable circles, but remove the three middle text captions.
-     The two pole names are already shown above by .bipolar-labels. */
+  /* Keep only the two pole texts beside the first and last circles. */
   .bipolar-control .five-level-label {
     display: none !important;
+  }
+
+  .bipolar-control .five-level-choice:first-child .five-level-label,
+  .bipolar-control .five-level-choice:last-child .five-level-label {
+    display: block !important;
+    max-width: none !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    text-align: left !important;
+    color: var(--ink) !important;
   }
 
   .bipolar-control .five-level-circle,
   .bipolar-control .five-level-choice.level-2 .five-level-circle,
   .bipolar-control .five-level-choice.level-3 .five-level-circle,
   .bipolar-control .five-level-choice.level-4 .five-level-circle {
+    justify-self: center !important;
     position: relative !important;
     z-index: 2 !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     background: #fff !important;
   }
 
