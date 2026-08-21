@@ -1,28 +1,72 @@
 @media (max-width: 640px) {
-  /* Keep the vertical axis on the exact centre of the 48px circle column. */
+  /* Mobile uses the same simplified 5-point layout as desktop:
+     only the two pole labels are shown, with no connecting axis. */
+  .bipolar-control .bipolar-labels {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 14px !important;
+    margin-bottom: 20px !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  .bipolar-control .five-level-scale {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    align-items: center !important;
+    gap: 4px !important;
+    position: relative !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove the mobile vertical bar entirely. */
   .bipolar-control .five-level-scale::before {
-    left: 24px !important;
-    z-index: 0 !important;
+    content: none !important;
+    display: none !important;
   }
 
   .bipolar-control .five-level-choice {
-    position: relative;
-    z-index: 1;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    width: 100% !important;
+    min-height: 52px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    position: relative !important;
+    z-index: 1 !important;
   }
 
-  /* The circles sit above the axis so the line never shows through them. */
+  /* Keep all five selectable circles, but remove the three middle text captions.
+     The two pole names are already shown above by .bipolar-labels. */
+  .bipolar-control .five-level-label {
+    display: none !important;
+  }
+
   .bipolar-control .five-level-circle,
   .bipolar-control .five-level-choice.level-2 .five-level-circle,
   .bipolar-control .five-level-choice.level-3 .five-level-circle,
   .bipolar-control .five-level-choice.level-4 .five-level-circle {
-    justify-self: center;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    position: relative;
+    position: relative !important;
     z-index: 2 !important;
+    margin: 0 auto !important;
     background: #fff !important;
+  }
+
+  .bipolar-control .five-level-circle {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .bipolar-control .five-level-choice.level-2 .five-level-circle,
+  .bipolar-control .five-level-choice.level-4 .five-level-circle {
+    width: 37px !important;
+    height: 37px !important;
+  }
+
+  .bipolar-control .five-level-choice.level-3 .five-level-circle {
+    width: 30px !important;
+    height: 30px !important;
   }
 
   .bipolar-control .five-level-choice.selected .five-level-circle {
