@@ -148,13 +148,16 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     const url=`${window.location.origin}/character/${preview.shareCode}`;
     const data={title:`${preview.name} 캐릭터 리포트`,text:`${preview.name}의 캐릭터 리포트를 확인해보세요.`,url};
     setShareStatus('');
-    try{
-      if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare(data))){await navigator.share(data);setShareStatus('공유했어요');return}
-      await copyShareUrl(url);setShareStatus('링크를 복사했어요');
-    }catch(error){
-      if(error instanceof DOMException&&error.name==='AbortError')return;
-      try{await copyShareUrl(url);setShareStatus('링크를 복사했어요')}catch{setShareStatus('공유하지 못했어요')}
+    const copyPromise=copyShareUrl(url);
+    if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare(data)){
+      let sharePromise:Promise<void>;
+      try{sharePromise=navigator.share(data)}catch{try{await copyPromise;setShareStatus('링크를 복사했어요')}catch{setShareStatus('공유하지 못했어요')}return}
+      const [copyResult,shareResult]=await Promise.allSettled([copyPromise,sharePromise]);
+      if(copyResult.status==='rejected'){setShareStatus(shareResult.status==='fulfilled'?'공유했지만 링크 복사는 실패했어요':'공유하지 못했어요');return}
+      setShareStatus(shareResult.status==='fulfilled'?'링크를 복사하고 공유했어요':'링크를 복사했어요');
+      return;
     }
+    try{await copyPromise;setShareStatus('링크를 복사했어요')}catch{setShareStatus('공유하지 못했어요')}
   }
 
   async function saveOwnerIdentity(){
