@@ -20,6 +20,55 @@ function animateEnter(element: HTMLElement, x = 0, y = 7, duration = 190) {
   );
 }
 
+function animateSummaryExpanded(element: HTMLElement) {
+  if (reducedMotion()) return;
+  element.getAnimations().forEach(animation => animation.cancel());
+  const computed = window.getComputedStyle(element);
+  const targetHeight = element.getBoundingClientRect().height;
+  if (targetHeight < 1) return;
+
+  element.style.overflow = 'hidden';
+  const animation = element.animate(
+    [
+      {
+        height: '0px',
+        marginTop: '0px',
+        paddingTop: '0px',
+        paddingBottom: '0px',
+        borderTopWidth: '0px',
+        borderBottomWidth: '0px',
+        opacity: 0,
+        transform: 'translateY(-10px)',
+      },
+      {
+        height: `${targetHeight}px`,
+        marginTop: computed.marginTop,
+        paddingTop: computed.paddingTop,
+        paddingBottom: computed.paddingBottom,
+        borderTopWidth: computed.borderTopWidth,
+        borderBottomWidth: computed.borderBottomWidth,
+        opacity: 1,
+        transform: 'translateY(0)',
+      },
+    ],
+    { duration: 340, easing: 'cubic-bezier(.22,.72,.2,1)', fill: 'both' },
+  );
+
+  void animation.finished.finally(() => {
+    element.style.overflow = '';
+    animation.cancel();
+  });
+}
+
+function summaryCardExpandedFrom(node: HTMLElement) {
+  const expanded = node.matches('.report-mag .summary-expanded')
+    ? node
+    : node.closest<HTMLElement>('.report-mag .summary-expanded')
+      || node.querySelector<HTMLElement>('.report-mag .summary-expanded');
+  if (!expanded) return null;
+  return expanded.previousElementSibling?.classList.contains('summary-card-grid') ? expanded : null;
+}
+
 function questionOrder() {
   const text = document.querySelector<HTMLElement>('.analyze-page .question-card .q-meta span:first-child')?.textContent || '';
   const match = text.match(/(\d+)\s*\/\s*20/u);
@@ -54,8 +103,13 @@ export function GlobalScreenMotionBridge() {
   }, [pathname]);
 
   useEffect(() => {
+    const pendingSummaryExpanded = new Set<HTMLElement>();
+
     const syncDirectionalMotion = () => {
       queued.current = false;
+
+      pendingSummaryExpanded.forEach(animateSummaryExpanded);
+      pendingSummaryExpanded.clear();
 
       const order = questionOrder();
       if (order !== null) {
@@ -105,6 +159,9 @@ export function GlobalScreenMotionBridge() {
         for (const node of record.addedNodes) {
           if (!(node instanceof HTMLElement)) continue;
 
+          const summaryExpanded = summaryCardExpandedFrom(node);
+          if (summaryExpanded) pendingSummaryExpanded.add(summaryExpanded);
+
           const stageTarget = node.matches('.analyze-page > .card, .analyze-page > .stack')
             ? node
             : node.querySelector<HTMLElement>('.analyze-page > .card, .analyze-page > .stack');
@@ -121,6 +178,7 @@ export function GlobalScreenMotionBridge() {
 
     return () => {
       observer.disconnect();
+      pendingSummaryExpanded.clear();
       if (queued.current) queued.current = false;
     };
   }, []);
