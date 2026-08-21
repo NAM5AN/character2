@@ -1,6 +1,23 @@
+@media (min-width: 761px) {
+  /* 데스크톱은 기존 좌/우 페이지 컨트롤 사이 정중앙에 공유 버튼을 고정한다. */
+  #paid-detail-report > .actions {
+    position: relative;
+  }
+
+  #paid-detail-report > .actions > .detail-report-share-button {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 180px;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 760px) {
-  /* 모바일 상세 리포트 하단 액션은 페이지 이동을 먼저, 보조 작업을 아래에 둔다.
-     기존 컴포넌트 구조는 유지하고 CSS 배치만 바꿔 회귀 위험을 줄인다. */
+  /* 모바일 상세 리포트 하단 액션은 페이지 이동을 먼저, 공유를 그 아래,
+     보조 작업을 마지막에 둔다. */
   #paid-detail-report > .actions {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
@@ -43,9 +60,25 @@
     text-align: center;
   }
 
-  /* 요약으로 올라가기 / 다른 캐릭터 분석: 보조 액션은 두 칸으로 정돈한다. */
-  #paid-detail-report > .actions > div:first-child {
+  /* 공유는 페이지 이동 바로 아래에 한 줄 전체 폭으로 둔다. */
+  #paid-detail-report > .actions > .detail-report-share-button {
     order: 2;
+    width: 100%;
+    min-height: 54px;
+    padding: 0 16px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    font-size: 16px;
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* 요약으로 올라가기 / 다른 캐릭터 분석: 보조 액션은 마지막 줄에 둔다. */
+  #paid-detail-report > .actions > div:first-child {
+    order: 3;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px !important;
@@ -68,7 +101,7 @@
 
   /* 저장된 상세 리포트 화면은 '다른 캐릭터 분석' 링크가 액션의 직계 자식이다. */
   #paid-detail-report > .actions > a.btn {
-    order: 2;
+    order: 3;
     width: 100%;
     min-height: 46px;
     padding: 0 14px !important;
@@ -82,7 +115,8 @@
   }
 
   /* 구형 상세 리포트처럼 버튼들이 div 없이 직접 들어가는 경우도 폭을 맞춘다. */
-  #paid-detail-report > .actions > button.btn {
+  #paid-detail-report > .actions > button.btn:not(.detail-report-share-button) {
+    order: 3;
     width: 100%;
     min-height: 46px;
     padding: 0 14px !important;
