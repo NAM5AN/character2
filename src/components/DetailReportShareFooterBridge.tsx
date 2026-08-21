@@ -27,7 +27,7 @@ export function DetailReportShareFooterBridge(){
 
   useEffect(()=>{
     const locate=()=>{
-      const next=document.querySelector<HTMLElement>('#paid-detail-report .report-mag .sheet');
+      const next=document.querySelector<HTMLElement>('#paid-detail-report > .actions');
       setTarget(current=>current===next?current:next);
     };
     locate();
@@ -75,26 +75,14 @@ export function DetailReportShareFooterBridge(){
   if(!target)return null;
 
   return createPortal(
-    <div
-      className="detail-report-share-footer"
-      style={{
-        display:'flex',
-        justifyContent:'center',
-        marginTop:28,
-        paddingTop:28,
-        borderTop:'1px solid var(--line)',
-      }}
+    <button
+      type="button"
+      className="btn primary detail-report-share-button"
+      onClick={()=>void shareReport()}
+      aria-live="polite"
     >
-      <button
-        type="button"
-        className="btn primary"
-        style={{width:'min(100%,420px)',minHeight:48}}
-        onClick={()=>void shareReport()}
-        aria-live="polite"
-      >
-        {status||'공유하기'}
-      </button>
-    </div>,
+      {status||'공유하기'}
+    </button>,
     target,
   );
 }
