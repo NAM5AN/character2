@@ -16,8 +16,8 @@
 }
 
 @media (max-width: 760px) {
-  /* 모바일 상세 리포트 하단 액션은 페이지 이동을 먼저, 공유를 그 아래,
-     보조 작업을 마지막에 둔다. */
+  /* 모바일 하단 액션 순서:
+     1) 이전/다음 페이지  2) 다른 캐릭터 분석 등 보조 액션  3) 공유하기 */
   #paid-detail-report > .actions {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
@@ -36,18 +36,21 @@
     margin-left: 0 !important;
   }
 
-  /* 이전/다음 페이지: 가장 중요한 동작이라 첫 줄에 크게 배치한다.
-     버튼이 하나뿐이면 자연스럽게 한 줄 전체를 차지한다. */
+  /* 페이지 이동은 첫 줄. 2페이지처럼 버튼이 둘이면 2열,
+     1·3페이지처럼 하나뿐이면 1열 전체 폭을 사용한다. */
   #paid-detail-report > .actions > div:last-child {
     order: 1;
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px !important;
-    justify-content: stretch !important;
+  }
+
+  #paid-detail-report > .actions > div:last-child:has(> .btn:only-child) {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   #paid-detail-report > .actions > div:last-child .btn {
-    flex: 1 1 0;
-    width: auto;
+    width: 100% !important;
     min-width: 0;
     min-height: 54px;
     padding: 0 16px !important;
@@ -60,25 +63,9 @@
     text-align: center;
   }
 
-  /* 공유는 페이지 이동 바로 아래에 한 줄 전체 폭으로 둔다. */
-  #paid-detail-report > .actions > .detail-report-share-button {
-    order: 2;
-    width: 100%;
-    min-height: 54px;
-    padding: 0 16px !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 15px;
-    font-size: 16px;
-    line-height: 1.25;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  /* 요약으로 올라가기 / 다른 캐릭터 분석: 보조 액션은 마지막 줄에 둔다. */
+  /* 요약으로 올라가기 / 다른 캐릭터 분석은 페이지 이동 아래. */
   #paid-detail-report > .actions > div:first-child {
-    order: 3;
+    order: 2;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px !important;
@@ -101,7 +88,7 @@
 
   /* 저장된 상세 리포트 화면은 '다른 캐릭터 분석' 링크가 액션의 직계 자식이다. */
   #paid-detail-report > .actions > a.btn {
-    order: 3;
+    order: 2;
     width: 100%;
     min-height: 46px;
     padding: 0 14px !important;
@@ -114,9 +101,25 @@
     text-align: center;
   }
 
-  /* 구형 상세 리포트처럼 버튼들이 div 없이 직접 들어가는 경우도 폭을 맞춘다. */
-  #paid-detail-report > .actions > button.btn:not(.detail-report-share-button) {
+  /* 공유는 다른 캐릭터 분석보다 아래, 항상 마지막 한 줄 전체 폭. */
+  #paid-detail-report > .actions > .detail-report-share-button {
     order: 3;
+    width: 100%;
+    min-height: 54px;
+    padding: 0 16px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    font-size: 16px;
+    line-height: 1.25;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* 구형 상세 리포트처럼 보조 버튼이 div 없이 직접 들어가는 경우도 가운데 단계에 둔다. */
+  #paid-detail-report > .actions > button.btn:not(.detail-report-share-button) {
+    order: 2;
     width: 100%;
     min-height: 46px;
     padding: 0 14px !important;
