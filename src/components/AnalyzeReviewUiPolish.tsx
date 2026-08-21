@@ -311,7 +311,7 @@ export function AnalyzeReviewUiPolish(){
 
       const pageTitle=document.querySelector<HTMLElement>('.page-head h1');
       if(pageTitle){
-        const inputStage=!!document.querySelector('.card .field input.input');
+        const inputStage=!!document.querySelector('.analyze-page > .card:not(.question-card) input.input[placeholder^="예:"]');
         const desired=!inputStage&&currentName?`${currentName} 정밀 분석`:'캐릭터 정밀 분석';
         if(pageTitle.textContent!==desired)pageTitle.textContent=desired;
       }
