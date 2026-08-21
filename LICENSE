@@ -1,0 +1,67 @@
+CHA LAB SOURCE-AVAILABLE PROPRIETARY LICENSE
+Version 1.0, 2026
+
+Copyright (c) 2026 NAM5AN / CHA LAB. All rights reserved.
+
+1. PURPOSE
+
+This source code and its accompanying files (the "Software") are made
+publicly available solely for viewing, study, security review, and evaluation.
+The Software is not open-source software and is not offered under an
+open-source license.
+
+2. LIMITED PERMISSION
+
+You may view the Software through the repository hosting service and may make
+a fork only to the extent necessary to use the ordinary functionality of that
+service. No other rights are granted, whether express or implied.
+
+3. RESTRICTIONS
+
+Without prior written permission from the copyright holder, you may not:
+
+- copy or reproduce the Software outside the limited permission above;
+- modify, adapt, translate, or create derivative works from the Software;
+- publish, distribute, sublicense, sell, rent, or otherwise transfer the
+  Software or any substantial portion of it;
+- deploy, host, operate, or make the Software available as a service;
+- use the Software, its design, or its implementation for commercial purposes;
+- remove or alter copyright, license, attribution, or proprietary notices; or
+- represent the Software or a derivative work as your own work.
+
+4. CONTRIBUTIONS
+
+No contribution is accepted under this license merely because it is submitted.
+Any contribution requires separate terms agreed to by the contributor and the
+copyright holder. Opening an issue or submitting a proposal does not grant any
+license to the Software.
+
+5. THIRD-PARTY MATERIALS
+
+Third-party libraries, assets, fonts, models, and other materials included in
+or used by the Software remain subject to their respective licenses and terms.
+This license does not limit any rights granted directly by those third parties.
+
+6. NO TRADEMARK LICENSE
+
+This license grants no right to use the names, logos, service marks, domains,
+or branding of NAM5AN or CHA LAB.
+
+7. DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+8. PERMISSION REQUESTS
+
+For permission to use the Software beyond the limited rights stated above,
+contact the repository owner through the official GitHub repository.
+
+9. OTHER TERMS
+
+The terms of the repository hosting service continue to apply to use of that
+service. If any provision of this license is unenforceable, the remaining
+provisions remain in effect.
