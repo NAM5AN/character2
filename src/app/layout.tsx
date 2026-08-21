@@ -8,6 +8,7 @@ import { AdminFeedbackShortcut } from '@/components/AdminFeedbackShortcut';
 import { AdminFailureDeleteBridge } from '@/components/AdminFailureDeleteBridge';
 import { AdminCharacterIdentityEditBridge } from '@/components/AdminCharacterIdentityEditBridge';
 import { DetailReportAccordionBridge } from '@/components/DetailReportAccordionBridge';
+import { DetailReportAccordionTapGuard } from '@/components/DetailReportAccordionTapGuard';
 import { StoredReportThemeBridge } from '@/components/StoredReportThemeBridge';
 import { ReportOwnerSaveGate } from '@/components/ReportOwnerSaveGate';
 import { GlobalScreenMotionBridge } from '@/components/GlobalScreenMotionBridge';
@@ -38,6 +39,7 @@ import './admin-console-polish.css';
 import './default-neutral-theme.css';
 import './footer-layout.css';
 import './touch-hover-fix.css';
+import './report-accordion-mobile-stability.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHA LAB ㅡ 캐릭터 정밀 해석';
@@ -102,6 +104,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AdminFeedbackShortcut/>
         <AdminFailureDeleteBridge/>
         <AdminCharacterIdentityEditBridge/>
+        <DetailReportAccordionTapGuard/>
         <DetailReportAccordionBridge/>
         <StoredReportThemeBridge/>
         <ReportOwnerSaveGate/>
