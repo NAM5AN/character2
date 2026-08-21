@@ -149,7 +149,7 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
     const data={title:`${preview.name} 캐릭터 리포트`,text:`${preview.name}의 캐릭터 리포트를 확인해보세요.`,url};
     setShareStatus('');
     const copyPromise=copyShareUrl(url);
-    if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare(data)){
+    if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare(data))){
       let sharePromise:Promise<void>;
       try{sharePromise=navigator.share(data)}catch{try{await copyPromise;setShareStatus('링크를 복사했어요')}catch{setShareStatus('공유하지 못했어요')}return}
       const [copyResult,shareResult]=await Promise.allSettled([copyPromise,sharePromise]);
