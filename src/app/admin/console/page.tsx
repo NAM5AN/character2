@@ -921,11 +921,12 @@ export default function AdminConsolePage() {
         {filtered.map(c => (
           <div className="card" key={c.shareCode} style={{ padding: 22 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => openDetail(c)}
-                style={{ textAlign: 'left', background: 'transparent', border: 0, padding: 0, minWidth: 0, flex: 1, cursor: 'pointer' }}
-                aria-label={`${c.name} 상세 열기`}
-              >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Link
+                  href={`/character/${c.shareCode}`}
+                  style={{ display: 'block', textAlign: 'left', color: 'inherit', textDecoration: 'none' }}
+                  aria-label={`${c.name} 리포트 열기`}
+                >
                 <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
                   <strong style={{ fontSize: 22, letterSpacing: '-.02em' }}>{c.name || '(이름 없음)'}</strong>
                   <span className="muted">오너 · {c.ownerName || '—'}</span>
@@ -947,9 +948,10 @@ export default function AdminConsolePage() {
                   <span className="tag" style={{ fontSize: 12 }}>요약 생성 {fmtDuration(c.summaryGenMs)}</span>
                   <span className="tag" style={{ fontSize: 12 }}>상세 생성 {fmtDuration(c.detailGenMs)}</span>
                 </div>
-              </button>
+                </Link>
+              </div>
               <div className="actions" style={{ marginTop: 0 }}>
-                <button className="btn" onClick={() => openDetail(c)}>자세히</button>
+                <button className="btn" onClick={() => openDetail(c)}>관리</button>
                 <button className="btn danger" onClick={() => setPendingDelete(c)}>삭제</button>
               </div>
             </div>
