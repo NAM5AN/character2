@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { CharacterDraft, InterviewAnswer } from '@/lib/schemas/character';
 import type { InterviewQuestion, QuestionResponseType } from '@/lib/schemas/question';
 import type { CharacterReportPreview } from '@/lib/character-report';
@@ -46,6 +47,7 @@ export function AnalyzeFlow(){
   const [reason,setReason]=useState('');
   const [multiSelected,setMultiSelected]=useState<string[]>([]);
   const [ranking,setRanking]=useState<string[]>([]);
+  const [draggingRankItem,setDraggingRankItem]=useState<string|null>(null);
   const [sliderValue,setSliderValue]=useState(50);
   const [matrixAnswers,setMatrixAnswers]=useState<Record<string,string>>({});
   const [secondary,setSecondary]=useState('');
@@ -60,10 +62,11 @@ export function AnalyzeFlow(){
   const questionHistoryRef=useRef<InterviewQuestion[]>([]);
   const batchRequests=useRef<Map<number,Promise<InterviewQuestion[]>>>(new Map());
   const temporalRepairRequests=useRef<Set<string>>(new Set());
+  const rankingDragIndexRef=useRef<number|null>(null);
 
   useEffect(()=>{questionHistoryRef.current=questionHistory},[questionHistory]);
 
-  function resetResponseDraft(){setSelected('');setCustom('');setReason('');setMultiSelected([]);setRanking([]);setSliderValue(50);setMatrixAnswers({});setSecondary('')}
+  function resetResponseDraft(){setSelected('');setCustom('');setReason('');setMultiSelected([]);setRanking([]);rankingDragIndexRef.current=null;setDraggingRankItem(null);setSliderValue(50);setMatrixAnswers({});setSecondary('')}
   function setHistory(next:InterviewQuestion[]){questionHistoryRef.current=next;setQuestionHistory(next)}
 
   function applyQuestion(q:InterviewQuestion,history:InterviewQuestion[],answerList=answers){
@@ -195,6 +198,9 @@ export function AnalyzeFlow(){
   function addRank(option:string){setRanking(current=>current.includes(option)?current:[...current,option])}
   function removeRank(option:string){setRanking(current=>current.filter(item=>item!==option))}
   function moveRank(index:number,direction:-1|1){setRanking(current=>{const next=[...current];const target=index+direction;if(target<0||target>=next.length)return current;[next[index],next[target]]=[next[target],next[index]];return next})}
+  function startRankDrag(index:number,item:string,event:ReactPointerEvent<HTMLDivElement>){if(busy||event.button!==0||(event.target as HTMLElement).closest('button'))return;rankingDragIndexRef.current=index;setDraggingRankItem(item);event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
+  function dragRank(event:ReactPointerEvent<HTMLDivElement>){const from=rankingDragIndexRef.current;if(from===null)return;event.preventDefault();const row=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-ranking-index]');const to=Number(row?.dataset.rankingIndex);if(!Number.isInteger(to)||to<0||to>=ranking.length||to===from)return;setRanking(current=>{if(from>=current.length||to>=current.length)return current;const next=[...current];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});rankingDragIndexRef.current=to}
+  function stopRankDrag(event:ReactPointerEvent<HTMLDivElement>){if(rankingDragIndexRef.current===null)return;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);rankingDragIndexRef.current=null;setDraggingRankItem(null)}
 
   function renderResponseControls(){
     if(!question)return null;const type=responseTypeOf(question);const config=responseConfigOf(question);
@@ -202,7 +208,29 @@ export function AnalyzeFlow(){
     if(type==='sentence_continue')return <div className="field"><label className="label">문장을 이어 써주세요</label><textarea disabled={busy} className="input" style={{minHeight:120,resize:'vertical'}} value={custom} onChange={e=>setCustom(e.target.value)} /></div>;
     if(type==='dialogue_choice')return <><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>“{o}”</button>)}</div><div className="field"><label className="label">직접 대사 입력</label><textarea disabled={busy} className="input" style={{minHeight:76,resize:'vertical'}} value={custom} onChange={e=>{setCustom(e.target.value);setSelected('')}} /></div></>;
     if(type==='bipolar_scale')return <div className="bipolar-control"><div className="bipolar-labels"><strong>{config.leftLabel||'A'}</strong><strong>{config.rightLabel||'B'}</strong></div><div className="bipolar-track"><input aria-label="A와 B 사이에서 가까운 위치 선택" disabled={busy} className="bipolar-range" type="range" min={0} max={100} step={1} value={sliderValue} onPointerDown={()=>setSelected('dial')} onKeyDown={()=>setSelected('dial')} onChange={e=>{setSliderValue(Number(e.target.value));setSelected('dial')}} /></div><div className="bipolar-hints"><span>A에 가까움</span><span>반반</span><span>B에 가까움</span></div>{selected&&<div className="bipolar-current">{sliderValue===50?'정중앙':sliderValue<50?`${config.leftLabel||'A'} 쪽에 더 가까움`:`${config.rightLabel||'B'} 쪽에 더 가까움`}</div>}</div>;
-    if(type==='ranking'){const remaining=question.options.filter(o=>!ranking.includes(o));const actionStyle={padding:0,width:34,height:34,display:'inline-grid',placeItems:'center',flex:'0 0 auto',color:'var(--character-accent, var(--accent))'} as const;return <div style={{marginTop:18}}><p className="muted">중요한 순서대로 눌러주세요. 먼저 누른 항목이 1위가 됩니다.</p>{ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=><div key={item} style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',border:'1px solid var(--line)',borderRadius:12}}><strong style={{minWidth:40}}>{index+1}위</strong><span style={{flex:1}}>{item}</span><button type="button" aria-label={`${item} 순위를 위로 이동`} className="btn" disabled={busy||index===0} style={actionStyle} onClick={()=>moveRank(index,-1)}><RankingActionIcon direction="up"/></button><button type="button" aria-label={`${item} 순위를 아래로 이동`} className="btn" disabled={busy||index===ranking.length-1} style={actionStyle} onClick={()=>moveRank(index,1)}><RankingActionIcon direction="down"/></button><button type="button" aria-label={`${item} 순위에서 제거`} className="btn" disabled={busy} style={actionStyle} onClick={()=>removeRank(item)}><RankingActionIcon direction="remove"/></button></div>)}</div>}{remaining.length>0&&<div className="options">{remaining.map(o=><button disabled={busy} key={o} className="option" onClick={()=>addRank(o)}>{o}</button>)}</div>}</div>}
+    if(type==='ranking'){
+      const remaining=question.options.filter(o=>!ranking.includes(o));
+      const actionStyle={padding:0,width:34,height:34,display:'inline-grid',placeItems:'center',flex:'0 0 auto',color:'var(--character-accent, var(--accent))'} as const;
+      return <div style={{marginTop:18}}>
+        <p className="muted">중요한 순서대로 눌러주세요. 선택한 항목은 위아래로 끌거나 화살표로 순서를 바꿀 수 있어요.</p>
+        {ranking.length>0&&<div className="stack" style={{gap:8,marginBottom:14}}>{ranking.map((item,index)=>{const isDragging=draggingRankItem===item;return <div
+          key={item}
+          data-ranking-index={index}
+          onPointerDown={event=>startRankDrag(index,item,event)}
+          onPointerMove={dragRank}
+          onPointerUp={stopRankDrag}
+          onPointerCancel={stopRankDrag}
+          style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',border:'1px solid var(--line)',borderRadius:12,background:isDragging?'var(--character-accent-soft, var(--accent-soft))':'transparent',boxShadow:isDragging?'0 0 0 2px var(--character-accent, var(--accent)), 0 10px 24px rgba(0,0,0,.12)':'none',transform:isDragging?'scale(1.015)':'none',transition:'background-color .16s ease, box-shadow .16s ease, transform .16s ease',touchAction:'none',userSelect:'none',cursor:busy?'default':isDragging?'grabbing':'grab',position:'relative',zIndex:isDragging?2:1}}
+        >
+          <strong style={{minWidth:40}}>{index+1}위</strong>
+          <span style={{flex:1,minWidth:0}}>{item}</span>
+          <button type="button" aria-label={`${item} 순위를 위로 이동`} className="btn" disabled={busy||index===0} style={actionStyle} onClick={()=>moveRank(index,-1)}><RankingActionIcon direction="up"/></button>
+          <button type="button" aria-label={`${item} 순위를 아래로 이동`} className="btn" disabled={busy||index===ranking.length-1} style={actionStyle} onClick={()=>moveRank(index,1)}><RankingActionIcon direction="down"/></button>
+          <button type="button" aria-label={`${item} 순위에서 제거`} className="btn" disabled={busy} style={actionStyle} onClick={()=>removeRank(item)}><RankingActionIcon direction="remove"/></button>
+        </div>})}</div>}
+        {remaining.length>0&&<div className="options">{remaining.map(o=><button disabled={busy} key={o} className="option" onClick={()=>addRank(o)}>{o}</button>)}</div>}
+      </div>
+    }
     if(type==='forced_choice')return <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div>;
     if(type==='multi_select')return <><p className="muted" style={{marginTop:18}}>해당되는 것을 모두 골라주세요.{config.maxSelections?` 최대 ${config.maxSelections}개까지 선택할 수 있어요.`:''}</p><div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${multiSelected.includes(o)?'selected':''}`} onClick={()=>toggleMulti(o)}>{multiSelected.includes(o)?'✓ ':''}{o}</button>)}</div></>;
     if(type==='least_likely')return <div className="options">{question.options.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>setSelected(o)}>{o}</button>)}</div>;
