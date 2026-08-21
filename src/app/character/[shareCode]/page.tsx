@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getSupabaseServer } from '@/lib/supabase/server';
@@ -9,7 +11,17 @@ import type { CompletedDetailPayload } from '@/components/CompletedCharacterRepo
 import { detailViewCookieName } from '@/lib/detail-access';
 import { normalizeStoredDetailParagraphGuides } from '@/lib/stored-detail-paragraph-guides';
 
-async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
+const SITE_ORIGIN='https://www.cha-lab.com';
+const DEFAULT_TITLE='CHA LAB ㅡ 캐릭터 정밀 해석';
+const DEFAULT_DESCRIPTION='나도 몰랐던 내 캐릭터의 심리';
+
+function compactMetadataText(value:string,max=170){
+  const normalized=value.replace(/\s+/gu,' ').trim();
+  if(normalized.length<=max)return normalized;
+  return `${normalized.slice(0,max-1).trimEnd()}…`;
+}
+
+const loadPreview=cache(async(rawCode:string):Promise<CharacterReportPreview|null>=>{
   const code=normalizeShareCode(rawCode);
   if(!isShareCode(code))return null;
   const supabase=getSupabaseServer();
@@ -17,7 +29,7 @@ async function loadPreview(rawCode:string):Promise<CharacterReportPreview|null>{
   if(error||!data)return null;
   const parsed=characterReportPreviewSchema.safeParse(data);
   return parsed.success?parsed.data:null;
-}
+});
 
 async function loadSavedDetail(rawCode:string):Promise<CompletedDetailPayload|null>{
   const code=normalizeShareCode(rawCode);
@@ -39,6 +51,41 @@ async function loadSavedDetail(rawCode:string):Promise<CompletedDetailPayload|nu
     cached:true,
     stageReady,
     complete,
+  };
+}
+
+export async function generateMetadata({params}:{params:Promise<{shareCode:string}>}):Promise<Metadata>{
+  const {shareCode}=await params;
+  const normalized=normalizeShareCode(shareCode);
+  const preview=await loadPreview(normalized);
+  if(!preview){
+    return {title:DEFAULT_TITLE,description:DEFAULT_DESCRIPTION};
+  }
+
+  const title=`${preview.name} 정밀 해석 | CHA LAB`;
+  const description=compactMetadataText(preview.oneLineSummary||DEFAULT_DESCRIPTION);
+  const canonical=`${SITE_ORIGIN}/character/${preview.shareCode}`;
+  const imageUrl=`${canonical}/opengraph-image`;
+
+  return {
+    title,
+    description,
+    alternates:{canonical},
+    openGraph:{
+      type:'website',
+      locale:'ko_KR',
+      siteName:'CHA LAB',
+      url:canonical,
+      title,
+      description,
+      images:[{url:imageUrl,width:1200,height:630,alt:`${preview.name} 캐릭터 정밀 해석`}],
+    },
+    twitter:{
+      card:'summary_large_image',
+      title,
+      description,
+      images:[imageUrl],
+    },
   };
 }
 
