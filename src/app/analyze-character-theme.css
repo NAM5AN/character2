@@ -118,19 +118,21 @@ html[data-character-theme='active'] .analyze-page .bipolar-range::-moz-range-thu
 
 /* Five-level A/B control: replace the remaining graphite/paper fills with the
    character palette while keeping label text colors exactly as before. */
+/* 빈칸(라인만) → 호버 시 포인트 서브색으로 채움 → 선택 시 포인트 메인색으로 꽉 채움. */
 html[data-character-theme='active'] .analyze-page .five-level-circle {
-  background: var(--character-surface) !important;
-  border-color: color-mix(in srgb,var(--character-point) 38%,var(--line)) !important;
+  background: transparent !important;
+  border-color: color-mix(in srgb,var(--character-point) 42%,var(--line)) !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-choice:hover .five-level-circle {
+  background: var(--character-accent-soft) !important;
   border-color: var(--character-accent) !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-choice.selected .five-level-circle {
   background: var(--character-accent) !important;
   border-color: var(--character-accent) !important;
-  box-shadow: inset 0 0 0 7px var(--character-surface),0 0 0 2px var(--character-accent) !important;
+  box-shadow: none !important;
 }
 
 html[data-character-theme='active'] .analyze-page .five-level-scale::before {

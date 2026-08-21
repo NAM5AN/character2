@@ -13,6 +13,10 @@ function nearestLevel(value:number){
   return LEVEL_VALUES.reduce((best,item)=>Math.abs(item-value)<Math.abs(best-value)?item:best,LEVEL_VALUES[0]);
 }
 
+// 점 밑에 보이는 표기. 긴 문장을 5개 점마다 반복하지 않고 방향/강도만 화살표로 보여준다.
+// 어느 쪽 문장인지는 위쪽 양끝 라벨이 이미 알려주고, 각 문장 전체는 aria-label 로만 남는다.
+const LEVEL_ARROWS = ['◀◀', '◀', '●', '▶', '▶▶'];
+function levelArrow(index:number){ return LEVEL_ARROWS[index] ?? '●'; }
 function levelLabel(index:number,left:string,right:string){
   if(index===0)return left;
   if(index===1)return `‘${left}’에 조금 더 가까움`;
@@ -45,8 +49,9 @@ function refreshLabels(scale:HTMLElement,left:string,right:string){
   scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach((button,index)=>{
     const label=levelLabel(index,left,right);
     if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);
+    const arrow=levelArrow(index);
     const caption=button.querySelector<HTMLElement>('.five-level-label');
-    if(caption&&caption.textContent!==label)caption.textContent=label;
+    if(caption&&caption.textContent!==arrow)caption.textContent=arrow;
   });
 }
 
@@ -198,9 +203,9 @@ export function BipolarFiveLevelUi(){
     .five-level-circle {
       width:58px;
       height:58px;
-      border:3px solid #77746f;
+      border:3px solid color-mix(in srgb, var(--character-point, #77746f) 42%, var(--line, #d8d5cf));
       border-radius:50%;
-      background:var(--paper);
+      background:transparent;
       display:block;
       flex:0 0 auto;
       transition:transform .14s ease,background .14s ease,border-color .14s ease,box-shadow .14s ease;
@@ -208,22 +213,23 @@ export function BipolarFiveLevelUi(){
     .five-level-choice.level-2 .five-level-circle,
     .five-level-choice.level-4 .five-level-circle { width:48px;height:48px;margin-top:5px; }
     .five-level-choice.level-3 .five-level-circle { width:38px;height:38px;margin-top:10px; }
-    .five-level-choice:hover .five-level-circle { border-color:var(--ink);transform:scale(1.05); }
+    .five-level-choice:hover .five-level-circle { background:var(--character-accent-soft);border-color:var(--character-accent);transform:scale(1.05); }
     .five-level-choice.selected .five-level-circle {
-      background:var(--ink);
-      border-color:var(--ink);
-      box-shadow:inset 0 0 0 7px var(--paper),0 0 0 2px var(--ink);
+      background:var(--character-accent);
+      border-color:var(--character-accent);
+      box-shadow:none;
     }
     .five-level-label {
-      font-size:12px;
-      line-height:1.4;
-      font-weight:800;
+      font-size:15px;
+      line-height:1;
+      font-weight:700;
+      letter-spacing:-1px;
       text-align:center;
-      color:var(--muted);
+      color:color-mix(in srgb, var(--character-point, #77746f) 45%, var(--muted, #8b8880));
       word-break:keep-all;
       max-width:190px;
     }
-    .five-level-choice.selected .five-level-label { color:var(--ink); }
+    .five-level-choice.selected .five-level-label { color:var(--character-accent); }
     .five-level-choice:focus-visible { outline:2px solid var(--ink);outline-offset:6px;border-radius:8px; }
     @media (max-width:640px){
       .bipolar-control { padding:18px 14px 16px; }
