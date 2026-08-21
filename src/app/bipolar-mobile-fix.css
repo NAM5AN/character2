@@ -1,6 +1,6 @@
 @media (max-width: 640px) {
-  /* Mobile bipolar answers stay vertical, but without the old connecting bar.
-     Only the two pole captions remain; the three middle captions are hidden. */
+  /* Mobile bipolar answers use one centered vertical I-shaped stack:
+     top pole text -> five circles -> bottom pole text. No connecting bar. */
   .bipolar-control .bipolar-labels {
     display: none !important;
   }
@@ -8,11 +8,11 @@
   .bipolar-control .five-level-scale {
     display: flex !important;
     flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 6px !important;
+    align-items: center !important;
+    gap: 5px !important;
     position: relative !important;
     margin-top: 0 !important;
-    padding: 2px 0 !important;
+    padding: 4px 0 !important;
   }
 
   .bipolar-control .five-level-scale::before {
@@ -22,18 +22,31 @@
 
   .bipolar-control .five-level-choice {
     width: 100% !important;
-    min-height: 58px !important;
-    display: grid !important;
-    grid-template-columns: 48px minmax(0, 1fr) !important;
+    min-height: 46px !important;
+    display: flex !important;
+    flex-direction: column !important;
     align-items: center !important;
-    gap: 14px !important;
-    padding: 4px 2px !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 0 !important;
     position: relative !important;
     z-index: 1 !important;
-    text-align: left !important;
+    text-align: center !important;
   }
 
-  /* Keep only the two pole texts beside the first and last circles. */
+  /* Labels live inside the first/last choice buttons in the existing DOM.
+     Reverse only the first one so its text appears above the first circle. */
+  .bipolar-control .five-level-choice:first-child {
+    flex-direction: column-reverse !important;
+    gap: 10px !important;
+    margin-bottom: 1px !important;
+  }
+
+  .bipolar-control .five-level-choice:last-child {
+    gap: 10px !important;
+    margin-top: 1px !important;
+  }
+
   .bipolar-control .five-level-label {
     display: none !important;
   }
@@ -41,22 +54,25 @@
   .bipolar-control .five-level-choice:first-child .five-level-label,
   .bipolar-control .five-level-choice:last-child .five-level-label {
     display: block !important;
-    max-width: none !important;
+    width: min(100%, 300px) !important;
+    max-width: 300px !important;
+    margin: 0 auto !important;
     font-size: 13px !important;
-    line-height: 1.45 !important;
-    text-align: left !important;
+    line-height: 1.4 !important;
+    text-align: center !important;
     color: var(--ink) !important;
+    word-break: keep-all !important;
   }
 
   .bipolar-control .five-level-circle,
   .bipolar-control .five-level-choice.level-2 .five-level-circle,
   .bipolar-control .five-level-choice.level-3 .five-level-circle,
   .bipolar-control .five-level-choice.level-4 .five-level-circle {
-    justify-self: center !important;
     position: relative !important;
     z-index: 2 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     background: #fff !important;
+    flex: 0 0 auto !important;
   }
 
   .bipolar-control .five-level-circle {
