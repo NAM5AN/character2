@@ -70,9 +70,9 @@ html[data-character-theme='active'] .full-preview-other {
 }
 
 html[data-character-theme='active'] .full-preview-share {
-  background: var(--character-accent) !important;
-  border-color: var(--character-accent) !important;
-  color: #fff !important;
+  background: color-mix(in srgb,var(--character-accent-soft) 72%,var(--character-surface)) !important;
+  border-color: color-mix(in srgb,var(--character-point) 30%,var(--line)) !important;
+  color: var(--ink) !important;
 }
 
 html[data-character-theme='active'] .full-preview-overlay > div {
