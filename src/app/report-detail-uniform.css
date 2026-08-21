@@ -2,7 +2,7 @@
    hero / feature / wide / timeline 등 변형 클래스가 붙어도 같은 편집형으로 보이게 한다.
    대항목/중항목과 겹쳐 보이던 큰 소항목 번호는 제거하고,
    소항목은 제목 위의 작은 캡션 번호 + 짧은 선으로 명확히 구분한다.
-   study-block, spectrum, compare/manual/pressure 블록은 건드리지 않는다. */
+   study-block, compare/manual/pressure 블록의 기본 배치는 유지한다. */
 
 .report-mag .topic-grid > article.topic {
   grid-column: span 12 !important;
@@ -116,5 +116,40 @@
     margin-top: 5px !important;
     font-size: 15px !important;
     line-height: 1.82 !important;
+  }
+
+  /* 모바일 스펙트럼: 양극 라벨을 막대 위 한 줄에 두고 각 항목 사이 여백을 넓힌다. */
+  .report-mag .spectrums {
+    gap: 28px;
+  }
+
+  .report-mag .spectrum-item {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'left right'
+      'track track';
+    column-gap: 16px;
+    row-gap: 10px;
+    align-items: end;
+  }
+
+  .report-mag .spectrum-item .lbl {
+    min-width: 0;
+  }
+
+  .report-mag .spectrum-item .lbl.left {
+    grid-area: left;
+    text-align: left;
+  }
+
+  .report-mag .spectrum-item .lbl.right {
+    grid-area: right;
+    text-align: right;
+  }
+
+  .report-mag .spectrum-item .spectrum-track {
+    grid-area: track;
+    width: 100%;
+    margin-top: 2px;
   }
 }
