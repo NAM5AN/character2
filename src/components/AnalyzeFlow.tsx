@@ -23,6 +23,9 @@ function isSavedSession(value:unknown):value is SavedAnalysisSession{if(!value||
 function uniqueAnswersByOrder(items:InterviewAnswer[]){const byOrder=new Map<number,InterviewAnswer>();for(const item of items){if(Number.isInteger(item.order)&&item.order>=1&&item.order<=20)byOrder.set(item.order,item)}return [...byOrder.values()].sort((a,b)=>a.order-b.order)}
 function upsertAnswer(items:InterviewAnswer[],answer:InterviewAnswer){return uniqueAnswersByOrder([...items.filter(item=>item.order!==answer.order),answer])}
 function firstMissingOrder(items:InterviewAnswer[]){const orders=new Set(uniqueAnswersByOrder(items).map(item=>item.order));for(let order=1;order<=20;order+=1)if(!orders.has(order))return order;return null}
+// 오너가 고른 성격 태그는 AnalyzeReviewUiPolish 가 여기에 저장하고 질문 요청 때 draft 에 주입한다.
+// 첫 질문을 미리 만들 때 그 태그까지 같은지 확인해야 해서 같은 키를 읽는다.
+const PERSONALITY_OWNER_TAG_KEY='chara_lab_personality_owner_tags_v1';
 function mergeQuestionHistory(base:InterviewQuestion[],incoming:InterviewQuestion[]){const byOrder=new Map<number,InterviewQuestion>();for(const item of base)byOrder.set(item.order,item);for(const item of incoming)byOrder.set(item.order,item);return [...byOrder.values()].sort((a,b)=>a.order-b.order)}
 function hasMeaningfulProgress(saved:SavedAnalysisSession){return !!(saved.name.trim()||saved.profileText.trim()||saved.secretProfileText.trim()||saved.draft||saved.answers.length||saved.question||saved.questionHistory.length||saved.selected||saved.custom.trim()||saved.reason.trim()||saved.multiSelected?.length||saved.ranking?.length||saved.secondary?.trim()||Object.keys(saved.matrixAnswers||{}).length)}
 function responseDataFromAnswer(answer:InterviewAnswer|undefined):ResponseData{if(!answer?.branchContext||typeof answer.branchContext!=='object')return{};const raw=(answer.branchContext as Record<string,unknown>).responseData;return raw&&typeof raw==='object'?raw as ResponseData:{}}
@@ -151,6 +154,48 @@ export function AnalyzeFlow(){
   function verdict(id:string,ownerVerdict:'confirmed'|'ambiguous'|'rejected'){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>{if(x.id!==id)return x;if(ownerVerdict==='confirmed'){const {ownerFeedback:_ownerFeedback,...rest}=x;return {...rest,ownerVerdict}}return {...x,ownerVerdict}})})}
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
 
+  // 검수 화면에서 판정을 다 마치고 잠시 멈춘 사이에 첫 질문을 미리 만들어 둔다.
+  // 첫 질문 프롬프트에는 검수 결과(확정·애매·정정)와 오너가 고른 성격 태그가 그대로 들어간다.
+  // 그래서 검수가 끝나기 전에 만들면 사용자가 고친 내용이 빠진 질문이 되어 버린다.
+  // '모두 판정됨 + 일정 시간 변화 없음'일 때만 그 시점 내용으로 만들고, 이후 또 고치면
+  // 서명이 달라지므로 미리 만든 것은 쓰지 않고 평소대로 새로 생성한다.
+  const firstQuestionPrefetch=useRef<{signature:string;promise:Promise<InterviewQuestion[]>}|null>(null);
+  const firstQuestionPrefetchCount=useRef(0);
+
+  function reviewSignature(source:CharacterDraft|null){
+    if(!source)return '';
+    const verdicts=source.aiInferences.map(item=>`${item.id}:${item.ownerVerdict}:${(item.ownerFeedback||'').trim()}`).join('|');
+    let tags='';
+    try{
+      const raw=localStorage.getItem(PERSONALITY_OWNER_TAG_KEY);
+      const parsed=raw?JSON.parse(raw) as {sessionId?:unknown;tags?:unknown}:null;
+      if(parsed&&parsed.sessionId===source.usageSessionId&&Array.isArray(parsed.tags))tags=parsed.tags.join(',');
+    }catch{}
+    return `${verdicts}#${tags}`;
+  }
+
+  useEffect(()=>{
+    if(stage!=='review'||!draft)return;
+    // 아직 판정하지 않은 추론이 남아 있으면 검수가 끝나지 않은 것이다.
+    if(draft.aiInferences.some(item=>item.ownerVerdict==='unreviewed'))return;
+    let lastSignature=reviewSignature(draft);
+    let stableSince=Date.now();
+    const id=window.setInterval(()=>{
+      const signature=reviewSignature(draft);
+      if(signature!==lastSignature){lastSignature=signature;stableSince=Date.now();return}
+      if(Date.now()-stableSince<1500)return;
+      if(firstQuestionPrefetch.current?.signature===signature)return;
+      // 검수를 계속 고치는 동안 호출이 무한정 반복되지 않도록 상한을 둔다.
+      if(firstQuestionPrefetchCount.current>=3)return;
+      firstQuestionPrefetchCount.current+=1;
+      firstQuestionPrefetch.current={signature,promise:requestBatch(1,[],[]).catch(()=>[] as InterviewQuestion[])};
+    },400);
+    return()=>window.clearInterval(id);
+  // requestBatch 는 렌더마다 새로 만들어지므로 의존성에 넣으면 렌더마다 타이머가 리셋되어
+  // '변화 없이 머문 시간' 판정이 성립하지 않는다. 검수 상태(stage, draft)에만 반응해야 한다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[stage,draft]);
+
   async function requestBatch(startOrder:number,currentAnswers:InterviewAnswer[],plannedBase=questionHistoryRef.current){
     if(!draft||startOrder>20)return[];const count=Math.min(1,21-startOrder);const existing=plannedBase.filter(q=>q.order>=startOrder&&q.order<startOrder+count);if(existing.length===count)return existing.sort((a,b)=>a.order-b.order);const pending=batchRequests.current.get(startOrder);if(pending)return pending;
     const promise=(async()=>{const normalizedAnswers=uniqueAnswersByOrder(currentAnswers);const r=await fetch('/api/characters/questions/next',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({draft,answers:normalizedAnswers,plannedQuestions:plannedBase,startOrder,batchSize:count})});const body=await r.json();if(!r.ok){const err=new Error(typeof body?.error==='string'?body.error:`HTTP_${r.status}`) as Error&{status?:number;body?:any};err.status=r.status;err.body=body;throw err}const incoming=(Array.isArray(body.questions)?body.questions:body.question?[body.question]:[]) as InterviewQuestion[];const merged=mergeQuestionHistory(questionHistoryRef.current,incoming);setHistory(merged);return incoming.sort((a,b)=>a.order-b.order)})();
@@ -161,7 +206,12 @@ export function AnalyzeFlow(){
     if(order>20){await finalize(currentAnswers);return}const existing=historyBase.find(item=>item.order===order)||questionHistoryRef.current.find(item=>item.order===order);if(existing){const history=mergeQuestionHistory(historyBase,questionHistoryRef.current);applyQuestion(existing,history,currentAnswers);return}setBusy(true);setError('');try{const questions=await requestBatch(order,currentAnswers,historyBase);const history=questionHistoryRef.current;const q=questions.find(item=>item.order===order)||history.find(item=>item.order===order);if(!q){setError('다음 질문 묶음을 불러오지 못했어요. 다시 시도해주세요.');return}applyQuestion(q,history,currentAnswers)}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}
   }
 
-  async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);batchRequests.current.clear();temporalRepairRequests.current.clear();setBusy(true);setError('');try{const first=await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
+  async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);
+    // 검수 내용이 미리 만들 때와 같으면 그 결과를 그대로 쓴다(추가 대기 없음).
+    // 그 사이 검수를 더 고쳤다면 낡은 질문이므로 쓰지 않고 새로 만든다.
+    const prefetched=firstQuestionPrefetch.current;
+    const reusable=prefetched&&draft&&prefetched.signature===reviewSignature(draft)?prefetched.promise:null;
+    batchRequests.current.clear();temporalRepairRequests.current.clear();setBusy(true);setError('');try{const ready=reusable?await reusable:[];const first=ready.length?ready:await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:any};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
 
   function buildCurrentAnswer(){
     if(!question)return null;const type=responseTypeOf(question);const config=responseConfigOf(question);const customAnswer=custom.trim();const reasonText=reason.trim();let answer='';let answerSource:'choice'|'custom'|'structured'='structured';
