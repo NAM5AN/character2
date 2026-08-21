@@ -1,17 +1,16 @@
--- Mirrors the production migration `admin_gen_diagnostics_export` applied on 2026-08-21.
--- It keeps active generation heartbeats, clears retained diagnostics on the admin
--- all-clear action, and exposes owner-authenticated rows for CSV export.
+-- Admin diagnostics export + all-clear action.
+-- Individual failure-row deletion keeps the existing RPC semantics. The new all-clear
+-- RPC separately clears failure + retry rows and only stale in-flight rows (>6 min),
+-- so currently running generations are never removed.
 
 create or replace function public.character2_admin_delete_gen_failures(p_token text,p_ids bigint[] default null,p_all boolean default false)
 returns integer language plpgsql security definer set search_path=public,extensions as $$
-declare v_deleted integer:=0; v_part integer:=0;
+declare v_deleted integer:=0;
 begin
   if not public.character2_admin_session_ok(p_token) then raise exception 'ADMIN_AUTH_INVALID'; end if;
   if coalesce(p_all,false) then
-    delete from public.character2_gen_failures where kind in ('failure','retry');
-    get diagnostics v_part=row_count; v_deleted:=v_deleted+v_part;
-    delete from public.character2_gen_inflight where started_at < now()-interval '6 minutes';
-    get diagnostics v_part=row_count; v_deleted:=v_deleted+v_part;
+    delete from public.character2_gen_failures where kind='failure';
+    get diagnostics v_deleted=row_count;
     return v_deleted;
   end if;
   if p_ids is null or cardinality(p_ids)=0 then return 0; end if;
@@ -22,6 +21,20 @@ begin
 end;$$;
 revoke all on function public.character2_admin_delete_gen_failures(text,bigint[],boolean) from public;
 grant execute on function public.character2_admin_delete_gen_failures(text,bigint[],boolean) to anon;
+
+create or replace function public.character2_admin_clear_gen_diagnostics(p_token text)
+returns integer language plpgsql security definer set search_path=public,extensions as $$
+declare v_deleted integer:=0; v_part integer:=0;
+begin
+  if not public.character2_admin_session_ok(p_token) then raise exception 'ADMIN_AUTH_INVALID'; end if;
+  delete from public.character2_gen_failures where kind in ('failure','retry');
+  get diagnostics v_part=row_count; v_deleted:=v_deleted+v_part;
+  delete from public.character2_gen_inflight where started_at < now()-interval '6 minutes';
+  get diagnostics v_part=row_count; v_deleted:=v_deleted+v_part;
+  return v_deleted;
+end;$$;
+revoke all on function public.character2_admin_clear_gen_diagnostics(text) from public;
+grant execute on function public.character2_admin_clear_gen_diagnostics(text) to anon;
 
 create or replace function public.character2_admin_gen_diagnostics_export(p_token text,p_limit integer default 5000)
 returns jsonb language plpgsql stable security definer set search_path=public,extensions as $$
