@@ -305,7 +305,7 @@ export function AnalyzeReviewUiPolish(){
           setLoadingTextWithDots(element,'인터뷰 준비 중…');
         }
         if(label.startsWith('캐릭터 요약을 정리하고 있어요')||label.includes('답변을 살펴보고 있어요')){
-          setLoadingTextWithDots(element,currentName?`${currentName}의 답변을 살펴보고 있어요`:'답변을 살펴보고 있어요');
+          setLoadingTextWithDots(element,'답변을 살펴보고 있어요');
         }
       });
 
