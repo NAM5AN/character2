@@ -359,10 +359,10 @@ export function CharacterReportView({preview,creatorEditToken}:{preview:Characte
           </div>}
           {busy&&<div role="status" aria-live="polite" style={{width:'100%',pointerEvents:'none',padding:'18px 20px',borderRadius:18,background:'var(--accent-soft)',border:'1px solid var(--line)',boxShadow:'0 12px 34px rgba(23,24,22,.12)'}}>
             <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-              <div className="loading" style={{fontWeight:900}}>{flavorMessage} <i className="dot"/><i className="dot"/><i className="dot"/></div>
+              <div className="loading" aria-hidden="true" style={{fontWeight:900}}>{flavorMessage} <i className="dot"/><i className="dot"/><i className="dot"/></div>
               <strong style={{fontSize:20}}>{progress}%</strong>
             </div>
-            <div aria-hidden="true" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
+            <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="상세 리포트 생성 진행률" style={{height:10,borderRadius:999,overflow:'hidden',background:'rgba(23,24,22,.12)',marginTop:10}}>
               <div style={{height:'100%',width:`${progress}%`,borderRadius:999,background:'rgba(23,24,22,.78)',transition:'width .8s ease'}}/>
             </div>
           </div>}

@@ -32,10 +32,17 @@ function syncControl(control:HTMLElement,range:HTMLInputElement,scale:HTMLElemen
   const active=nearestLevel(Number(range.value||50));
   const hasReactSelection=Boolean(control.querySelector('.bipolar-current'));
   const touched=hasReactSelection||control.dataset.fiveLevelTouched==='1';
-  scale.querySelectorAll<HTMLButtonElement>('.five-level-choice').forEach(button=>{
+  const buttons=[...scale.querySelectorAll<HTMLButtonElement>('.five-level-choice')];
+  const activeIndex=buttons.findIndex(button=>Number(button.dataset.value)===active);
+  buttons.forEach((button,index)=>{
     const checked=Number(button.dataset.value)===active&&touched;
     button.classList.toggle('selected',checked);
     button.setAttribute('aria-checked',checked?'true':'false');
+    // 라디오그룹은 Tab 한 번으로 그룹에 들어오고 내부는 화살표로 이동하는 것이 규약이다.
+    // 그래서 그룹 전체에서 탭 정지점은 하나뿐이어야 한다(roving tabindex).
+    // 아직 고르지 않았으면 첫 항목이 진입점이 된다.
+    const isTabStop=touched?index===activeIndex:index===0;
+    button.tabIndex=isTabStop?0:-1;
   });
 }
 
@@ -71,6 +78,18 @@ function setRangeValueForReact(range:HTMLInputElement,value:number){
   range.dispatchEvent(new Event('change',{bubbles:true}));
 }
 
+// 클릭과 화살표 키가 같은 경로를 쓰도록 값 반영을 한 곳에 모은다.
+function selectValue(button:HTMLButtonElement,value:number,scale:HTMLElement){
+  const control=button.closest('.bipolar-control') as HTMLElement|null;
+  const range=control?.querySelector<HTMLInputElement>('.bipolar-range');
+  if(!control||!range)return;
+  control.dataset.fiveLevelTouched='1';
+  try{range.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{range.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
+  setRangeValueForReact(range,value);
+  // React의 controlled value 반영 후 실제 상태값으로 다시 동기화한다.
+  queueMicrotask(()=>syncControl(control,range,scale));
+}
+
 function createScale(control:HTMLElement){
   const scale=document.createElement('div') as ManagedScale;
   scale.className='five-level-scale';
@@ -91,16 +110,29 @@ function createScale(control:HTMLElement){
     caption.className='five-level-label';
     button.append(circle,caption);
 
-    button.addEventListener('click',()=>{
-      const currentControl=button.closest('.bipolar-control') as HTMLElement|null;
-      const currentRange=currentControl?.querySelector<HTMLInputElement>('.bipolar-range');
-      if(!currentControl||!currentRange)return;
-      currentControl.dataset.fiveLevelTouched='1';
-      try{currentRange.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))}catch{currentRange.dispatchEvent(new Event('pointerdown',{bubbles:true}))}
-      setRangeValueForReact(currentRange,value);
-      // React의 controlled value 반영 후 실제 상태값으로 다시 동기화한다.
-      queueMicrotask(()=>syncControl(currentControl,currentRange,scale));
+    button.addEventListener('click',()=>{ selectValue(button,value,scale) });
+
+    // role="radio" 를 선언한 이상 화살표 이동도 제공해야 한다. 보조기술은 그 선언을 보고
+    // "화살표로 고르세요"라고 안내하는데, 예전에는 화살표가 아무 반응이 없었다.
+    button.addEventListener('keydown',event=>{
+      const keys=['ArrowLeft','ArrowUp','ArrowRight','ArrowDown','Home','End'];
+      if(!keys.includes(event.key))return;
+      event.preventDefault();
+      const buttons=[...scale.querySelectorAll<HTMLButtonElement>('.five-level-choice')];
+      const here=buttons.indexOf(button);
+      if(here<0)return;
+      const last=buttons.length-1;
+      const next=event.key==='Home'?0
+        :event.key==='End'?last
+        :event.key==='ArrowLeft'||event.key==='ArrowUp'?(here===0?last:here-1)
+        :(here===last?0:here+1);
+      const target=buttons[next];
+      if(!target)return;
+      // 라디오그룹에서는 이동이 곧 선택이다. 포커스도 함께 옮긴다.
+      selectValue(target,Number(target.dataset.value),scale);
+      target.focus();
     });
+
     scale.appendChild(button);
   });
 

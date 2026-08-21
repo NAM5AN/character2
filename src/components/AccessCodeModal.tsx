@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useModalFocus } from '@/lib/use-modal-focus';
 
 type Props = {
   open: boolean;
@@ -28,7 +29,11 @@ export function AccessCodeModal({
   const [postype,setPostype]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  const dialogRef=useRef<HTMLDivElement|null>(null);
   useEffect(()=>{ if(open){ fetch('/api/access/validate').then(r=>r.json()).then(x=>setPostype(x.postypeUrl||'')).catch(()=>{}); setCode(localStorage.getItem('chara_ai_access_code')||''); setError(''); }},[open]);
+  // 열릴 때 포커스 이동 · Escape 닫기 · Tab 순환 · 닫힐 때 복귀
+  useModalFocus(open,dialogRef,onClose);
+
   if(!open) return null;
   async function validate(){
     setBusy(true); setError('');
@@ -49,7 +54,7 @@ export function AccessCodeModal({
     }finally{setBusy(false)}
   }
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}>
-    <div className="modal" role="dialog" aria-modal="true" aria-busy={busy}>
+    <div className="modal" role="dialog" aria-modal="true" aria-busy={busy} ref={dialogRef}>
       {eyebrow?<div className="eyebrow">{eyebrow}</div>:null}<h3>{title}</h3>
       <p>{description}</p>
       <div className="notice" style={{margin:'14px 0',lineHeight:1.7}}>
