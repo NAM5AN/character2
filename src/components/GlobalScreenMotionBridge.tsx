@@ -262,7 +262,7 @@ export function GlobalScreenMotionBridge() {
         }
       }
       queueSync();
-    };
+    });
 
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     syncDirectionalMotion();
