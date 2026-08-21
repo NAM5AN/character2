@@ -77,24 +77,37 @@ html[data-character-theme='active'] .analyze-page .progress > span {
   background-color: var(--character-accent);
 }
 
-/* Summary-generation screen used fixed graphite progress colors and also lacked a
-   marker that kept the character theme alive. When a character palette is active,
-   keep the loading dots and progress meter on the character point color. */
+/* Summary-generation screen used fixed graphite progress colors. The current
+   progress markup is role=progressbar, so target that directly and override the
+   inline fallback colors with the character palette. */
 html[data-character-theme='active'] .analyze-page .card:has(> .loading) .loading .dot {
   background-color: var(--character-accent) !important;
 }
 
-html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] {
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [role='progressbar'] {
   background: color-mix(in srgb, var(--character-accent) 14%, var(--character-surface)) !important;
 }
 
-html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] > div {
+html[data-character-theme='active'] .analyze-page .card:has(> .loading) [role='progressbar'] > div {
   background: var(--character-accent) !important;
 }
 
-html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] + p,
-html[data-character-theme='active'] .analyze-page .card:has(> .loading) [aria-hidden='true'] ~ p {
-  border-color: color-mix(in srgb, var(--character-accent) 16%, transparent);
+/* Keep the rotating loading flavor on one line on both desktop and mobile. */
+.analyze-page .card:has(> .loading) div:has(+ [role='progressbar']) > span.muted {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .analyze-page .card:has(> .loading) div:has(+ [role='progressbar']) > span.muted {
+    font-size: 12px !important;
+  }
 }
 
 html[data-character-theme='active'] .analyze-page .bipolar-range::-webkit-slider-runnable-track {
