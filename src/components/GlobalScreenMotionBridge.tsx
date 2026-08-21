@@ -141,11 +141,22 @@ export function GlobalScreenMotionBridge() {
 
   useEffect(() => {
     if (reducedMotion()) return;
+    let pageAnimation: Animation | null = null;
     const frame = window.requestAnimationFrame(() => {
       const main = document.querySelector<HTMLElement>('main');
-      if (main) animateEnter(main, 0, 7, 185);
+      if (!main) return;
+      // A transform on <main> makes fixed-position modal backdrops use the content box
+      // as their containing block. Keep the page entrance motion opacity-only so modals
+      // always stay attached to the browser viewport (especially on mobile).
+      pageAnimation = main.animate(
+        [{ opacity: 0.68 }, { opacity: 1 }],
+        { duration: 185, easing: EASE },
+      );
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      pageAnimation?.cancel();
+    };
   }, [pathname]);
 
   useEffect(() => {
@@ -251,7 +262,7 @@ export function GlobalScreenMotionBridge() {
         }
       }
       queueSync();
-    });
+    };
 
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     syncDirectionalMotion();
