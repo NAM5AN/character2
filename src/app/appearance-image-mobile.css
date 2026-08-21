@@ -1,0 +1,84 @@
+/* Mobile appearance-image layout.
+   Keep the upload controls and thumbnail rail in one fixed-height row so adding
+   images does not push the primary analysis button down. The thumbnail rail is
+   width-contained and scrolls internally instead of escaping the rounded card. */
+@media (max-width: 760px) {
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) {
+    display: grid;
+    grid-template-columns: minmax(128px, 0.78fr) minmax(0, 1.22fr);
+    column-gap: 10px;
+    align-items: start;
+    min-width: 0;
+  }
+
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > .label {
+    grid-column: 1 / -1;
+  }
+
+  /* Upload button + paste hint occupy the left side of the reserved media row. */
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:first-of-type {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:first-of-type > .btn {
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:first-of-type > .muted {
+    margin-left: 0 !important;
+    max-width: 128px;
+    font-size: 11px !important;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  /* The existing thumbnail grid becomes a compact horizontal rail on mobile. */
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:has(> div > img) {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex !important;
+    gap: 7px !important;
+    width: 100%;
+    max-width: 100% !important;
+    min-width: 0;
+    min-height: 76px;
+    padding: 0 1px 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:has(> div > img) > div {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 62px;
+    min-width: 62px;
+    aspect-ratio: 1 / 1 !important;
+    scroll-snap-align: start;
+  }
+
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div:has(> div > img) button {
+    width: 24px !important;
+    height: 24px !important;
+    top: 4px !important;
+    right: 4px !important;
+    font-size: 16px !important;
+  }
+
+  /* Document-import status and errors remain full width below the fixed media row. */
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > div.muted,
+  .analyze-page .field:has(input[type='file'][accept*='image/jpeg']) > .error {
+    grid-column: 1 / -1;
+  }
+}
