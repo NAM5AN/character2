@@ -1,0 +1,26 @@
+@media (max-width: 640px) {
+  /* 결제 안내 모바일 문구는 요청한 위치에서만 강제로 줄바꿈한다. */
+  .full-preview-overlay > div:not([role='status']) > p {
+    font-size: 0 !important;
+  }
+
+  .full-preview-overlay > div:not([role='status']) > p::before {
+    content: '아직 못 꺼낸 더 얘기가 많아요.\A바로 확인해보세요.';
+    white-space: pre-line;
+    font-size: 16px;
+    line-height: 1.75;
+    font-weight: 700;
+  }
+
+  .full-preview-other {
+    font-size: 0 !important;
+  }
+
+  .full-preview-other::before {
+    content: '다른 캐릭터\A분석하기';
+    white-space: pre-line;
+    font-size: 16px;
+    line-height: 1.35;
+    font-weight: 700;
+  }
+}
