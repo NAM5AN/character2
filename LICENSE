@@ -1,191 +1,21 @@
-CHA LAB OPEN USE LICENSE
-Version 2.0, 2026
+MIT License
 
 Copyright (c) 2026 NAM5AN / CHA LAB
 
-1. PERMISSION
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this source code and its accompanying files (the "Software"), to use, copy,
-modify, adapt, merge, publish, distribute, sublicense, deploy, host, operate,
-and use the Software for commercial or non-commercial purposes, including the
-creation and sale of derivative works, subject to the conditions below.
-
-You may use the Software as a starting point for your own project, service,
-application, study, experiment, portfolio, tool, or commercial product.
-
-2. ATTRIBUTION AND LICENSE NOTICE
-
-The copyright notice and this license notice must be included in copies or
-substantial portions of the Software that are distributed as source code.
-You are not required to use the CHA LAB name, logo, design identity, domain,
-or branding in derivative works.
-
-3. NO STANDALONE RESALE OF AN UNCHANGED COPY
-
-You may not sell or offer for sale a verbatim or substantially identical copy
-of the Software when the primary product being sold is the copied Software
-itself, including as a source-code package, template, downloadable project, or
-repository clone.
-
-Changing only names, logos, colors, text, configuration, deployment settings,
-or making similarly trivial changes does not by itself turn an otherwise
-substantially identical copy into a new derivative product for the purpose of
-this clause.
-
-This restriction does NOT prohibit charging money for:
-
-- a product or service that contains meaningful modifications, original
-  features, or substantial additional work;
-- hosting or operating the Software as part of a service;
-- integration, customization, maintenance, support, consulting, or development
-  work; or
-- derivative works that use the Software as one component of a larger product.
-
-In short: build with it, change it, learn from it, deploy it, and make money
-with your own work. Do not simply repackage an essentially unchanged copy and
-sell that copy as the product.
-
-4. AI-ASSISTED DEVELOPMENT NOTICE
-
-This project was created and developed with the assistance of generative AI
-tools. AI tools were used during parts of the process such as ideation,
-implementation, code generation, review, debugging, documentation, and
-iteration.
-
-The project maintainer selected, edited, tested, integrated, and deployed the
-resulting work and made the final product and design decisions. This notice is
-provided for transparency and does not grant rights to any third-party AI
-model, provider, output, or material beyond the rights otherwise available
-under applicable law and the relevant third-party terms.
-
-5. THIRD-PARTY MATERIALS
-
-Third-party libraries, assets, fonts, models, APIs, and other materials
-included in or used by the Software remain subject to their own licenses and
-terms. This license applies only to material for which the copyright holder has
-the authority to grant these permissions.
-
-6. NO TRADEMARK LICENSE
-
-This license does not grant permission to use the names, logos, service marks,
-domains, or branding of NAM5AN or CHA LAB in a way that suggests endorsement,
-affiliation, or that a derivative project is the official CHA LAB service.
-
-7. DISCLAIMER
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT
-PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM,
-DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
-
-8. OPEN-SOURCE COMPATIBILITY NOTE
-
-The source code is publicly available and broadly reusable. However, because
-Section 3 restricts the standalone sale of substantially unchanged copies,
-this custom license is not an OSI-approved open-source license. If that
-restriction is removed in a future version, the project may be relicensed
-under a standard open-source license such as MIT or Apache-2.0.
-
-9. OTHER TERMS
-
-If any provision of this license is found unenforceable, the remaining
-provisions remain in effect.
-
---------------------------------------------------------------------------
-
-한국어 번역문
-
-아래 한국어 번역문은 이해를 돕기 위해 제공됩니다. 영문 원문과 한국어
-번역문 사이에 의미 또는 해석상의 차이가 있는 경우 영문 원문이 우선합니다.
-
-CHA LAB 공개 사용 라이선스
-버전 2.0, 2026
-
-Copyright (c) 2026 NAM5AN / CHA LAB
-
-1. 사용 허가
-
-이 소스 코드와 그에 수반되는 파일(이하 "소프트웨어")을 취득한 누구에게나
-아래 조건을 지키는 범위에서 소프트웨어를 사용, 복제, 수정, 각색, 병합,
-게시, 배포, 재라이선스, 배포(Deploy), 호스팅, 운영하고 상업적 또는
-비상업적으로 활용할 권한을 무상으로 부여합니다. 수정한 2차적 저작물을
-판매하는 것도 허용합니다.
-
-이 소프트웨어를 자신의 프로젝트, 서비스, 애플리케이션, 학습, 실험,
-포트폴리오, 도구 또는 상업적 제품의 출발점으로 자유롭게 사용할 수 있습니다.
-
-2. 저작권 및 라이선스 고지
-
-소프트웨어의 전부 또는 상당 부분을 소스 코드 형태로 배포하는 경우 기존
-저작권 고지와 이 라이선스 고지를 함께 포함해야 합니다.
-2차적 저작물에서 CHA LAB의 이름, 로고, 디자인 아이덴티티, 도메인 또는
-브랜딩을 사용할 의무는 없습니다.
-
-3. 사실상 그대로인 복제본의 단독 판매 금지
-
-소프트웨어를 그대로 복제했거나 사실상 동일하게 복제한 뒤, 그 복제된
-소프트웨어 자체를 주된 상품으로 삼아 소스 코드 패키지, 템플릿, 다운로드형
-프로젝트, 저장소 복제본 등의 형태로 판매해서는 안 됩니다.
-
-이름, 로고, 색상, 문구, 설정값, 배포 설정만 바꾸거나 그와 비슷한 수준의
-사소한 변경만 한 경우에는 이 조항에서 말하는 새로운 2차적 제품으로 보지
-않습니다.
-
-다음과 같은 상업적 이용은 금지하지 않습니다.
-
-- 의미 있는 수정, 새로운 기능 또는 상당한 추가 작업이 포함된 제품이나
-  서비스를 판매하는 행위
-- 소프트웨어를 서비스의 일부로 호스팅하거나 운영하고 이용료를 받는 행위
-- 통합, 커스터마이징, 유지보수, 지원, 컨설팅 또는 개발 작업에 비용을 받는
-  행위
-- 더 큰 제품의 한 구성 요소로 소프트웨어를 사용한 2차적 저작물을 판매하는
-  행위
-
-요약하면 자유롭게 배우고, 고치고, 만들고, 배포하고, 자신의 작업으로 수익을
-내도 됩니다. 다만 사실상 같은 복제본을 다시 포장해 그 복제본 자체를 상품으로
-판매하는 행위는 허용하지 않습니다.
-
-4. AI 활용 제작 고지
-
-이 프로젝트는 생성형 AI 도구의 도움을 받아 제작 및 개발되었습니다.
-기획 아이디어, 구현, 코드 생성, 코드 검토, 디버깅, 문서 작성, 반복 수정 등
-제작 과정의 일부에서 AI 도구를 활용했습니다.
-
-프로젝트 관리자는 AI가 생성하거나 제안한 결과를 선택, 편집, 테스트, 통합하고
-최종 제품·디자인 결정과 배포를 수행했습니다. 이 고지는 제작 과정을 투명하게
-밝히기 위한 것이며, 제3자 AI 모델·제공자·출력물·자료에 대해 관련 법률이나
-각 제3자의 이용 조건을 넘어서는 별도의 권리를 부여하지 않습니다.
-
-5. 제3자 자료
-
-소프트웨어에 포함되거나 소프트웨어가 사용하는 제3자 라이브러리, 자산, 글꼴,
-모델, API 및 기타 자료에는 각각의 라이선스와 이용 조건이 적용됩니다.
-이 라이선스는 저작권자가 사용 권한을 부여할 권리가 있는 자료에만 적용됩니다.
-
-6. 상표 사용
-
-이 라이선스는 NAM5AN 또는 CHA LAB의 이름, 로고, 서비스표, 도메인 또는
-브랜딩을 사용해 공식 서비스와의 제휴·보증을 암시하거나 2차적 프로젝트를
-공식 CHA LAB 서비스인 것처럼 표시할 권리를 부여하지 않습니다.
-
-7. 보증 부인 및 책임 제한
-
-이 소프트웨어는 상품성, 특정 목적에 대한 적합성, 권원 및 비침해에 관한
-보증을 포함하여 명시적이거나 묵시적인 어떠한 보증도 없이 "있는 그대로"
-제공됩니다. 법률이 허용하는 최대 범위에서 저작권자는 소프트웨어 또는 그
-사용과 관련하여 발생하는 청구, 손해 또는 기타 책임을 부담하지 않습니다.
-
-8. 오픈소스 호환성 안내
-
-소스 코드는 공개되어 있고 폭넓은 재사용을 허용합니다. 다만 제3조에서 사실상
-변경되지 않은 복제본 자체의 판매를 제한하므로 이 사용자 정의 라이선스는
-OSI가 승인한 표준 오픈소스 라이선스에는 해당하지 않습니다. 향후 해당 제한을
-제거한다면 MIT 또는 Apache-2.0과 같은 표준 오픈소스 라이선스로 변경할 수
-있습니다.
-
-9. 기타
-
-이 라이선스의 일부 조항이 집행 불가능하더라도 나머지 조항은 계속 효력을
-유지합니다.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
