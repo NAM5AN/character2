@@ -292,6 +292,16 @@ export async function POST(request: Request) {
       ...unansweredPlanned.map(item=>({category:item.category,format:item.format,responseType:item.responseType,targetHook:item.targetHook})),
     ];
     const categoryCounts = Object.fromEntries(Object.keys(CATEGORY_TARGETS).map(category=>[category,coveredQuestions.filter(item=>item.category===category).length]));
+    const priorityCategories = Object.entries(CATEGORY_TARGETS)
+      .filter(([category,target])=>(categoryCounts[category] ?? 0) < target)
+      .sort(([categoryA,targetA],[categoryB,targetB])=>{
+        const coverageA=(categoryCounts[categoryA] ?? 0) / targetA;
+        const coverageB=(categoryCounts[categoryB] ?? 0) / targetB;
+        if(coverageA!==coverageB) return coverageA-coverageB;
+        return targetB-targetA;
+      })
+      .slice(0,2)
+      .map(([category])=>category);
     const formatCounts = Object.fromEntries(Object.keys(FORMAT_LABELS).map(format=>[format,coveredQuestions.filter(item=>item.format===format).length]));
     const responseTypeCounts = Object.fromEntries(RESPONSE_TYPES.map(type=>[type,coveredQuestions.filter(item=>item.responseType===type).length]));
 
@@ -308,7 +318,35 @@ export async function POST(request: Request) {
     }
 
     const batchSchema = makeBatchSchema(specs, evidenceSources);
-    const adaptiveTarget = history.length ? Math.min(batchCount, Math.max(1, Math.ceil(batchCount * .6))) : 0;
+    const phase = startOrder <= 6 ? 'explore' : startOrder <= 14 ? 'mixed' : 'deep';
+    const lastMode = history.at(-1)?.mode || '';
+    const justDugDeeper = lastMode === 'branch' || lastMode === 'counter';
+    const interviewStrategy = phase === 'explore'
+      ? 'explore'
+      : justDugDeeper
+        ? 'pivot'
+        : phase === 'mixed'
+          ? 'followup'
+          : 'revisit';
+    const strategyInstruction = interviewStrategy === 'explore'
+      ? `- 지금은 탐색 단계입니다. 아직 충분히 다루지 않은 캐릭터 고유 Hook을 우선하세요.
+- 직전 답변의 후속 질문을 반드시 만들 필요는 없습니다.
+- 단, 직전 답변에서 캐릭터 해석을 크게 바꿀 새로운 모순·예외·조건이 나타났다면 1회 파고들 수 있습니다.
+- 배치가 여러 문항이면 서로 다른 Hook을 다루세요.`
+      : interviewStrategy === 'followup'
+        ? `- 이전 실제 답변에서 새롭게 드러난 조건·예외·모순·우선순위 중 정보가치가 높은 것 하나를 한 단계 더 확인하는 질문을 우선 검토하세요.
+- 이미 확인한 답을 상황만 바꿔 반복해서 묻지는 마세요.
+- 파고들 가치가 충분하지 않다면 새 Hook으로 pivot해도 됩니다.
+- 배치가 여러 문항이면 파고들기는 최대 1개만 사용하고 나머지는 다른 Hook으로 이동하세요.`
+        : interviewStrategy === 'pivot'
+          ? `- 직전 문항에서 이미 한 단계 파고들었습니다. 이번에는 같은 핵심 주제를 계속 추적하지 말고 아직 덜 본 캐릭터 고유 Hook으로 이동하세요.
+- 이전 답변은 새 질문의 맥락으로 활용할 수 있지만 직전 질문의 단순 후속편을 만들지는 마세요.
+- 배치가 여러 문항이면 각 문항은 서로 다른 Hook을 다루세요.`
+          : `- 지금은 심화 단계입니다. 지금까지의 문답 전체에서 정보가치가 높았던 Hook을 다시 검토하세요.
+- 직전 답변만 따라가지 말고 3~10문항 전에 나온 중요한 답도 필요하면 다시 연결할 수 있습니다.
+- 앞서 얻은 해석의 예외·임계점·모순·숨은 우선순위를 확인하세요.
+- 같은 Hook을 계속 연속 추적하기보다 여러 핵심 Hook을 번갈아 깊게 검증하세요.
+- 배치가 여러 문항이면 각 문항은 서로 다른 핵심 Hook을 다루세요.`;
     const usedHooks = coveredQuestions.map(item=>item.targetHook).filter(Boolean);
     const specText = specs.map(spec=>({
       order:spec.order,
@@ -318,7 +356,11 @@ export async function POST(request: Request) {
     }));
 
     const generated = await withAiUsageContext({sessionId:body.draft.usageSessionId,characterName:body.draft.basicProfile.name,stage:`questions_${startOrder}_${startOrder+batchCount-1}`},()=>askOpenAIJson({
-      instructions: `${QUESTION_INSTRUCTIONS}\n\n${QUESTION_EVIDENCE_INSTRUCTIONS}\n\n이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
+      instructions: `${QUESTION_INSTRUCTIONS}\
+\
+${QUESTION_EVIDENCE_INSTRUCTIONS}\
+\
+이번에는 한 문항이 아니라 최대 5문항의 다음 배치를 한 번에 만듭니다. questions 배열만 가진 JSON 객체를 출력하세요. 같은 배치 안의 문항은 서로의 답을 아직 모른다는 전제로 독립적으로 성립해야 합니다.`,
       schema: batchSchema,
       maxOutputTokens: Math.max(2200, batchCount * 1250),
       input: `생성할 문항 배치: ${startOrder}~${startOrder+batchCount-1} / 20
@@ -338,19 +380,27 @@ ${JSON.stringify(compactDraft)}
 - 이미 생성됐지만 아직 답하지 않은 앞선 문항: ${JSON.stringify(unansweredPlanned.map(q=>({order:q.order,question:q.question,targetHook:q.targetHook,responseType:q.responseType})))}
 - 이미 사용한 targetHook: ${JSON.stringify(usedHooks)}
 
-이번 배치의 적응성 규칙 — 매우 중요:
-${adaptiveTarget>0?`- ${batchCount}개 중 최소 ${adaptiveTarget}개는 최근 실제 답변이나 이유에서 새로 드러난 조건, 예외, 우선순위, 모순을 출발점으로 삼으세요.`:'- 첫 배치이므로 오너 검수 결과는 아직 쓰지 말고, 프로필에 사실로 적힌 내용에서만 정보가치가 높은 미확인 지점을 고르세요.'}
-- 이전 답변의 문장을 질문에 억지로 복사하지 말고, 그 답 때문에 새로 생긴 '아직 답이 없는 다음 의문'을 물으세요.
-- 이전 답변과 프로필 예상이 어긋났다면 그 차이를 가르는 질문을 우선 검토하세요.
+이번 문항의 인터뷰 전략:
+${strategyInstruction}
+
+공통 진행 규칙:
+- 이전 답변의 문장을 질문에 억지로 복사하지 말고, 파고들 때도 그 답 때문에 새로 생긴 '아직 답이 없는 다음 의문'을 물으세요.
+- 이전 답변과 프로필 예상이 어긋났다면 그 차이를 가르는 질문은 정보가치가 높은 후보입니다.
 - 이미 답한 내용을 상황만 바꿔 재확인하면 실패입니다.
+- 파고들기는 이전 질문을 반복하는 것이 아니라 아직 밝혀지지 않은 새로운 정보를 얻어야 합니다.
 - 한 배치 안에서 targetHook을 반복하지 말고 서로 다른 미확인 지점을 다루세요.
 - 이 배치의 앞 문항에 사용자가 어떻게 답할지 아직 모르므로, 2번째 이후 문항이 앞 문항의 특정 답을 전제로 하면 안 됩니다.
 
 현재 다양성 현황:
 - category counts: ${JSON.stringify(categoryCounts)}
+- category 목표: ${JSON.stringify(CATEGORY_TARGETS)}
+- 우선 검토 category: ${JSON.stringify(priorityCategories)}
 - format counts: ${JSON.stringify(formatCounts)}
 - responseType counts: ${JSON.stringify(responseTypeCounts)}
-- category 목표 참고: ${JSON.stringify(CATEGORY_TARGETS)}
+- 캐릭터 근거와 정보가치가 비슷한 질문 후보가 여러 개라면 우선 검토 category에 속하는 질문을 먼저 선택하세요.
+- 이미 충분히 다룬 category를 습관적으로 반복하지 마세요.
+- category가 달라도 사실상 같은 심리나 같은 사건을 반복해서 묻는다면 다양성이 확보된 것이 아닙니다.
+- 단, 목표 숫자만 맞추려고 캐릭터와 무관하거나 근거가 약한 질문을 만들지는 마세요.
 - scenario는 전체 최대 5~6회, free_response는 전체 1~2회만 사용하세요.
 
 서버가 고정한 문항별 UI 형식:
