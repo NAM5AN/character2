@@ -27,6 +27,11 @@ function firstMissingOrder(items:InterviewAnswer[]){const orders=new Set(uniqueA
 function mergeQuestionHistory(base:InterviewQuestion[],incoming:InterviewQuestion[]){const byOrder=new Map<number,InterviewQuestion>();for(const item of base)byOrder.set(item.order,item);for(const item of incoming)byOrder.set(item.order,item);return [...byOrder.values()].sort((a,b)=>a.order-b.order)}
 function hasMeaningfulProgress(saved:SavedAnalysisSession){return !!(saved.name.trim()||saved.profileText.trim()||saved.secretProfileText.trim()||saved.draft||saved.answers.length||saved.question||saved.questionHistory.length||saved.selected||saved.custom.trim()||saved.reason.trim()||saved.multiSelected?.length||saved.ranking?.length||saved.secondary?.trim()||Object.keys(saved.matrixAnswers||{}).length)}
 function responseDataFromAnswer(answer:InterviewAnswer|undefined):ResponseData{if(!answer?.branchContext||typeof answer.branchContext!=='object')return{};const raw=(answer.branchContext as Record<string,unknown>).responseData;return raw&&typeof raw==='object'?raw as ResponseData:{}}
+function questionSnapshotFromAnswer(answer:InterviewAnswer):InterviewQuestion|null{if(!answer.branchContext||typeof answer.branchContext!=='object')return null;const raw=(answer.branchContext as Record<string,unknown>).questionSnapshot;if(!raw||typeof raw!=='object')return null;const candidate=raw as Partial<InterviewQuestion>;return Number.isInteger(candidate.order)&&typeof candidate.question==='string'?raw as InterviewQuestion:null}
+function stripQuestionSnapshot(answer:InterviewAnswer):InterviewAnswer{if(!answer.branchContext||typeof answer.branchContext!=='object')return answer;const branchContext={...(answer.branchContext as Record<string,unknown>)};delete branchContext.questionSnapshot;return {...answer,branchContext}}
+function historyFromSavedSession(saved:Partial<SavedAnalysisSession>){const direct=Array.isArray(saved.questionHistory)?mergeQuestionHistory([],saved.questionHistory as InterviewQuestion[]):[];const persistedAnswers=Array.isArray(saved.answers)?uniqueAnswersByOrder(saved.answers as InterviewAnswer[]):[];const snapshots=persistedAnswers.map(questionSnapshotFromAnswer).filter((item):item is InterviewQuestion=>Boolean(item));const current=saved.question&&typeof saved.question==='object'?saved.question as InterviewQuestion:null;return mergeQuestionHistory(direct,[...snapshots,...(current?[current]:[])])}
+function answersForPersistence(items:InterviewAnswer[],history:InterviewQuestion[]){const questionsByOrder=new Map(history.map(item=>[item.order,item]));return uniqueAnswersByOrder(items).map(answer=>{const snapshot=questionsByOrder.get(answer.order);if(!snapshot)return answer;const branchContext=answer.branchContext&&typeof answer.branchContext==='object'?{...(answer.branchContext as Record<string,unknown>)}:{};return {...answer,branchContext:{...branchContext,questionSnapshot:snapshot}}})}
+function persistedNavigationHistory(){try{const raw=localStorage.getItem(ANALYSIS_SESSION_KEY);if(!raw)return[];return historyFromSavedSession(JSON.parse(raw) as Partial<SavedAnalysisSession>)}catch{return[]}}
 function RankingActionIcon({direction}:{direction:'up'|'down'|'remove'}){
   const path=direction==='up'?'M5 10.5 12 3.5l7 7M12 4v16':direction==='down'?'M5 13.5 12 20.5l7-7M12 20V4':'M5.5 5.5l13 13M18.5 5.5l-13 13';
   return <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d={path} stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>;
@@ -99,11 +104,15 @@ export function AnalyzeFlow(){
 
   function restoreSavedSession(saved:SavedAnalysisSession){
     const restoredDraft=saved.draft&&typeof saved.draft==='object'?saved.draft as CharacterDraft:null;
-    const restoredAnswers=Array.isArray(saved.answers)?uniqueAnswersByOrder(saved.answers as InterviewAnswer[]):[];
-    const restoredHistory=Array.isArray(saved.questionHistory)?mergeQuestionHistory([],saved.questionHistory as InterviewQuestion[]):[];
+    const persistedAnswers=Array.isArray(saved.answers)?uniqueAnswersByOrder(saved.answers as InterviewAnswer[]):[];
+    const restoredAnswers=persistedAnswers.map(stripQuestionSnapshot);
+    const restoredHistory=historyFromSavedSession(saved);
     const requestedIndex=Number.isInteger(saved.activeQuestionIndex)?Number(saved.activeQuestionIndex):Math.max(0,restoredHistory.length-1);
-    const restoredIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
-    const restoredQuestion=(saved.question&&typeof saved.question==='object'?saved.question:null) as InterviewQuestion|null || restoredHistory[restoredIndex] || null;
+    const fallbackIndex=restoredHistory.length?Math.max(0,Math.min(requestedIndex,restoredHistory.length-1)):0;
+    const savedQuestion=(saved.question&&typeof saved.question==='object'?saved.question:null) as InterviewQuestion|null;
+    const restoredQuestion=savedQuestion||restoredHistory[fallbackIndex]||null;
+    const matchedIndex=restoredQuestion?restoredHistory.findIndex(item=>item.order===restoredQuestion.order):-1;
+    const restoredIndex=matchedIndex>=0?matchedIndex:fallbackIndex;
     setName(typeof saved.name==='string'?saved.name:'');setProfileText(typeof saved.profileText==='string'?saved.profileText:'');setSecretProfileText(typeof saved.secretProfileText==='string'?saved.secretProfileText:'');setDraft(restoredDraft);setAnswers(restoredAnswers);setHistory(restoredHistory);setQuestion(restoredQuestion);setActiveQuestionIndex(restoredIndex);setSelected(typeof saved.selected==='string'?saved.selected:'');setCustom(typeof saved.custom==='string'?saved.custom:'');setReason(typeof saved.reason==='string'?saved.reason:'');setMultiSelected(Array.isArray(saved.multiSelected)?saved.multiSelected:[]);setRanking(Array.isArray(saved.ranking)?saved.ranking:[]);setSliderValue(typeof saved.sliderValue==='number'?saved.sliderValue:50);setMatrixAnswers(saved.matrixAnswers&&typeof saved.matrixAnswers==='object'?saved.matrixAnswers:{});setSecondary(typeof saved.secondary==='string'?saved.secondary:'');setError('');
     if((saved.stage==='interview'||saved.stage==='finalizing')&&restoredDraft&&restoredQuestion)setStage('interview');else if(saved.stage==='review'&&restoredDraft)setStage('review');else setStage('input');
   }
@@ -131,7 +140,7 @@ export function AnalyzeFlow(){
 
   useEffect(()=>{
     if(!hydrated.current||!persistenceEnabled.current||stage==='done')return;
-    const timer=window.setTimeout(()=>{try{const saved:SavedAnalysisSession={version:1,stage:stage as SavedStage,name,profileText,secretProfileText,draft,answers:uniqueAnswersByOrder(answers),question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary};if(hasMeaningfulProgress(saved))localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));else localStorage.removeItem(ANALYSIS_SESSION_KEY)}catch{}},150);
+    const timer=window.setTimeout(()=>{try{const saved:SavedAnalysisSession={version:1,stage:stage as SavedStage,name,profileText,secretProfileText,draft,answers:answersForPersistence(answers,questionHistory),question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary};if(hasMeaningfulProgress(saved))localStorage.setItem(ANALYSIS_SESSION_KEY,JSON.stringify(saved));else localStorage.removeItem(ANALYSIS_SESSION_KEY)}catch{}},150);
     return()=>window.clearTimeout(timer);
   },[stage,name,profileText,secretProfileText,draft,answers,question,questionHistory,activeQuestionIndex,selected,custom,reason,multiSelected,ranking,sliderValue,matrixAnswers,secondary]);
 
@@ -148,15 +157,12 @@ export function AnalyzeFlow(){
   },[profileText,secretProfileText,draft,answers]);
 
   const flavorName=draft?.basicProfile.name||name||'이 캐릭터';
-  // 요약 생성 화면에서 쓸 확정 성격 태그(오너 선택 우선, 없으면 AI 초기 선택).
   const settledFlavorTags=useMemo(()=>{
     const tags=draft?.personalityTags;
     const owner=tags?.ownerSelected??[];
     const ai=tags?.aiInitial??[];
     return owner.length?owner:ai;
   },[draft]);
-  // 프로필 파싱 화면은 성격을 아직 모르므로 공통(any) 문구만, 요약 생성 화면은 확정 태그를
-  // 직접 넘겨 성격별 문구가 나오게 한다. (빈 배열 = 공통만, 키워드 감지에 의존하지 않음)
   const flavorMessage=useRotatingFlavor(characterSignalText,flavorName,busy,stage==='finalizing'?settledFlavorTags:[]);
 
   function continueSavedAnalysis(){if(!resumeCandidate)return;persistenceEnabled.current=false;restoreSavedSession(resumeCandidate);setResumeCandidate(null);window.setTimeout(()=>{persistenceEnabled.current=true},0)}
@@ -166,15 +172,11 @@ export function AnalyzeFlow(){
   function verdict(id:string,ownerVerdict:'confirmed'|'ambiguous'|'rejected'){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>{if(x.id!==id)return x;if(ownerVerdict==='confirmed'){const {ownerFeedback:_ownerFeedback,...rest}=x;return {...rest,ownerVerdict}}return {...x,ownerVerdict}})})}
   function inferenceFeedback(id:string,ownerFeedback:string){if(!draft)return;setDraft({...draft,aiInferences:draft.aiInferences.map(x=>x.id===id?{...x,ownerFeedback}:x)})}
 
-  // 첫 질문은 오너 검수 결과를 쓰지 않고 프로필에 사실로 적힌 내용만으로 만들어진다
-  // (questions/next 의 첫 배치 처리). 그래서 검수 화면에 들어서는 순간 미리 만들어 둘 수 있고,
-  // 검수를 어떻게 고치든 이 질문은 낡아지지 않으므로 버려지는 호출도 생기지 않는다.
   const firstQuestionPrefetch=useRef<Promise<InterviewQuestion[]>|null>(null);
 
   useEffect(()=>{
     if(stage!=='review'||!draft||firstQuestionPrefetch.current)return;
     firstQuestionPrefetch.current=requestBatch(1,[],[]).catch(()=>[] as InterviewQuestion[]);
-  // requestBatch 는 렌더마다 새로 만들어지므로 의존성에 넣지 않는다. 검수 단계 진입에만 반응한다.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[stage,draft]);
 
@@ -189,7 +191,6 @@ export function AnalyzeFlow(){
   }
 
   async function startInterview(){setAnswers([]);setQuestion(null);setHistory([]);setActiveQuestionIndex(0);
-    // 검수 화면에 들어설 때 미리 만들어 둔 첫 질문을 그대로 쓴다(추가 대기 없음).
     const reusable=firstQuestionPrefetch.current;
     batchRequests.current.clear();temporalRepairRequests.current.clear();setBusy(true);setError('');try{const ready=reusable?await reusable:[];const first=ready.length?ready:await requestBatch(1,[],[]);const history=questionHistoryRef.current;const q=first.find(item=>item.order===1)||history.find(item=>item.order===1);if(q)applyQuestion(q,history,[]);else setError('첫 질문 묶음을 만들지 못했어요.')}catch(err){const e=err as Error&{status?:number;body?:unknown};handleApiError(e.status||500,e.body||{error:e.message})}finally{setBusy(false)}}
 
@@ -204,8 +205,8 @@ export function AnalyzeFlow(){
     if(question.order===20){const missing=firstMissingOrder(next);if(missing!==null){const repairedAnswers=next.filter(answer=>answer.order<missing);const repairedHistory=nextHistory.filter(item=>item.order<missing);setAnswers(repairedAnswers);setHistory(repairedHistory);await goToOrder(missing,repairedAnswers,repairedHistory);return}await finalize(next);return}await goToOrder(question.order+1,next,nextHistory);
   }
 
-  function previousQuestion(){if(busy||!question)return;const previous=questionHistory.filter(item=>item.order<question.order).at(-1);if(previous)applyQuestion(previous,questionHistory,answers)}
-  function forwardQuestion(){if(busy||!question)return;const next=questionHistory.find(item=>item.order===question.order+1);if(next)applyQuestion(next,questionHistory,answers)}
+  function previousQuestion(){if(busy||!question)return;const history=questionHistoryRef.current;const previous=history.filter(item=>item.order<question.order).at(-1);if(previous){applyQuestion(previous,history,answers);return}const persisted=persistedNavigationHistory().filter(item=>item.order<=question.order);const fallback=persisted.filter(item=>item.order<question.order).at(-1);if(fallback)applyQuestion(fallback,mergeQuestionHistory(history,persisted),answers)}
+  function forwardQuestion(){if(busy||!question)return;const history=questionHistoryRef.current;const next=history.find(item=>item.order===question.order+1);if(next)applyQuestion(next,history,answers)}
   async function finalize(finalAnswers=answers){if(!draft)return;const normalizedAnswers=uniqueAnswersByOrder(finalAnswers);if(normalizedAnswers.length!==20){setStage('interview');setError('답변 순서를 복구하는 중이에요. 마지막으로 완료하지 못한 질문부터 다시 이어주세요.');return}setStage('finalizing');setFinalizeProgress(4);setBusy(true);setError('');try{const body=await postJsonStream<{preview:unknown;shareCode:string;editToken:string}>('/api/characters/finalize',{draft,answers:normalizedAnswers},r=>setFinalizeProgress(Math.max(4,Math.min(99,Math.round(r*100)))));persistenceEnabled.current=false;localStorage.removeItem(ANALYSIS_SESSION_KEY);sessionStorage.removeItem(ANALYSIS_SESSION_KEY);localStorage.setItem(`chara_edit_${body.shareCode}`,body.editToken);setResult(body as never);setStage('done')}catch(err){const e=err as Error&{status?:number;body?:unknown};handleApiError(e.status||500,e.body||{error:e.message});setStage('interview')}finally{setBusy(false)}}
 
   function toggleMulti(option:string){const max=question?responseConfigOf(question).maxSelections:undefined;setMultiSelected(current=>{if(current.includes(option))return current.filter(item=>item!==option);if(max&&current.length>=max)return current;return [...current,option]})}
@@ -258,7 +259,6 @@ export function AnalyzeFlow(){
     if(type==='condition_followup'){
       const baseChoices=question.options;
       const shiftedChoices=config.options2?.length?config.options2:question.options;
-      // 보기를 고르면 직접 입력은 비우고, 직접 입력하면 보기 선택을 푼다(둘 중 하나만 답이 된다).
       const baseCustom=selected?'':custom;
       const shiftedCustom=shiftedChoices.includes(secondary)?'':secondary;
       return <><div className="field"><div className="label" id="base-situation-label">기본 상황</div><div className="options" role="group" aria-labelledby="base-situation-label">{baseChoices.map(o=><button disabled={busy} key={o} className={`option ${selected===o?'selected':''}`} onClick={()=>{setSelected(o);setCustom('')}}>{o}</button>)}<div className={`option ${baseCustom?'selected':''}`} style={{display:'block',cursor:'text'}}><strong style={{display:'block',marginBottom:8}}>직접 입력</strong><input disabled={busy} className="input" style={{width:'100%',padding:'9px 10px'}} placeholder="이 상황에서 할 행동을 직접 적어주세요." value={baseCustom} onChange={e=>{setCustom(e.target.value);setSelected('')}}/></div></div></div><div className="field"><div className="label" id="shifted-situation-label">{config.prompt2}</div><div className="options" role="group" aria-labelledby="shifted-situation-label">{shiftedChoices.map(o=><button disabled={busy} key={o} className={`option ${secondary===o?'selected':''}`} onClick={()=>setSecondary(o)}>{o}</button>)}<div className={`option ${shiftedCustom?'selected':''}`} style={{display:'block',cursor:'text'}}><strong style={{display:'block',marginBottom:8}}>직접 입력</strong><input disabled={busy} className="input" style={{width:'100%',padding:'9px 10px'}} placeholder="조건이 바뀌었을 때 할 행동을 직접 적어주세요." value={shiftedCustom} onChange={e=>setSecondary(e.target.value)}/></div></div></div></>;
