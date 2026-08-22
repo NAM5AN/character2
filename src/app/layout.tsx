@@ -40,6 +40,7 @@ import './default-neutral-theme.css';
 import './footer-layout.css';
 import './touch-hover-fix.css';
 import './report-accordion-mobile-stability.css';
+import './payment-teaser-mobile-copy.css';
 
 const siteUrl = 'https://character2-eight.vercel.app';
 const metadataTitle = 'CHA LAB ㅡ 캐릭터 정밀 해석';
